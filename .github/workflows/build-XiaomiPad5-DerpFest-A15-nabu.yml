@@ -69,8 +69,8 @@ env:
 
   KERNEL_PATCH: "false" 
 
-  KPM_ENABLE: true 
-  KPM_INLINE: "true"
+  KPM_ENABLE: false 
+  KPM_INLINE: "false"
   KPM_KPATCH_NEXT: "false" 
   KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" 
 
@@ -119,28 +119,7 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "🚀 重构补丁冲突"
-          python3 -c "
-          import re
-          path = 'include/linux/sched.h'
-          with open(path, 'r') as f: text = f.read()
-          
-          # 以 task_pid 函数为锚点切分文件
-          parts = text.split('static inline struct pid *task_pid')
-          if len(parts) > 1:
-              before = parts[0]
-              # 提取 task_struct 尾部的最后 500 个字符
-              head, tail = before[:-500], before[-500:]
-              
-              # 暴力清除尾部所有因为补丁冲突产生的独立 '};'
-              tail = re.sub(r'^\s*};\s*$', '', tail, flags=re.MULTILINE)
-              
-              # 重新组装，并在锚点前精准补回唯一的一个 '};'
-              text = head + tail + '\n};\n\nstatic inline struct pid *task_pid' + parts[1]
-              
-              with open(path, 'w') as f: f.write(text)
-              print('✅ sched.h 尾部大括号已完美修复！')
-          "
+          # Nothing
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
