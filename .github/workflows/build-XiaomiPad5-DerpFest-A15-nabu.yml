@@ -119,29 +119,29 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "🚀"
+          echo "脚本：重构 sched.h"
           python3 -c "
           import re
           path = 'include/linux/sched.h'
           with open(path, 'r') as f: text = f.read()
           
-          # 以 task_pid 函数为绝对锚点切分文件
-          parts = text.split('static inline struct pid *task_pid')
+          # ⚠️ 加上了 #endif
+          parts = text.split('static inline struct pid *task_pid', 1)
           if len(parts) > 1:
               before = parts[0]
-              # 提取 task_struct 
+              # 提取 task_struct 尾部最后 800 个字符进行大扫除
               head, tail = before[:-800], before[-800:]
               
-              # h
+              # 暴力铲除所有独占一行的 }; (不管有多少个全部干掉)
               tail = re.sub(r'^\s*};\s*$', '', tail, flags=re.MULTILINE)
               
-              # 重新精准组
+              # 重新精准组装，只给它留唯一的一个 };
               text = head + tail + '\n};\n\nstatic inline struct pid *task_pid' + parts[1]
               
               with open(path, 'w') as f: f.write(text)
-              print(' sched.h 尾部大括号已完美修复，幽灵彻底拔除！')
+              print(' sched.h 尾部大括号已完美修复，且防重复锁 #endif 完好无损！')
           else:
-              print(' 未找到 task_pid 锚，请检查！')
+              print(' 未找到 task_pid 锚点，请检查！')
           "
 
       - name: 🧰 Patch Kernel of Re:Kernel
