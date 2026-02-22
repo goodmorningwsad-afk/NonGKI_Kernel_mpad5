@@ -64,7 +64,7 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  HOOK_METHOD: "tracepoint" 
+  HOOK_METHOD: "syscall" 
   HOOK_OLDER: "false" 
 
   KERNEL_PATCH: "false" 
