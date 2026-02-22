@@ -119,7 +119,30 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          # Nothing
+          echo "🚀"
+          python3 -c "
+          import re
+          path = 'include/linux/sched.h'
+          with open(path, 'r') as f: text = f.read()
+          
+          # 以 task_pid 函数为绝对锚点切分文件
+          parts = text.split('static inline struct pid *task_pid')
+          if len(parts) > 1:
+              before = parts[0]
+              # 提取 task_struct 
+              head, tail = before[:-800], before[-800:]
+              
+              # h
+              tail = re.sub(r'^\s*};\s*$', '', tail, flags=re.MULTILINE)
+              
+              # 重新精准组
+              text = head + tail + '\n};\n\nstatic inline struct pid *task_pid' + parts[1]
+              
+              with open(path, 'w') as f: f.write(text)
+              print(' sched.h 尾部大括号已完美修复，幽灵彻底拔除！')
+          else:
+              print(' 未找到 task_pid 锚，请检查！')
+          "
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
