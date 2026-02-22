@@ -54,7 +54,7 @@ env:
 
   PACK_METHOD: "Anykernel3" 
 
-  KERNELSU_METHOD: "shell" 
+  KERNELSU_METHOD: "only" 
 
   PATCHES_SOURCE: "author/source" 
   PATCHES_BRANCH: "branch" 
@@ -64,7 +64,7 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  HOOK_METHOD: "syscall" 
+  HOOK_METHOD: "normal" 
   HOOK_OLDER: "false" 
 
   KERNEL_PATCH: "false" 
