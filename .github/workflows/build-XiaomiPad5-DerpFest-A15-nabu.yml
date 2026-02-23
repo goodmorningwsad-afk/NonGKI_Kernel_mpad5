@@ -119,6 +119,20 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
+          echo " ：内核"
+          
+          # 1. 斩断 Kconfig 的报错根源（删掉原作者忘记删的指向）
+          sed -i '/kernelsu/Id' drivers/Kconfig
+          sed -i '/KernelSU/Id' drivers/Kconfig
+          
+          # 2. 斩断 Makefile 的关联
+          sed -i '/kernelsu/Id' drivers/Makefile
+          sed -i '/KernelSU/Id' drivers/Makefile
+          
+          # 3. 擦除 sched.h 里残留的半残 SUSFS 代码块
+          sed -i '/CONFIG_KSU_SUSFS/,/#endif/d' include/linux/sched.h
+          
+          echo " 旧版 KSU/SUSFS 痕迹已彻底物理抹除！现在是纯正的官方内核！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
