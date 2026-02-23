@@ -119,31 +119,31 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 终局之战：屏蔽所有未使用警告，强制满血通关！"
+          echo "🚀 终极真理大一统版：融合所有历史修复 + statfs.c 补丁！"
           
-          # 1. 物理移除僵尸文件夹
+          # [1] 物理移除僵尸文件夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
           rm -rf KernelSU
           
-          # 2. 斩断 Makefile 和 Kconfig 的残留报错
+          # [2] 斩断 Makefile 和 Kconfig 的残留报错
           find . -type f -name "Kconfig" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Kconfig" -exec sed -i '/KernelSU/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/KernelSU/Id' {} +
           
-          # 3. 擦除 sched.h 里所有半残的 SUSFS 痕迹
+          # [3] 擦除 sched.h 里所有半残的 SUSFS 痕迹与引发大括号断层的宏
           sed -i '/CONFIG_KSU_SUSFS/,/#endif/d' include/linux/sched.h
           sed -i '/randomized_struct_fields_start/d' include/linux/sched.h
           sed -i '/randomized_struct_fields_end/d' include/linux/sched.h
           sed -i '1i #pragma once' include/linux/sched.h
           
-          # 4. 彻底斩断残余的 SUSFS 头文件引用
+          # [4] 彻底斩断残余的 SUSFS 头文件引用 (修复全局幽灵引用)
           find . -type f -name "*.c" -exec sed -i '/linux\/susfs_def\.h/d' {} +
           find . -type f -name "*.c" -exec sed -i '/linux\/susfs\.h/d' {} +
           find . -type f -name "*.h" -exec sed -i '/linux\/susfs_def\.h/d' {} +
           find . -type f -name "*.h" -exec sed -i '/linux\/susfs\.h/d' {} +
           
-          # 5.  靶向修复 fs/namei.c
+          # [5]  靶向修复 fs/namei.c (缺失的 err 变量声明)
           python3 << 'EOF'
           import os
           path = 'fs/namei.c'
@@ -157,7 +157,7 @@ jobs:
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          # 6.  靶向修复 fs/dcache.c
+          # [6]  靶向修复 fs/dcache.c (多余和缺失的 endif)
           python3 << 'EOF'
           import os
           path = 'fs/dcache.c'
@@ -178,14 +178,13 @@ jobs:
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          # 7.  极致靶向修复 fs/namespace.c (最高级护盾版)
+          # [7]  极致靶向修复 fs/namespace.c (最高级护盾+结构维持+伪造函数)
           python3 << 'EOF'
           import os
           path = 'fs/namespace.c'
           if os.path.exists(path):
               with open(path, 'r') as f: lines = f.readlines()
               
-              #  注入最高级免死金牌，强行无视所有 Unused 警告！
               pragmas = [
                   '#pragma clang diagnostic ignored "-Wreturn-type"\n',
                   '#pragma clang diagnostic ignored "-Wunused-function"\n',
@@ -196,8 +195,7 @@ jobs:
                   '#pragma GCC diagnostic ignored "-Wunused-variable"\n',
                   '#pragma GCC diagnostic ignored "-Wunused-label"\n'
               ]
-              for p in pragmas:
-                  lines.insert(0, p)
+              for p in pragmas: lines.insert(0, p)
               
               for i in range(len(lines)):
                   l = lines[i]
@@ -218,8 +216,21 @@ jobs:
               
               with open(path, 'w') as f: f.writelines(lines)
           EOF
+
+          # [8]  新增：靶向修复 fs/statfs.c (剔除第13行附近的悬空 endif)
+          python3 << 'EOF'
+          import os
+          path = 'fs/statfs.c'
+          if os.path.exists(path):
+              with open(path, 'r') as f: lines = f.readlines()
+              for i in range(min(30, len(lines))):
+                  if lines[i].strip() == '#endif':
+                      lines[i] = '// auto-wiped stray endif near line 13\n'
+                      break
+              with open(path, 'w') as f: f.writelines(lines)
+          EOF
           
-          echo " 所有警告护盾均已开启！fs 目录最后一道纸糊防线已被击破！"
+          echo " 全部整合完毕！所有防线已巩固，点火起飞！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
