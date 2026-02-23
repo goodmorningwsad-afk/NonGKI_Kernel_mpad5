@@ -119,7 +119,7 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "🚀 终极打地鼠：启动最强 AST 语法自愈引擎定点爆破 namespace.c！"
+          echo " 终极打地鼠：修正误伤，精准定位修复！"
           
           # 1. 物理移除僵尸文件夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
@@ -137,7 +137,7 @@ jobs:
           sed -i '/randomized_struct_fields_end/d' include/linux/sched.h
           sed -i '1i #pragma once' include/linux/sched.h
           
-          # 4. 🚑 究极 AST 语法自愈引擎 (核心杀招)
+          # 4.  究极 AST 语法自愈引擎 (修正误伤版)
           python3 -c "
           import os, re
           
@@ -145,38 +145,37 @@ jobs:
               if not os.path.exists(path): return
               with open(path, 'r') as f: lines = f.readlines()
               
-              # 阶段1：无情抹除 KSU、SUSFS 及其引发的残余变量和报错标签
               for i in range(len(lines)):
-                  if re.search(r'CONFIG_KSU|susfs|sus_mnt|DEFAULT_SUS|bypass_orig_flow|out_free:', lines[i], re.IGNORECASE):
+                  # 抹除通用 KSU/SUSFS 残留
+                  if re.search(r'CONFIG_KSU|susfs|sus_mnt|DEFAULT_SUS|bypass_orig_flow', lines[i], re.IGNORECASE):
                       lines[i] = '// auto-wiped remnant\n'
+                  # 【关键修正】只在 namespace.c 里删除导致报错的 out_free: 标签，绝不误伤 exec.c
+                  if 'namespace.c' in path and 'out_free:' in lines[i]:
+                      lines[i] = '// auto-wiped unused label\n'
               
-              # 阶段2：严格校验并平衡 #if 和 #endif，彻底解决宏指令报错
               stack = 0
               for i in range(len(lines)):
                   l = lines[i].strip()
-                  if l.startswith('#if'):  # 捕获 #if, #ifdef, #ifndef
+                  if l.startswith('#if'):
                       stack += 1
                   elif l.startswith('#endif'):
                       if stack > 0:
                           stack -= 1
                       else:
                           lines[i] = '// auto-removed stray #endif\n'
-                          print(f' 成功斩杀 {path} 第 {i+1} 行的溢出 #endif')
               
-              # 阶段3：补齐末尾缺失的 #endif，拯救 unterminated 报错
               while stack > 0:
-                  lines.append('\n#endif // auto-added to prevent EOF error\n')
-                  print(f' 成功为 {path} 补齐缺失的 #endif')
+                  lines.append('\n#endif\n')
                   stack -= 1
                   
               with open(path, 'w') as f: f.writelines(lines)
 
-          # 将重灾区 namespace.c 纳入自愈阵列！
+          # 执行自愈手术
           for p in ['fs/namespace.c', 'fs/dcache.c', 'fs/namei.c', 'fs/exec.c', 'fs/open.c', 'fs/read_write.c']:
               heal_c_file(p)
           "
           
-          # 5.  修复 fs/namei.c 变量未声明 BUG (保持有效)
+          # 5.  修复 fs/namei.c 变量未声明 BUG
           python3 -c "
           import os
           path = 'fs/namei.c'
@@ -190,7 +189,7 @@ jobs:
               with open(path, 'w') as f: f.writelines(lines)
           "
           
-          echo " namespace.c 残余被彻底清除！全图语法已达到数学级平衡，冲！"
+          echo " 修复完毕！文件系统(fs)大关已经打通！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
