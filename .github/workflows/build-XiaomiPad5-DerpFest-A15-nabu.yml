@@ -119,60 +119,26 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 启动终极源码级智能修复：死幽灵大括号！"
+          echo "🚀 终极真理：抹除作祟的预处理宏！"
           
-          # 1. 僵尸文件夹
+          # 1. 物理移除文件夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
           rm -rf KernelSU
           
-          # 2. 斩断残留报错
+          # 2. 斩断留报错
           find . -type f -name "Kconfig" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Kconfig" -exec sed -i '/KernelSU/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/KernelSU/Id' {} +
           
-          # 3. 运行 进行降维打击级的智能大括号修复
-          python3 -c "
-          import os
-          path = 'include/linux/sched.h'
-          with open(path, 'r') as f:
-              text = f.read()
-
-          start_idx = text.find('struct task_struct {')
-          end_idx = text.find('static inline struct pid *task_pid', start_idx)
-
-          if start_idx != -1 and end_idx != -1:
-              body = text[start_idx:end_idx]
-              count = 0
-              new_body = []
-              last_brace_idx = body.rfind('}')
-              
-              for i, char in enumerate(body):
-                  if char == '{':
-                      count += 1
-                      new_body.append(char)
-                  elif char == '}':
-                      if i == last_brace_idx:
-                          # 最后一个整个结构体
-                          count -= 1
-                          new_body.append(char)
-                      else:
-                          if count <= 1:
-                              # 发现任幽灵大括号，直接丢弃！
-                              print(f' 发现括号！已成击并丢弃提前闭合的 }}')
-                          else:
-                              count -= 1
-                              new_body.append(char)
-                  else:
-                      new_body.append(char)
-
-              text = text[:start_idx] + ''.join(new_body) + text[end_idx:]
-              with open(path, 'w') as f:
-                  f.write(text)
-              print(' sched.h 结构体大过数学级完美平衡校验！')
-          else:
-              print(' 未找到 task_pid 锚点！')
-          "
+          # 3. 擦S 痕迹
+          sed -i '/CONFIG_KSU_SUSFS/,/#endif/d' include/linux/sched.h
+          
+          # 4.  核心宏定义！
+          sed -i '/randomized_struct_fields_start/d' include/linux/sched.h
+          sed -i '/randomized_struct_fields_end/d' include/linux/sched.h
+          
+          echo " 宏定义清洗完毕核错！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
