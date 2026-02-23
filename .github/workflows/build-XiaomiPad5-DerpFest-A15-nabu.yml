@@ -119,7 +119,7 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 终极靶向治疗：全自动精准清创 namespace.c！"
+          echo " 终极靶向治疗：清理残余孤儿 goto！"
           
           # 1. 物理移除僵尸文件夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
@@ -178,7 +178,7 @@ jobs:
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          # 7.  极致靶向修复 fs/namespace.c (无视空格版)
+          # 7.  极致靶向修复 fs/namespace.c (解决孤儿 goto)
           python3 << 'EOF'
           import os
           path = 'fs/namespace.c'
@@ -186,28 +186,27 @@ jobs:
               with open(path, 'r') as f: lines = f.readlines()
               for i in range(len(lines)):
                   l = lines[i]
+                  
                   # 抹除残余变量和挂掉的调用
-                  if 'susfs_mnt_id_start' in l or 'susfs_mnt_group_start' in l:
-                      lines[i] = '// ' + l
-                  elif 'susfs_mnt_alloc_id' in l:
-                      lines[i] = '// ' + l
-                  elif 'bypass_orig_flow' in l:
-                      lines[i] = '// ' + l
-                  elif 'susfs_mnt_id_backup' in l:
-                      lines[i] = '// ' + l
-                  elif l.strip() == 'out_free:':
-                      lines[i] = '// ' + l
-                  # 抹除第44行附近多余的 #endif
-                  elif l.strip() == '#endif' and i < 60:
-                      lines[i] = '// stray endif removed\n'
-                  #  杀手锏：无视空格，只要包含这两个关键词直接注释！
-                  elif 'CONFIG_MANDATORY_FILE_LOCKING' in l and '#ifdef' in l:
-                      lines[i] = '// unterminated ifdef removed\n'
+                  if 'susfs_mnt_id_start' in l or 'susfs_mnt_group_start' in l: lines[i] = '// ' + l
+                  elif 'susfs_mnt_alloc_id' in l: lines[i] = '// ' + l
+                  elif 'bypass_orig_flow' in l: lines[i] = '// ' + l
+                  elif 'susfs_mnt_id_backup' in l: lines[i] = '// ' + l
+                  elif l.strip() == 'out_free:': lines[i] = '// ' + l
+                  
+                  # 抹除多余和未闭合的宏
+                  elif l.strip() == '#endif' and i < 60: lines[i] = '// stray endif removed\n'
+                  elif 'CONFIG_MANDATORY_FILE_LOCKING' in l and '#ifdef' in l: lines[i] = '// unterminated ifdef removed\n'
+                  
+                  #  新增：定点狙击 2300-2400 行之间找不到目标的孤儿 goto！
+                  elif 2300 < i < 2400:
+                      if 'goto out;' in l: lines[i] = '// ' + l
+                      elif 'goto out2;' in l: lines[i] = '// ' + l
                       
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          echo " namespace.c 残余被彻底清除！全军出击！"
+          echo " fs/ 目录下最后的顽疾已被抹除！冲！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
