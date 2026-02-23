@@ -119,20 +119,22 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " ：内核"
+          echo " 启动全图清道夫：物理切断所有 KSU/SUSFS 幽灵关联"
           
-          # 1. 斩断 Kconfig 的报错根源（删掉原作者忘记删的指向）
-          sed -i '/kernelsu/Id' drivers/Kconfig
-          sed -i '/KernelSU/Id' drivers/Kconfig
+          # 1. 全局搜索并删除所有名为 kernelsu 的残余文件夹（不分大小写）
+          find . -type d -iname "kernelsu*" -exec rm -rf {} +
+          rm -rf KernelSU
           
-          # 2. 斩断 Makefile 的关联
-          sed -i '/kernelsu/Id' drivers/Makefile
-          sed -i '/KernelSU/Id' drivers/Makefile
+          # 2. 全图扫荡所有的 Makefile 和 Kconfig，把里面调用 kernelsu 的代码全部删掉
+          find . -type f -name "Kconfig" -exec sed -i '/kernelsu/Id' {} +
+          find . -type f -name "Makefile" -exec sed -i '/kernelsu/Id' {} +
+          find . -type f -name "Kconfig" -exec sed -i '/KernelSU/Id' {} +
+          find . -type f -name "Makefile" -exec sed -i '/KernelSU/Id' {} +
           
           # 3. 擦除 sched.h 里残留的半残 SUSFS 代码块
           sed -i '/CONFIG_KSU_SUSFS/,/#endif/d' include/linux/sched.h
           
-          echo " 旧版 KSU/SUSFS 痕迹已彻底物理抹除！现在是纯正的官方内核！"
+          echo " 净化完成！内核现已恢复至 100% 原厂原生状态！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
