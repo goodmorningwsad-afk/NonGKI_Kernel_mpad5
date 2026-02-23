@@ -138,7 +138,7 @@ jobs:
           sed -i '/randomized_struct_fields_start/d' include/linux/sched.h
           sed -i '/randomized_struct_fields_end/d' include/linux/sched.h
           
-          # 5.  终极防御：强行注入 #pragma once，绝对禁止文件被读取两次！
+          # 5.  终极防御：强行注入 #pragma once
           sed -i '1i #pragma once' include/linux/sched.h
           
           # 6.  修复 fs/namei.c 变量未声明 BUG
@@ -155,7 +155,7 @@ jobs:
           with open(path, 'w') as f: f.writelines(lines)
           "
           
-          # 7.  新增：彻底斩断残余的 SUSFS 头文件引用 (修复 dcache.c 报错)
+          # 7.  彻底斩断残余的 SUSFS 头文件引用
           echo " 清理全图残留的 susfs 头文件引用..."
           find . -type f -name "*.c" -exec sed -i '/linux\/susfs_def\.h/d' {} +
           find . -type f -name "*.c" -exec sed -i '/linux\/susfs\.h/d' {} +
