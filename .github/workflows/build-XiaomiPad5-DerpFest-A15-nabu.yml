@@ -32,7 +32,7 @@ env:
   KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
 
-  KERNELSU_AUTO_GET : "true" 
+  KERNELSU_AUTO_GET : "fakse" 
   KERNELSU_AUTO_FORK : "sukisu" 
 
   SUSFS_ENABLE : false 
@@ -54,7 +54,7 @@ env:
 
   PACK_METHOD: "Anykernel3" 
 
-  KERNELSU_METHOD: "only" 
+  KERNELSU_METHOD: "none" 
 
   PATCHES_SOURCE: "author/source" 
   PATCHES_BRANCH: "branch" 
@@ -64,7 +64,7 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  HOOK_METHOD: "normal" 
+  HOOK_METHOD: "none" 
   HOOK_OLDER: "false" 
 
   KERNEL_PATCH: "false" 
@@ -110,8 +110,8 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-      - name: 🪝 Patch Kernel of SUSFS
-        uses: ./.github/workflows/patch-susfs
+      #- name: 🪝 Patch Kernel of SUSFS
+        #uses: ./.github/workflows/patch-susfs
 
       #- name: 🔗 Patch for no-kprobe
         #uses: ./.github/workflows/patch-no-kprobe
@@ -119,40 +119,15 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 启动强力清"
           
-          # 1. 偷梁换柱：用 SukiSU-Ultra 替换掉深层的旧版 KSU 文件夹
-          OLD_KSU=$(find fs drivers security -maxdepth 2 -type d -iname "kernelsu*" | head -n 1)
-          if [ -n "$OLD_KSU" ]; then
-              rm -rf "$OLD_KSU"
-              cp -r KernelSU "$OLD_KSU"
-              echo " 已替换底盘引擎: $OLD_KSU"
-          fi
-          
-          python3 -c "
-          import re
-          path = 'include/linux/sched.h'
-          with open(path, 'r') as f: text = f.read()
-          
-          # 刀法 1：彻底挖掉原作者留下的、会干扰编译的半残 SUSFS 补丁残骸
-          text = re.sub(r'#ifdef CONFIG_KSU_SUSFS.*?#endif', '', text, flags=re.DOTALL)
-          
-          # 刀法 2：植入极其标准的 ksu_security 变量，堵住 SukiSU 的嘴，让它别再瞎塞 };
-          if 'ksu_security' not in text:
-              ksu_struct = '#ifdef CONFIG_KSU\n\tvoid *ksu_security;\n#endif\n\n\trandomized_struct_fields_end'
-              text = text.replace('randomized_struct_fields_end', ksu_struct)
-              
-          with open(path, 'w') as f: f.write(text)
-          print(' sched.h死补丁就位！')
-          "
-      - name: 🧰 Patch Kernel of Re:Kernel
-        uses: ./.github/workflows/patch-rekernel
+      #- name: 🧰 Patch Kernel of Re:Kernel
+        #uses: ./.github/workflows/patch-rekernel
 
-      - name: 🔒 Patch Kernel of Baseband Guard
-        uses: ./.github/workflows/patch-baseband-guard
+       #- name: 🔒 Patch Kernel of Baseband Guard
+         #uses: ./.github/workflows/patch-baseband-guard
 
-      - name: 🔧 Patch Hide Stuff
-        uses: ./.github/workflows/patch-hide-stuff
+       #- name: 🔧 Patch Hide Stuff
+        # uses: ./.github/workflows/patch-hide-stuff
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
