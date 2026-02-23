@@ -119,26 +119,29 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "🚀 终极真理：抹除作祟的预处理宏！"
+          echo " 部署盾！"
           
-          # 1. 物理移除文件夹
+          # 1. 物夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
           rm -rf KernelSU
           
-          # 2. 斩断留报错
+          # 2. 斩断错
           find . -type f -name "Kconfig" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Kconfig" -exec sed -i '/KernelSU/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/KernelSU/Id' {} +
           
-          # 3. 擦S 痕迹
+          # 3. 擦SFS 痕迹
           sed -i '/CONFIG_KSU_SUSFS/,/#endif/d' include/linux/sched.h
           
-          # 4.  核心宏定义！
+          # 4. 直接！
           sed -i '/randomized_struct_fields_start/d' include/linux/sched.h
           sed -i '/randomized_struct_fields_end/d' include/linux/sched.h
           
-          echo " 宏定义清洗完毕核错！"
+          # 5. ，绝对禁读取次！
+          sed -i '1i #pragma once' include/linux/sched.h
+          
+          echo " 宏清洗这你了！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
