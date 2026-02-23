@@ -178,7 +178,7 @@ jobs:
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          # 7.  新增：极致靶向修复 fs/namespace.c (一发入魂)
+          # 7.  极致靶向修复 fs/namespace.c (无视空格版)
           python3 << 'EOF'
           import os
           path = 'fs/namespace.c'
@@ -200,14 +200,14 @@ jobs:
                   # 抹除第44行附近多余的 #endif
                   elif l.strip() == '#endif' and i < 60:
                       lines[i] = '// stray endif removed\n'
-                  # 抹除未闭合的 ifdef，把被吞噬的结尾代码释放出来！
-                  elif l.strip() == '#ifdef CONFIG_MANDATORY_FILE_LOCKING':
+                  #  杀手锏：无视空格，只要包含这两个关键词直接注释！
+                  elif 'CONFIG_MANDATORY_FILE_LOCKING' in l and '#ifdef' in l:
                       lines[i] = '// unterminated ifdef removed\n'
                       
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          echo " namespace.c 十连杀完成！全军出击！"
+          echo " namespace.c 残余被彻底清除！全军出击！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
