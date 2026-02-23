@@ -119,7 +119,7 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 终极真理：量！"
+          echo " 终极真理：抹除作祟的宏 + 部署防连击护盾 + 自动修补未声明变量！"
           
           # 1. 物理移除僵尸文件夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
@@ -138,28 +138,31 @@ jobs:
           sed -i '/randomized_struct_fields_start/d' include/linux/sched.h
           sed -i '/randomized_struct_fields_end/d' include/linux/sched.h
           
-          # 5. 行注入 #pragma once，绝对禁止文件被读取两次！
+          # 5.  终极防御：强行注入 #pragma once，绝对禁止文件被读取两次！
           sed -i '1i #pragma once' include/linux/sched.h
           
-          # 6.  新增：修复 fs/namei.c 变量未声明 BUG
+          # 6.  修复 fs/namei.c 变量未声明 BUG
           echo " 自动修补 fs/namei.c 中的烂摊子..."
           python3 -c "
           path = 'fs/namei.c'
           with open(path, 'r') as f: lines = f.readlines()
-          
-          # 从报错的 3150 行附近往上找，找到最近的一个 '{' (即函数开头)
           for i in range(3160, -1, -1):
               if lines[i].startswith('{'):
-                  # 为了安全，先检查一下前15行有没有声明过
                   if 'int error' not in ''.join(lines[i:i+15]):
-                      # 在函数大括面强行插入声明
                       lines.insert(i + 1, '\tint error = 0;\n')
-                      print(f'mei.c 第 {i+1} 行注入变量声明！')
+                      print(f' 已成功在 fs/namei.c 第 {i+1} 行注入变量声明！')
                   break
-                  
           with open(path, 'w') as f: f.writelines(lines)
           "
-          echo "任何语拦住你了！"
+          
+          # 7.  新增：彻底斩断残余的 SUSFS 头文件引用 (修复 dcache.c 报错)
+          echo " 清理全图残留的 susfs 头文件引用..."
+          find . -type f -name "*.c" -exec sed -i '/linux\/susfs_def\.h/d' {} +
+          find . -type f -name "*.c" -exec sed -i '/linux\/susfs\.h/d' {} +
+          find . -type f -name "*.h" -exec sed -i '/linux\/susfs_def\.h/d' {} +
+          find . -type f -name "*.h" -exec sed -i '/linux\/susfs\.h/d' {} +
+          
+          echo " 所有源码级修复彻底完成！这回真没有任何东西能拦住你了！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
