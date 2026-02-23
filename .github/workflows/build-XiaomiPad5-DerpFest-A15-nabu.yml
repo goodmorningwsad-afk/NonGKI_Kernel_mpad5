@@ -119,29 +119,47 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 部署盾！"
+          echo " 终极真理：量！"
           
-          # 1. 物夹
+          # 1. 物理移除僵尸文件夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
           rm -rf KernelSU
           
-          # 2. 斩断错
+          # 2. 斩断 Kconfig 和 Makefile 的残留报错
           find . -type f -name "Kconfig" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Kconfig" -exec sed -i '/KernelSU/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/KernelSU/Id' {} +
           
-          # 3. 擦SFS 痕迹
+          # 3. 擦除 sched.h 里所有半残的 SUSFS 痕迹
           sed -i '/CONFIG_KSU_SUSFS/,/#endif/d' include/linux/sched.h
           
-          # 4. 直接！
+          # 4. 直接抹除导致结构体被腰斩的元凶宏定义！
           sed -i '/randomized_struct_fields_start/d' include/linux/sched.h
           sed -i '/randomized_struct_fields_end/d' include/linux/sched.h
           
-          # 5. ，绝对禁读取次！
+          # 5. 行注入 #pragma once，绝对禁止文件被读取两次！
           sed -i '1i #pragma once' include/linux/sched.h
           
-          echo " 宏清洗这你了！"
+          # 6.  新增：修复 fs/namei.c 变量未声明 BUG
+          echo " 自动修补 fs/namei.c 中的烂摊子..."
+          python3 -c "
+          path = 'fs/namei.c'
+          with open(path, 'r') as f: lines = f.readlines()
+          
+          # 从报错的 3150 行附近往上找，找到最近的一个 '{' (即函数开头)
+          for i in range(3160, -1, -1):
+              if lines[i].startswith('{'):
+                  # 为了安全，先检查一下前15行有没有声明过
+                  if 'int error' not in ''.join(lines[i:i+15]):
+                      # 在函数大括面强行插入声明
+                      lines.insert(i + 1, '\tint error = 0;\n')
+                      print(f'mei.c 第 {i+1} 行注入变量声明！')
+                  break
+                  
+          with open(path, 'w') as f: f.writelines(lines)
+          "
+          echo "任何语拦住你了！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
