@@ -119,22 +119,26 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " SUSFS 幽灵关联"
+          echo "修补与源码级修复：净可编译内核！"
           
-          # 1. 全局u 的残余文件夹（不分大小写）
+          # 1. 夹和旧版核心
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
           rm -rf KernelSU
           
-          # 2. 全图扫荡用 kernelsu 的代码全部删掉
+          # 2akefile 的报错根源
           find . -type f -name "Kconfig" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Kconfig" -exec sed -i '/KernelSU/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/KernelSU/Id' {} +
           
-          # 3. 擦半残 SUSFS 代码块
+          # 3. 残 SUSFS 代码块
           sed -i '/CONFIG_KSU_SUSFS/,/#endif/d' include/linux/sched.h
           
-          echo " 净化完生状态！"
+          # 4. 宏定义！
+          sed -i '/randomized_struct_fields_start/d' include/linux/sched.h
+          sed -i '/randomized_struct_fields_end/d' include/linux/sched.h
+          
+          echo "的灭！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
