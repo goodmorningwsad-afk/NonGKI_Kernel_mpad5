@@ -119,7 +119,7 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "🚀 终极真理大一统版：融合所有历史修复 + statfs.c 护盾！"
+          echo " 终极真理大一统版：收复 fs/notify 最后的失地！"
           
           # [1] 物理移除僵尸文件夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
@@ -217,17 +217,14 @@ jobs:
               with open(path, 'w') as f: f.writelines(lines)
           EOF
 
-          # [8]  靶向修复 fs/statfs.c (剔除悬空 endif + 注入未使用函数免死金牌)
+          # [8] 靶向修复 fs/statfs.c
           python3 << 'EOF'
           import os
           path = 'fs/statfs.c'
           if os.path.exists(path):
               with open(path, 'r') as f: lines = f.readlines()
-              
-              # 注入免死金牌！强行无视未使用的函数警告
               lines.insert(0, '#pragma clang diagnostic ignored "-Wunused-function"\n')
               lines.insert(0, '#pragma GCC diagnostic ignored "-Wunused-function"\n')
-              
               for i in range(min(30, len(lines))):
                   if lines[i].strip() == '#endif':
                       lines[i] = '// auto-wiped stray endif near line 13\n'
@@ -235,7 +232,20 @@ jobs:
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          echo " 所有防线均已稳固，准备迎接属于你的绿灯通关！"
+          # [9]  新增：靶向修复 fs/notify/fdinfo.c (解放被吞噬的官方函数)
+          python3 << 'EOF'
+          import os
+          path = 'fs/notify/fdinfo.c'
+          if os.path.exists(path):
+              with open(path, 'r') as f: lines = f.readlines()
+              for i in range(min(30, len(lines))):
+                  if lines[i].strip() == '#endif':
+                      lines[i] = '// auto-wiped stray endif near line 16 to restore standard functions\n'
+                      break
+              with open(path, 'w') as f: f.writelines(lines)
+          EOF
+          
+          echo " fs 子系统全线告捷！准备看 AnyKernel3 的绿色成功日志吧！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
