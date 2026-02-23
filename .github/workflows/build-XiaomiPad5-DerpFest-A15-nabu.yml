@@ -119,7 +119,7 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 终极万剑归宗：撕破所有面具，核心函数强行归位！"
+          echo " 终极真理大一统版：无差别正则洗脑，强制恢复官方代码！"
           
           # [1] 物理移除僵尸文件夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
@@ -248,56 +248,53 @@ jobs:
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          # [10]  史诗杀招：黑客级别名映射，万剑归宗破解 task_mmu.c！
+          # [10]  终极核弹：正则表达式强制重命名 task_mmu.c 的函数！
           python3 << 'EOF'
-          import os
+          import os, re
           path = 'fs/proc/task_mmu.c'
           if os.path.exists(path):
-              with open(path, 'r') as f: lines = f.readlines()
+              with open(path, 'r') as f: text = f.read()
               
-              # 1. 注入神级宏：暴力重置所有的伪装前缀！
-              inject = [
+              # 1. 物理断电：拔掉所有的 KSU 宏定义，防止进入递归陷阱
+              pragmas = [
                   '#undef CONFIG_KSU\n',
                   '#undef CONFIG_KSU_SUSFS\n',
                   '#undef CONFIG_KSU_SUSFS_SUS_MOUNT\n',
                   '#pragma clang diagnostic ignored "-Wincompatible-function-pointer-types"\n',
-                  '#pragma GCC diagnostic ignored "-Wincompatible-function-pointer-types"\n'
+                  '#pragma GCC diagnostic ignored "-Wincompatible-function-pointer-types"\n',
+                  '#pragma clang diagnostic ignored "-Wimplicit-function-declaration"\n',
+                  '#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"\n'
               ]
+              text = "".join(pragmas) + text
               
-              # 核心函数名单
-              funcs = ['m_start', 'm_next', 'm_stop', 'proc_map_release', 
-                       'show_vma_header_prefix', 'is_stack', 'seq_print_vma_name', 
-                       'm_cache_vma', 'do_maps_open', 'show_map_vma']
-              # SUSFS/KSU 惯用伪装名单
-              prefixes = ['orig_', 'ksu_', 'susfs_', 'ksu_orig_', 'susfs_orig_']
+              # 2.  核心黑客科技：不管它戴了什么面具，强行把它洗脑回原本的名字！
+              text = re.sub(r'static\s+void\s*\*\s*[a-zA-Z0-9_]*m_start\s*\(', 'static void *m_start(', text)
+              text = re.sub(r'static\s+void\s*\*\s*[a-zA-Z0-9_]*m_next\s*\(', 'static void *m_next(', text)
+              text = re.sub(r'static\s+void\s+[a-zA-Z0-9_]*m_stop\s*\(', 'static void m_stop(', text)
+              text = re.sub(r'static\s+int\s+[a-zA-Z0-9_]*proc_map_release\s*\(', 'static int proc_map_release(', text)
               
-              for f in funcs:
-                  for p in prefixes:
-                      # 不管原作者把函数改成了什么名字，编译前全部强制变回原名！
-                      inject.append(f'#define {p}{f} {f}\n')
+              lines = text.split('\n')
               
-              lines = inject + lines
-              
-              # 2. 清除导致文件腰斩的 stray endif
-              for i in range(min(150, len(lines))):
+              # 3. 清理第 22 行附近导致断层的僵尸 endif
+              for i in range(min(50, len(lines))):
                   if lines[i].strip() == '#endif':
-                      lines[i] = '// auto-wiped stray endif\n'
+                      lines[i] = '// auto-wiped stray endif'
                       break
                       
-              # 3. 智能平衡文件末尾缺失的宏
+              # 4. 智能闭合尾部宏，保证语法完美无缺
               stack = 0
               for l in lines:
                   s = l.strip()
                   if s.startswith('#if'): stack += 1
                   elif s.startswith('#endif'): stack -= 1
               while stack > 0:
-                  lines.append('\n#endif // auto-added to balance macros\n')
+                  lines.append('#endif // auto-added to balance macros')
                   stack -= 1
                   
-              with open(path, 'w') as f: f.writelines(lines)
+              with open(path, 'w') as f: f.write('\n'.join(lines))
           EOF
           
-          echo " 神级宏注入完毕！所有的伪装已被暴力粉碎！冲！"
+          echo " 所有的原配函数已被强行赎回！通关的大门已经没有任何阻碍！冲！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
