@@ -119,7 +119,7 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "🚀 真理大结局：撕碎伪装，核心函数全员归位！"
+          echo " 史诗大结局：踹开宏大门，夺回被绑架的核心函数！"
           
           # [1] 物理移除僵尸文件夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
@@ -157,7 +157,7 @@ jobs:
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          # [6]  靶向修复 fs/dcache.c
+          # [6] 靶向修复 fs/dcache.c
           python3 << 'EOF'
           import os
           path = 'fs/dcache.c'
@@ -248,38 +248,41 @@ jobs:
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          # [10]  终极杀招：恢复 fs/proc/task_mmu.c (撕裂 orig_ 伪装)
+          # [10]  史诗杀招：强制激活并绝育 fs/proc/task_mmu.c
           python3 << 'EOF'
-          import os
+          import os, re
           path = 'fs/proc/task_mmu.c'
           if os.path.exists(path):
-              with open(path, 'r') as f: text = f.read()
+              with open(path, 'r') as f: text = f.readlines()
               
-              #  撕碎 KernelSU/SUSFS 加在核心函数上的 orig_ 伪装面具！
-              text = text.replace('orig_m_start', 'm_start')
-              text = text.replace('orig_m_next', 'm_next')
-              text = text.replace('orig_m_stop', 'm_stop')
-              text = text.replace('orig_show_map_vma', 'show_map_vma')
-              text = text.replace('orig_do_maps_open', 'do_maps_open')
-              text = text.replace('orig_proc_map_release', 'proc_map_release')
-              text = text.replace('orig_show_vma_header_prefix', 'show_vma_header_prefix')
-              text = text.replace('orig_is_stack', 'is_stack')
-              text = text.replace('orig_seq_print_vma_name', 'seq_print_vma_name')
-              text = text.replace('orig_m_cache_vma', 'm_cache_vma')
-              
-              lines = text.split('\n')
-              
-              #  注入隐式声明护盾，以防万一还有漏网之鱼
-              lines.insert(0, '#pragma clang diagnostic ignored "-Wimplicit-function-declaration"')
-              lines.insert(0, '#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"')
-              
-              # 定点爆破头部多余的 endif
-              for i in range(min(50, len(lines))):
-                  if lines[i].strip() == '#endif':
-                      lines[i] = '// auto-wiped stray endif near line 22'
+              # 1. 爆破头部多余 endif
+              for i in range(min(50, len(text))):
+                  if text[i].strip() == '#endif':
+                      text[i] = '// auto-wiped stray endif near line 22\n'
                       break
-                      
-              # 智能平衡尾部缺失的 endif
+              text = "".join(text)
+              
+              # 2. 注入全局防报错护盾
+              text = '#pragma clang diagnostic ignored "-Wimplicit-function-declaration"\n' + text
+              text = '#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"\n' + text
+              
+              # 3.  核心骗术：强制打开所有 KSU 宏，释放被绑架的核心函数！
+              text = text.replace('#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT', '#if 1')
+              text = text.replace('#ifdef CONFIG_KSU_SUSFS', '#if 1')
+              text = text.replace('#ifdef CONFIG_KSU', '#if 1')
+              text = text.replace('#ifndef CONFIG_KSU_SUSFS_SUS_MOUNT', '#if 0')
+              text = text.replace('#ifndef CONFIG_KSU_SUSFS', '#if 0')
+              text = text.replace('#ifndef CONFIG_KSU', '#if 0')
+              text = text.replace('defined(CONFIG_KSU_SUSFS_SUS_MOUNT)', '1')
+              text = text.replace('defined(CONFIG_KSU_SUSFS)', '1')
+              text = text.replace('defined(CONFIG_KSU)', '1')
+              
+              # 4.  物理绝育：把所有的 SUSFS 和 KSU 挂钩调用替换成 0，彻底切断联系！
+              text = re.sub(r'ksu_handle_task_mmu\s*\([^)]*\)', '0', text)
+              text = re.sub(r'susfs_is_mnt_dev_hide\s*\([^)]*\)', '0', text)
+              
+              # 5. 平衡结尾宏
+              lines = text.split('\n')
               stack = 0
               for l in lines:
                   s = l.strip()
@@ -292,7 +295,7 @@ jobs:
               with open(path, 'w') as f: f.write('\n'.join(lines))
           EOF
           
-          echo " 所有的伪装均已撕碎！通往 AnyKernel3 打包的最终大门已经敞开！"
+          echo " 所有的伪装与绑架均已被破解！最后一道门槛已被粉碎，冲锋！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
