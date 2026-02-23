@@ -119,7 +119,7 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 终极靶向治疗：只修 dcache.c 和 namei.c，绝不乱杀！"
+          echo " 终极靶向治疗：全自动精准清创 namespace.c！"
           
           # 1. 物理移除僵尸文件夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
@@ -137,13 +137,13 @@ jobs:
           sed -i '/randomized_struct_fields_end/d' include/linux/sched.h
           sed -i '1i #pragma once' include/linux/sched.h
           
-          # 4. 彻底斩断残余的 SUSFS 头文件引用 (解决之前 dcache.c 找不到头文件)
+          # 4. 彻底斩断残余的 SUSFS 头文件引用
           find . -type f -name "*.c" -exec sed -i '/linux\/susfs_def\.h/d' {} +
           find . -type f -name "*.c" -exec sed -i '/linux\/susfs\.h/d' {} +
           find . -type f -name "*.h" -exec sed -i '/linux\/susfs_def\.h/d' {} +
           find . -type f -name "*.h" -exec sed -i '/linux\/susfs\.h/d' {} +
           
-          # 5.  靶向修复 fs/namei.c 变量未声明 BUG
+          # 5.  靶向修复 fs/namei.c
           python3 << 'EOF'
           import os
           path = 'fs/namei.c'
@@ -157,35 +157,57 @@ jobs:
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          # 6.  纳米级靶向修复 fs/dcache.c
+          # 6.  靶向修复 fs/dcache.c
           python3 << 'EOF'
           import os
           path = 'fs/dcache.c'
           if os.path.exists(path):
               with open(path, 'r') as f: lines = f.readlines()
-              
-              # 定点抹除第 42 行附近的无头 #endif
               for i in range(min(60, len(lines))):
                   if lines[i].strip() == '#endif':
                       lines[i] = '// auto-wiped stray endif near line 42\n'
-                      break  # 杀掉第一个多余的就立刻停手！
-              
-              # 智能统计文件的宏指令，只在末尾缺啥补啥，不多删一行代码
+                      break
               stack = 0
               for l in lines:
                   s = l.strip()
                   if s.startswith('#if'): stack += 1
                   elif s.startswith('#endif'): stack -= 1
-              
-              # 补齐尾部缺失的 #endif
               while stack > 0:
-                  lines.append('\n#endif // auto-added for unterminated ifdef\n')
+                  lines.append('\n#endif // auto-added\n')
                   stack -= 1
-                  
               with open(path, 'w') as f: f.writelines(lines)
           EOF
           
-          echo " dcache.c 靶向手术完成！不碰其他文件，稳步推进！"
+          # 7.  新增：极致靶向修复 fs/namespace.c (一发入魂)
+          python3 << 'EOF'
+          import os
+          path = 'fs/namespace.c'
+          if os.path.exists(path):
+              with open(path, 'r') as f: lines = f.readlines()
+              for i in range(len(lines)):
+                  l = lines[i]
+                  # 抹除残余变量和挂掉的调用
+                  if 'susfs_mnt_id_start' in l or 'susfs_mnt_group_start' in l:
+                      lines[i] = '// ' + l
+                  elif 'susfs_mnt_alloc_id' in l:
+                      lines[i] = '// ' + l
+                  elif 'bypass_orig_flow' in l:
+                      lines[i] = '// ' + l
+                  elif 'susfs_mnt_id_backup' in l:
+                      lines[i] = '// ' + l
+                  elif l.strip() == 'out_free:':
+                      lines[i] = '// ' + l
+                  # 抹除第44行附近多余的 #endif
+                  elif l.strip() == '#endif' and i < 60:
+                      lines[i] = '// stray endif removed\n'
+                  # 抹除未闭合的 ifdef，把被吞噬的结尾代码释放出来！
+                  elif l.strip() == '#ifdef CONFIG_MANDATORY_FILE_LOCKING':
+                      lines[i] = '// unterminated ifdef removed\n'
+                      
+              with open(path, 'w') as f: f.writelines(lines)
+          EOF
+          
+          echo " namespace.c 十连杀完成！全军出击！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
