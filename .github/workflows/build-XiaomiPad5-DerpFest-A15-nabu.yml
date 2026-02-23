@@ -119,7 +119,7 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 终极微调：收起友军误伤的刀，精准狙击 namespace.c！"
+          echo " 终极真理：修复引号冲突，精准狙击 namespace.c！"
           
           # 1. 物理移除僵尸文件夹
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
@@ -137,14 +137,14 @@ jobs:
           sed -i '/randomized_struct_fields_end/d' include/linux/sched.h
           sed -i '1i #pragma once' include/linux/sched.h
           
-          # 4.  彻底斩断残余的 SUSFS 头文件引用 (修复 dcache.c)
+          # 4. 彻底斩断残余的 SUSFS 头文件引用 (修复 dcache.c)
           find . -type f -name "*.c" -exec sed -i '/linux\/susfs_def\.h/d' {} +
           find . -type f -name "*.c" -exec sed -i '/linux\/susfs\.h/d' {} +
           find . -type f -name "*.h" -exec sed -i '/linux\/susfs_def\.h/d' {} +
           find . -type f -name "*.h" -exec sed -i '/linux\/susfs\.h/d' {} +
           
-          # 5.  修复 fs/namei.c 变量未声明 BUG
-          python3 -c "
+          # 5.  使用 EOF 运行 Python：修复 fs/namei.c 变量未声明 BUG
+          python3 << 'EOF'
           import os
           path = 'fs/namei.c'
           if os.path.exists(path):
@@ -155,10 +155,10 @@ jobs:
                           lines.insert(i + 1, '\tint error = 0;\n')
                       break
               with open(path, 'w') as f: f.writelines(lines)
-          "
+          EOF
           
-          # 6.  纳米级精准修复：只针对 namespace.c 进行定点打地鼠！
-          python3 -c "
+          # 6.  使用 EOF 运行 Python：纳米级精准修复 namespace.c
+          python3 << 'EOF'
           import os
           path = 'fs/namespace.c'
           if os.path.exists(path):
@@ -173,14 +173,14 @@ jobs:
                   elif 'susfs_mnt_id_backup' in l: lines[i] = '// auto-wiped\n'
                   elif 'out_free:' in l: lines[i] = '// auto-wiped\n'
                   
-                  # 抹除第44行附近导致 "#endif without #if" 的无头骑士 #endif
+                  # 抹除第44行附近导致无头骑士 endif 的残留
                   elif l.strip() == '#endif' and i < 50: lines[i] = '// auto-wiped stray endif\n'
                   
-                  # 抹除第1701行导致 "unterminated conditional" 的未闭合 #ifdef
+                  # 抹除第1701行导致未闭合 ifdef 的残留
                   elif 'CONFIG_MANDATORY_FILE_LOCKING' in l and '#ifdef' in l: lines[i] = '// auto-wiped unterminated ifdef\n'
               
               with open(path, 'w') as f: f.writelines(lines)
-          "
+          EOF
           
           echo " 修复完毕！撤销了对 exec.c 的误伤，namespace.c 精准排雷完成！"
           
