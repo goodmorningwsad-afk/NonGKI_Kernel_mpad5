@@ -107,8 +107,8 @@ jobs:
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
 
-      #- name: ⚙️ Get neccssary tools
-      #  uses: ./.github/workflows/build-ready
+      - name: ⚙️ Get neccssary tools
+        uses: ./.github/workflows/build-ready
 
       #- name: 🪝 Patch Kernel of SUSFS
         #uses: ./.github/workflows/patch-susfs
@@ -119,22 +119,22 @@ jobs:
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 启动全图清道夫：物理切断所有 KSU/SUSFS 幽灵关联"
+          echo " SUSFS 幽灵关联"
           
-          # 1. 全局搜索并删除所有名为 kernelsu 的残余文件夹（不分大小写）
+          # 1. 全局u 的残余文件夹（不分大小写）
           find . -type d -iname "kernelsu*" -exec rm -rf {} +
           rm -rf KernelSU
           
-          # 2. 全图扫荡所有的 Makefile 和 Kconfig，把里面调用 kernelsu 的代码全部删掉
+          # 2. 全图扫荡用 kernelsu 的代码全部删掉
           find . -type f -name "Kconfig" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/kernelsu/Id' {} +
           find . -type f -name "Kconfig" -exec sed -i '/KernelSU/Id' {} +
           find . -type f -name "Makefile" -exec sed -i '/KernelSU/Id' {} +
           
-          # 3. 擦除 sched.h 里残留的半残 SUSFS 代码块
+          # 3. 擦半残 SUSFS 代码块
           sed -i '/CONFIG_KSU_SUSFS/,/#endif/d' include/linux/sched.h
           
-          echo " 净化完成！内核现已恢复至 100% 原厂原生状态！"
+          echo " 净化完生状态！"
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
