@@ -158,6 +158,15 @@ jobs:
           # 建立软链接，防止某些老脚本只认 "python"
           sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
 
+      - name: 💊 Add Swap Space
+        run: |
+          sudo fallocate -l 16G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          echo "Swap 虚拟内存已拉满，当前内存状态："
+          free -h
+
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
