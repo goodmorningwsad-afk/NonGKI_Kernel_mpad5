@@ -64,7 +64,7 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  HOOK_METHOD: "none" 
+  HOOK_METHOD: "normal" 
   HOOK_OLDER: "false" 
 
   KERNEL_PATCH: "false" 
@@ -112,32 +112,40 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-      #- name: 🪝 Patch Kernel of SUSFS
-        #uses: ./.github/workflows/patch-susfs
-
-      #- name: 🔗 Patch for no-kprobe
-       # uses: ./.github/workflows/patch-no-kprobe
-
-      - name: 🛠️ 修复：注入 SukiSU
+      - name: ⏪ 回滚 KSU 与 SUSFS 提交
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
-          echo "1. 物理铲除旧版 KSU 引擎，防止软链接冲突..."
-          rm -rf drivers/kernelsu
+          echo " 1. 拉取完整历史记录..."
+          git fetch --unshallow || echo "已经是完整克隆，继续..."
           
-          echo "2. 植入 SukiSU-Ultra 核心..."
-          ln -sf "../KernelSU/kernel" "drivers/kernelsu"
+          echo " 2. 配置 Git 身份信息"
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
           
-          echo "3. 修复编译入口..."
-          grep -q "kernelsu" drivers/Makefile || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> drivers/Makefile
-          grep -q "source \"drivers/kernelsu/Kconfig\"" drivers/Kconfig || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" drivers/Kconfig
+          echo " 2.5 关键修复：把流水线刚才改动的文件先保存提交，给 Git 一个干净的工作区！"
+          git add -A
+          git commit -m "chore: save build-ready modifications" || echo "没有需要保存的更改"
           
-          echo "4. 激活底层挂钩配置..."
-          echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_MANUAL_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo " 3. 开始按时间倒序(由新到旧)逐个执行 git revert..."
+          COMMITS="08af382 1171f23 c44e1ab 3912338 5cb6bd8d9d71 4da2bb2 be70102 73789c6 bc69b25 fe2ed1a"
           
-          echo " SukiSU！"
+          for commit in $COMMITS; do
+            echo " 正在尝试回滚提交: $commit"
+            git revert --no-edit "$commit" || {
+              echo " 警告：回滚 $commit 时发生合并冲突！"
+              git status
+              echo "由于自动流水线无法手动解决冲突，编译将在此终止。"
+              exit 1
+            }
+            echo " 成功回滚: $commit"
+          done
+
+      #- name: 🪝 Patch Kernel of SUSFS
+        #uses: ./.github/workflows/patch-susfs
+
+      - name: 🔗 Patch for no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe
 
       - name: 🐍 Install Python 2
         run: |
