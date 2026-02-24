@@ -172,16 +172,7 @@ jobs:
           echo "# CONFIG_LTO_CLANG is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
           echo " LTO 优化已彻底关闭管够了！"
-
-      - name: 🚀 Build Process
-        uses: ./.github/workflows/build-process
-
-      - name: 🔩 Pack Process
-        uses: ./.github/workflows/pack-process
-
-      - name: ✏️ Upload Artifacts
-        uses: ./.github/workflows/upload-files
-          
+  
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
 
@@ -191,5 +182,12 @@ jobs:
        #- name: 🔧 Patch Hide Stuff
         # uses: ./.github/workflows/patch-hide-stuff
 
+      - name: 🚀 Build Process
+        uses: ./.github/workflows/build-process
+
+      - name: 🔩 Pack Process
+        uses: ./.github/workflows/pack-process
+
       - name: ✏️ Upload Artifacts
         uses: ./.github/workflows/upload-files
+
