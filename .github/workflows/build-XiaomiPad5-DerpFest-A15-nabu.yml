@@ -191,11 +191,5 @@ jobs:
        #- name: 🔧 Patch Hide Stuff
         # uses: ./.github/workflows/patch-hide-stuff
 
-      - name: 🚀 Build Process
-        uses: ./.github/workflows/build-process
-
-      - name: 🔩 Pack Process
-        uses: ./.github/workflows/pack-process
-
       - name: ✏️ Upload Artifacts
         uses: ./.github/workflows/upload-files
