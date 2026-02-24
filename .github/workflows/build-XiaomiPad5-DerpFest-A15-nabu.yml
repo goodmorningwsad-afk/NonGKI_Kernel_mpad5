@@ -103,6 +103,8 @@ jobs:
     steps:
       - name: ⏰ Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
@@ -116,189 +118,55 @@ jobs:
       #- name: 🔗 Patch for no-kprobe
         #uses: ./.github/workflows/patch-no-kprobe
 
-      - name: 🪛 Extra Kernel Options
+      - name:  回滚 KSU 与 SUSFS 提交
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 黎明之战：强行激活隐藏分支，物理绝育挂钩代码！"
           
-          # [1] 物理移除僵尸文件夹
-          find . -type d -iname "kernelsu*" -exec rm -rf {} +
-          rm -rf KernelSU
+          echo " 1. 拉取完整历史记录 (防止 build-ready 是浅克隆导致找不到旧提交)"
+          git fetch --unshallow || echo "已经是完整克隆，继续..."
           
-          # [2] 斩断 Makefile 和 Kconfig 的残留报错
-          find . -type f -name "Kconfig" -exec sed -i '/kernelsu/Id' {} +
-          find . -type f -name "Makefile" -exec sed -i '/kernelsu/Id' {} +
-          find . -type f -name "Kconfig" -exec sed -i '/KernelSU/Id' {} +
-          find . -type f -name "Makefile" -exec sed -i '/KernelSU/Id' {} +
+          echo " 2. 配置 Git 身份信息"
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
           
-          # [3] 擦除 sched.h 里的破坏性宏
-          sed -i '/CONFIG_KSU_SUSFS/,/#endif/d' include/linux/sched.h
-          sed -i '/randomized_struct_fields_start/d' include/linux/sched.h
-          sed -i '/randomized_struct_fields_end/d' include/linux/sched.h
-          sed -i '1i #pragma once' include/linux/sched.h
+          echo " 3. 开始按时间倒序(由新到旧)逐个执行 git revert..."
+          COMMITS=(
+            "08af382" # 已禁用 ksu 和 susfs
+            "fe2ed1a" # fs: 实现 SUSFS v1.5.5
+            "bc69b25" # 驱动程序: 添加 KSU 配置路径
+            "73789c6" # 驱动程序: 导入支持 SUSFS v1.5.5 的 KernelSU Next 1.0.4
+            "be70102" # 驱动程序: 为 KernelSu 设置正确的版本
+            "4da2bb2" # 向后移植: KernelSu 的 path_umount
+            "5cb6bd8" # selinux: 允许在 nosuid 下执行 init exec ksud
+            "3912338" # devpts: KernelSU: 修复：在终端执行 pm 失败
+            "c44e1ab" # 驱动程序: 添加 KernelSU 钩子
+          )
           
-          # [4] 彻底斩断残余的 SUSFS 头文件引用
-          find . -type f -name "*.c" -exec sed -i '/linux\/susfs_def\.h/d' {} +
-          find . -type f -name "*.c" -exec sed -i '/linux\/susfs\.h/d' {} +
-          find . -type f -name "*.h" -exec sed -i '/linux\/susfs_def\.h/d' {} +
-          find . -type f -name "*.h" -exec sed -i '/linux\/susfs\.h/d' {} +
+          for commit in "${COMMITS[@]}"; do
+            echo " 正在尝试回滚提交: $commit"
+            git revert --no-edit "$commit" || {
+              echo " 警告：回滚 $commit 时发生合并冲突！"
+              echo "Git 状态如下："
+              git status
+              echo "由于自动流水线无法手动解决冲突，编译将在此终止。"
+              exit 1
+            }
+            echo " 成功回滚: $commit"
+          done
           
-          # [5]  靶向修复 fs/namei.c
-          python3 << 'EOF'
-          import os
-          path = 'fs/namei.c'
-          if os.path.exists(path):
-              with open(path, 'r') as f: lines = f.readlines()
-              for i in range(3160, -1, -1):
-                  if lines[i].startswith('{'):
-                      if 'int error' not in ''.join(lines[i:i+15]):
-                          lines.insert(i + 1, '\tint error = 0;\n')
-                      break
-              with open(path, 'w') as f: f.writelines(lines)
-          EOF
-          
-          # [6]  靶向修复 fs/dcache.c
-          python3 << 'EOF'
-          import os
-          path = 'fs/dcache.c'
-          if os.path.exists(path):
-              with open(path, 'r') as f: lines = f.readlines()
-              for i in range(min(60, len(lines))):
-                  if lines[i].strip() == '#endif':
-                      lines[i] = '// auto-wiped stray endif near line 42\n'
-                      break
-              stack = 0
-              for l in lines:
-                  s = l.strip()
-                  if s.startswith('#if'): stack += 1
-                  elif s.startswith('#endif'): stack -= 1
-              while stack > 0:
-                  lines.append('\n#endif // auto-added\n')
-                  stack -= 1
-              with open(path, 'w') as f: f.writelines(lines)
-          EOF
-          
-          # [7]  极致靶向修复 fs/namespace.c
-          python3 << 'EOF'
-          import os
-          path = 'fs/namespace.c'
-          if os.path.exists(path):
-              with open(path, 'r') as f: lines = f.readlines()
-              pragmas = [
-                  '#pragma clang diagnostic ignored "-Wreturn-type"\n',
-                  '#pragma clang diagnostic ignored "-Wunused-function"\n',
-                  '#pragma clang diagnostic ignored "-Wunused-variable"\n',
-                  '#pragma clang diagnostic ignored "-Wunused-label"\n',
-                  '#pragma GCC diagnostic ignored "-Wreturn-type"\n',
-                  '#pragma GCC diagnostic ignored "-Wunused-function"\n',
-                  '#pragma GCC diagnostic ignored "-Wunused-variable"\n',
-                  '#pragma GCC diagnostic ignored "-Wunused-label"\n'
-              ]
-              for p in pragmas: lines.insert(0, p)
-              for i in range(len(lines)):
-                  l = lines[i]
-                  if 'susfs_mnt_id_start' in l or 'susfs_mnt_group_start' in l: lines[i] = '// ' + l
-                  elif 'susfs_mnt_alloc_id' in l: lines[i] = 'err = 0; // ' + l
-                  elif 'bypass_orig_flow' in l: lines[i] = '; // ' + l
-                  elif 'susfs_mnt_id_backup' in l: lines[i] = '; // ' + l
-                  elif l.strip() == 'out_free:': lines[i] = '// ' + l
-                  elif l.strip() == '#endif' and i < 70: lines[i] = '// stray endif removed\n'
-                  elif 'CONFIG_MANDATORY_FILE_LOCKING' in l and '#ifdef' in l: lines[i] = '// unterminated ifdef removed\n'
-                  if 2300 < i < 2400:
-                      if 'goto out;' in l: lines[i] = l.replace('goto out;', 'return err;')
-                      elif 'goto out2;' in l: lines[i] = l.replace('goto out2;', 'return err;')
-              lines.append('\n/* Auto-injected dummy function */\n')
-              lines.append('static void shrink_submounts(struct mount *mnt) { }\n')
-              with open(path, 'w') as f: f.writelines(lines)
-          EOF
+          echo " 所有 KSU/SUSFS 相关提交回滚完毕，代码已恢复官方纯净状态！"
+      # ==========================================
+      #  回滚结束，下面接着走你的正常编译流程
+      # ==========================================
 
-          # [8]  靶向修复 fs/statfs.c
-          python3 << 'EOF'
-          import os
-          path = 'fs/statfs.c'
-          if os.path.exists(path):
-              with open(path, 'r') as f: lines = f.readlines()
-              lines.insert(0, '#pragma clang diagnostic ignored "-Wunused-function"\n')
-              lines.insert(0, '#pragma GCC diagnostic ignored "-Wunused-function"\n')
-              for i in range(min(30, len(lines))):
-                  if lines[i].strip() == '#endif':
-                      lines[i] = '// auto-wiped stray endif near line 13\n'
-                      break
-              with open(path, 'w') as f: f.writelines(lines)
-          EOF
-          
-          # [9]  靶向修复 fs/notify/fdinfo.c
-          python3 << 'EOF'
-          import os
-          path = 'fs/notify/fdinfo.c'
-          if os.path.exists(path):
-              with open(path, 'r') as f: lines = f.readlines()
-              pragmas = [
-                  '#pragma clang diagnostic ignored "-Wunused-function"\n',
-                  '#pragma clang diagnostic ignored "-Wunused-variable"\n',
-                  '#pragma GCC diagnostic ignored "-Wunused-function"\n',
-                  '#pragma GCC diagnostic ignored "-Wunused-variable"\n'
-              ]
-              for p in pragmas: lines.insert(0, p)
-              for i in range(len(lines)):
-                  l = lines[i]
-                  if l.strip() == '#endif' and i < 30: lines[i] = '// stray endif removed\n'
-                  elif 'show_mark_fhandle(' in l and not 'void' in l: lines[i] = '// ' + l
-                  elif 'show_fdinfo(' in l and not 'void' in l: lines[i] = '// ' + l
-              with open(path, 'w') as f: f.writelines(lines)
-          EOF
-          
-          # [10]  终极杀招：欺骗编译器强行放出被隐藏的函数，并将挂钩物理绝育！
-          python3 << 'EOF'
-          import os
-          path = 'fs/proc/task_mmu.c'
-          if os.path.exists(path):
-              with open(path, 'r') as f: lines = f.readlines()
-              
-              # 1. 强行激活所有 KSU 宏，并赋予挂钩函数“空包弹”（变成0）
-              inject = [
-                  '#ifndef CONFIG_KSU_SUSFS\n',
-                  '#define CONFIG_KSU_SUSFS 1\n',
-                  '#endif\n',
-                  '#ifndef CONFIG_KSU_SUSFS_SUS_MOUNT\n',
-                  '#define CONFIG_KSU_SUSFS_SUS_MOUNT 1\n',
-                  '#endif\n',
-                  '#ifndef CONFIG_KSU\n',
-                  '#define CONFIG_KSU 1\n',
-                  '#endif\n',
-                  
-                  # 物理绝育：把 SUSFS 的拦截器变成废物
-                  '#define ksu_handle_task_mmu(...) (0)\n',
-                  '#define susfs_is_mnt_dev_hide(...) (0)\n',
-                  '#define susfs_is_mnt_hide(...) (0)\n',
-                  '#define susfs_is_sus_mnt(...) (0)\n',
-                  
-                  '#pragma clang diagnostic ignored "-Wimplicit-function-declaration"\n',
-                  '#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"\n'
-              ]
-              
-              # 2. 清除导致文件腰斩的孤儿 endif
-              for i in range(min(50, len(lines))):
-                  if lines[i].strip() == '#endif':
-                      lines[i] = '// auto-wiped stray endif\n'
-                      break
-                      
-              lines = inject + lines
-              
-              # 3. 智能平衡尾部宏，保证顺利通关
-              stack = 0
-              for l in lines:
-                  s = l.strip()
-                  if s.startswith('#if'): stack += 1
-                  elif s.startswith('#endif'): stack -= 1
-              while stack > 0:
-                  lines.append('\n#endif // auto-added to balance macros\n')
-                  stack -= 1
-                  
-              with open(path, 'w') as f: f.writelines(lines)
-          EOF
-          
-          echo " 绝育手术完成！被删的原生代码无需重写，狸猫换太子直接过关！冲！"
+      - name: 🚀 Build Process
+        uses: ./.github/workflows/build-process
+
+      - name: 🔩 Pack Process
+        uses: ./.github/workflows/pack-process
+
+      - name: ✏️ Upload Artifacts
+        uses: ./.github/workflows/upload-files
           
       #- name: 🧰 Patch Kernel of Re:Kernel
         #uses: ./.github/workflows/patch-rekernel
