@@ -122,16 +122,59 @@ jobs:
           sudo apt-get install -y python2 || apt-get install -y python2
           sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
 
-      # 🔥 推上电闸！
-      - name: 🔌 接通 SukiSU 总电闸 (Tracepoint 专用)
+      #  步骤 A：推上 SukiSU-Ultra 专属电闸！
+      - name: 🔌 接通 SukiSU Tracepoint 专属电闸
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo " 成功推上总电闸，准备注入 Tracepoint 挂钩！"
-     
-      - name: 🔗 Patch for no-kprobe
-        uses: ./.github/workflows/patch-no-kprobe
+          # 拔掉旧的 MANUAL，换上闪亮的 TRACEPOINT！
+          echo "CONFIG_KSU_TRACEPOINT_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo " 成功推上总电闸，准备物理注入代码！"
+
+      #  步骤 B：抛弃脚本，用 Python 实施精确代码注入！
+      - name: 🪛 注入 SukiSU 官方 Tracepoint 补丁
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          python3 -c '
+          import os
+
+          # 1. fs/exec.c
+          f = "fs/exec.c"
+          with open(f, "r") as file: data = file.read()
+          data = data.replace("EXPORT_TRACEPOINT_SYMBOL_GPL(task_rename);", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif\n\nEXPORT_TRACEPOINT_SYMBOL_GPL(task_rename);")
+          data = data.replace("return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_execveat_hook((int *)AT_FDCWD, &filename, &argv, &envp, 0);\n#endif\n\treturn do_execveat_common(AT_FDCWD, filename, argv, envp, 0);")
+          with open(f, "w") as file: file.write(data)
+
+          # 2. fs/open.c (精准匹配 4.14 内核)
+          f = "fs/open.c"
+          with open(f, "r") as file: data = file.read()
+          data = data.replace("#include \"internal.h\"", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif\n\n#include \"internal.h\"")
+          data = data.replace("unsigned int lookup_flags = LOOKUP_FOLLOW;", "unsigned int lookup_flags = LOOKUP_FOLLOW;\n\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_faccessat_hook(&dfd, &filename, &mode, NULL);\n#endif")
+          with open(f, "w") as file: file.write(data)
+
+          # 3. fs/read_write.c (精准匹配 4.14 内核)
+          f = "fs/read_write.c"
+          with open(f, "r") as file: data = file.read()
+          data = data.replace("#include <asm/unistd.h>", "#include <asm/unistd.h>\n\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif")
+          data = data.replace("loff_t pos = file_pos_read(f.file);", "loff_t pos = file_pos_read(f.file);\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\t\ttrace_ksu_trace_sys_read_hook(fd, &buf, &count);\n#endif")
+          with open(f, "w") as file: file.write(data)
+
+          # 4. fs/stat.c
+          f = "fs/stat.c"
+          with open(f, "r") as file: data = file.read()
+          data = data.replace("#include \"mount.h\"", "#include \"mount.h\"\n\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif")
+          data = data.replace("error = vfs_fstatat(dfd, filename, &stat, flag);", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_stat_hook(&dfd, &filename, &flag);\n#endif\n\n\terror = vfs_fstatat(dfd, filename, &stat, flag);")
+          with open(f, "w") as file: file.write(data)
+
+          # 5. drivers/input/input.c (音量键救砖/安全模式)
+          f = "drivers/input/input.c"
+          if os.path.exists(f):
+              with open(f, "r") as file: data = file.read()
+              data = data.replace("MODULE_AUTHOR(", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../../drivers/kernelsu/ksu_trace.h>\n#endif\n\nMODULE_AUTHOR(")
+              data = data.replace("if (is_event_supported(type, dev->evbit, EV_MAX)) {", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_input_hook(&type, &code, &value);\n#endif\n\n\tif (is_event_supported(type, dev->evbit, EV_MAX)) {")
+              with open(f, "w") as file: file.write(data)
+          '
+          echo " 官方 Tracepoint 补丁已通过高精脚本物理注入！"
 
       - name: 💊 Disable LTO to prevent OOM
         run: |
