@@ -64,7 +64,7 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  HOOK_METHOD: "normal" 
+  HOOK_METHOD: "syscall" 
   HOOK_OLDER: "false" 
 
   KERNEL_PATCH: "false" 
@@ -141,11 +141,11 @@ jobs:
             echo " 成功回滚: $commit"
           done
 
-      #- name: 🪝 Patch Kernel of SUSFS
-        #uses: ./.github/workflows/patch-susfs
+      - name: 🪝 Patch Kernel of SUSFS
+        uses: ./.github/workflows/patch-susfs
 
-      #- name: 🔗 Patch for no-kprobe
-      #  uses: ./.github/workflows/patch-no-kprobe
+      - name: 🔗 Patch for no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe
 
       - name: 🐍 Install Python 2
         run: |
@@ -154,6 +154,12 @@ jobs:
           sudo apt-get install -y python2 || apt-get install -y python2
           # 建立软链接，防止某些老脚本只认 "python"
           sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
+
+      - name: 🔌 接SukiSU
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo " ！了！"
 
       - name: 💊 Disable LTO to prevent OOM
         run: |
@@ -170,14 +176,14 @@ jobs:
           
           echo " LTO 优化已彻底关闭管够了！"
   
-      #- name: 🧰 Patch Kernel of Re:Kernel
-        #uses: ./.github/workflows/patch-rekernel
+      - name: 🧰 Patch Kernel of Re:Kernel
+        uses: ./.github/workflows/patch-rekernel
 
-       #- name: 🔒 Patch Kernel of Baseband Guard
-         #uses: ./.github/workflows/patch-baseband-guard
+       - name: 🔒 Patch Kernel of Baseband Guard
+         uses: ./.github/workflows/patch-baseband-guard
 
-       #- name: 🔧 Patch Hide Stuff
-        # uses: ./.github/workflows/patch-hide-stuff
+       - name: 🔧 Patch Hide Stuff
+         uses: ./.github/workflows/patch-hide-stuff
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
