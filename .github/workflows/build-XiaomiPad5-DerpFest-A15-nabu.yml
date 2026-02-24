@@ -32,7 +32,7 @@ env:
   KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
 
-  KERNELSU_AUTO_GET : "false" 
+  KERNELSU_AUTO_GET : "true" 
   KERNELSU_AUTO_FORK : "sukisu" 
 
   SUSFS_ENABLE : false 
@@ -54,7 +54,7 @@ env:
 
   PACK_METHOD: "Anykernel3" 
 
-  KERNELSU_METHOD: "none" 
+  KERNELSU_METHOD: "manual" 
 
   PATCHES_SOURCE: "author/source" 
   PATCHES_BRANCH: "branch" 
