@@ -67,7 +67,7 @@ env:
   REKERNEL_ENABLE: "false" 
 
   #  挂钩方式：最稳妥的 syscall
-  HOOK_METHOD: "normal" 
+  HOOK_METHOD: "tracepoint" 
   HOOK_OLDER: "false" 
 
   KERNEL_PATCH: "false" 
@@ -123,25 +123,15 @@ jobs:
           sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
 
       # 🔥 推上电闸！
-      - name: 🔌 物理超度幽灵配置，强行启用 Kprobe
+      - name: 🔌 接通 SukiSU 总电闸 (Tracepoint 专用)
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo " 1. 正在全网搜捕并击杀原作者残留的 Manual Hook..."
-          sed -i 's/CONFIG_KSU_MANUAL_HOOK=y/# CONFIG_KSU_MANUAL_HOOK is not set/g' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          # 补一刀，确保死透
-          echo "# CONFIG_KSU_MANUAL_HOOK is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          
-          echo " 2. 推上 KSU 总电闸，并唤醒官方 Kprobe..."
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KPROBES=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          
-          echo " 成功！这回绝对是纯正的官方 Kprobe 模式！"
+          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo " 成功推上总电闸，准备注入 Tracepoint 挂钩！"
      
-      #- name: 🔗 Patch for no-kprobe
-        #uses: ./.github/workflows/patch-no-kprobe
+      - name: 🔗 Patch for no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe
 
       - name: 💊 Disable LTO to prevent OOM
         run: |
