@@ -32,7 +32,7 @@ env:
   KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
 
-  # 🔥 基石既然改好了，这里放心地交给系统自动获取！
+  #  基石既然改好了，这里放心地交给系统自动获取！
   KERNELSU_AUTO_GET : "true" 
   KERNELSU_AUTO_FORK : "sukisu" 
 
@@ -55,7 +55,7 @@ env:
 
   PACK_METHOD: "Anykernel3" 
 
-  # 🔥 必须是 shell，这样它才会下载守护进程！
+  #  必须是 shell，这样它才会下载守护进程！
   KERNELSU_METHOD: "shell" 
 
   PATCHES_SOURCE: "author/source" 
@@ -66,7 +66,7 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  # 🔥 挂钩方式：最稳妥的 syscall
+  #  挂钩方式：最稳妥的 syscall
   HOOK_METHOD: "normal" 
   HOOK_OLDER: "false" 
 
@@ -112,7 +112,7 @@ jobs:
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
 
-      # 🔥 这一步现在非常无敌：它会先执行你写在里面的“大扫除”，然后再干净地下载 SukiSU 及其守护进程！
+      #  这一步现在非常无敌：它会先执行你写在里面的“大扫除”，然后再干净地下载 SukiSU 及其守护进程！
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
@@ -123,13 +123,13 @@ jobs:
           sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
 
       # 🔥 推上电闸！
-      - name: 🔌 接通 SukiSU 总电闸及手动挂钩
+      - name: 🔌 接通 SukiSU 总电闸 (启用官方 Kprobe)
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo " 成功推上总电闸，手动挂钩配置完毕！"
-
+          # （删掉了 MANUAL_HOOK 那一行，让它默认使用 Kprobe！）
+          echo " 成功推上总电闸，官方 Kprobe 挂载就绪！"
+     
       #- name: 🔗 Patch for no-kprobe
         #uses: ./.github/workflows/patch-no-kprobe
 
