@@ -10,11 +10,30 @@ runs:
           git clone --recursive "${{ env.KERNEL_SOURCE }}" -b "${{ env.KERNEL_BRANCH }}" device_kernel --depth=1
 
           # Get Kernel Version
-
           KERNEL_VERSION=$(head -n 3 $GITHUB_WORKSPACE/device_kernel/Makefile | grep -E 'VERSION|PATCHLEVEL' | awk '{print $3}' | paste -sd '.')
           echo "KERNEL_VERSION=$(head -n 3 device_kernel/Makefile | grep -E 'VERSION|PATCHLEVEL' | awk '{print $3}' | paste -sd '.')" >> $GITHUB_ENV
           echo "FIRST_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $1}')" >> $GITHUB_ENV
           echo "SECOND_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $2}')" >> $GITHUB_ENV
+
+          # ==========================================
+          # ==== 👇 插入的大扫除代码 (在 KSU 安装前执行) 👇 ====
+          # ==========================================
+          echo "==== 开始底层大扫除 ===="
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "拉取完整历史记录..."
+          git fetch --unshallow || echo "已经是完整克隆，继续..."
+          
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          
+          COMMITS="08af382 1171f23 c44e1ab 3912338 5cb6bd8d9d71 4da2bb2 be70102 73789c6 bc69b25 fe2ed1a"
+          for commit in $COMMITS; do
+            echo "正在回滚 $commit ..."
+            git revert --no-edit "$commit" || { echo "回滚失败！"; exit 1; }
+          done
+          echo "==== 🧹 大扫除完毕，内核恢复纯净！ ===="
+          # ==========================================
 
       - name: Get Kernel Arch
         shell: bash
