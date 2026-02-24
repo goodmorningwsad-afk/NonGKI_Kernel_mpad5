@@ -131,15 +131,16 @@ jobs:
           
           echo " 3. 开始按时间倒序(由新到旧)逐个执行 git revert..."
           COMMITS=(
-            "08af382" # 已禁用 ksu 和 susfs
-            "fe2ed1a" # fs: 实现 SUSFS v1.5.5
-            "bc69b25" # 驱动程序: 添加 KSU 配置路径
-            "73789c6" # 驱动程序: 导入支持 SUSFS v1.5.5 的 KernelSU Next 1.0.4
-            "be70102" # 驱动程序: 为 KernelSu 设置正确的版本
-            "4da2bb2" # 向后移植: KernelSu 的 path_umount
-            "5cb6bd8" # selinux: 允许在 nosuid 下执行 init exec ksud
-            "3912338" # devpts: KernelSU: 修复：在终端执行 pm 失败
-            "c44e1ab" # 驱动程序: 添加 KernelSU 钩子
+            "08af382" # [3月17日] 已禁用 ksu 和 susfs
+            "1171f23" # [2月21日] nabu：更新 ksu-next 的配置
+            "c44e1ab" # [2月19日] 驱动程序：添加 KernelSU 钩子
+            "3912338" # [2月19日] devpts：KernelSU：修复：在终端执行 pm 失败
+            "5cb6bd8" # [2月19日] selinux：允许在 nosuid 下执行 init exec ksud
+            "4da2bb2" # [2月19日] fs：向后移植 KernelSu 的 path_umount
+            "be70102" # [2月19日] 驱动程序：为 KernelSu 设置正确的版本
+            "73789c6" # [2月19日] 驱动程序：导入支持 SUSFS v1.5.5 的 KernelSU Next 1.0.4
+            "bc69b25" # [2月19日] 驱动程序：添加 KSU 配置路径
+            "fe2ed1a" # [2月19日] fs：实现 SUSFS v1.5.5
           )
           
           for commit in "${COMMITS[@]}"; do
