@@ -158,14 +158,20 @@ jobs:
           # 建立软链接，防止某些老脚本只认 "python"
           sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
 
-      - name: 💊 Add Swap Space
+      - name: 💊 Disable LTO to prevent OOM
         run: |
-          sudo fallocate -l 16G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-          echo "Swap 虚拟内存已拉满，当前内存状态："
-          free -h
+          cd $GITHUB_WORKSPACE/device_kernel
+          echo " 正在切断 LTO 优化的电源..."
+          
+          # 直接在配置文件中精准打击 LTO 开关
+          sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          
+          # 为了防止有漏网之鱼，直接在文件末尾再补两刀强行覆写
+          echo "# CONFIG_LTO is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "# CONFIG_LTO_CLANG is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          
+          echo " LTO 优化已彻底关闭管够了！"
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
