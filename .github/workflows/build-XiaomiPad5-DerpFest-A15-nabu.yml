@@ -149,6 +149,15 @@ jobs:
           
           echo " 所有 KSU/SUSFS 相关提交回滚完毕，代码已恢复官方纯净状态！"
 
+
+      - name: 🐍 Install Python 2
+        run: |
+          # 容器内可能不需要 sudo，加个 || 保证兼容性
+          sudo apt-get update || apt-get update
+          sudo apt-get install -y python2 || apt-get install -y python2
+          # 建立软链接，防止某些老脚本只认 "python"
+          sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
+
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
