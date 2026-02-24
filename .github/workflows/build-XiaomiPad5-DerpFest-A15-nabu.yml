@@ -118,7 +118,7 @@ jobs:
       #- name: 🔗 Patch for no-kprobe
         #uses: ./.github/workflows/patch-no-kprobe
 
-      - name:  回滚 KSU 与 SUSFS 提交
+      - name: ⏪ 优雅回滚 KSU 与 SUSFS 提交
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
@@ -129,16 +129,17 @@ jobs:
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
           
-          echo " 3. 开始按时间倒序(由新到旧)逐个执行 git revert..."
+          echo " 2.5 关键修复：把流水线刚才改动的文件先保存提交，给 Git 一个干净的工作区！"
+          git add -A
+          git commit -m "chore: save build-ready modifications" || echo "没有需要保存的更改"
           
-          # 【修复点】：放弃 Bash 数组，改用最基础的字符串空格分隔，完美兼容默认 sh 环境
+          echo " 3. 开始按时间倒序(由新到旧)逐个执行 git revert..."
           COMMITS="08af382 1171f23 c44e1ab 3912338 5cb6bd8 4da2bb2 be70102 73789c6 bc69b25 fe2ed1a"
           
           for commit in $COMMITS; do
             echo " 正在尝试回滚提交: $commit"
             git revert --no-edit "$commit" || {
               echo " 警告：回滚 $commit 时发生合并冲突！"
-              echo "Git 状态如下："
               git status
               echo "由于自动流水线无法手动解决冲突，编译将在此终止。"
               exit 1
