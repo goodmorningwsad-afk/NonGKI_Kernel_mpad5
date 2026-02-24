@@ -67,7 +67,7 @@ env:
   REKERNEL_ENABLE: "false" 
 
   # 🔥 挂钩方式：最稳妥的 syscall
-  HOOK_METHOD: "syscall" 
+  HOOK_METHOD: "normal" 
   HOOK_OLDER: "false" 
 
   KERNEL_PATCH: "false" 
@@ -130,8 +130,8 @@ jobs:
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo " 成功推上总电闸，手动挂钩配置完毕！"
 
-      - name: 🔗 Patch for no-kprobe
-        uses: ./.github/workflows/patch-no-kprobe
+      #- name: 🔗 Patch for no-kprobe
+        #uses: ./.github/workflows/patch-no-kprobe
 
       - name: 💊 Disable LTO to prevent OOM
         run: |
