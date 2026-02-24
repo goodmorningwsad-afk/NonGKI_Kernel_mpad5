@@ -32,6 +32,7 @@ env:
   KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
 
+  # 🔥 基石既然改好了，这里放心地交给系统自动获取！
   KERNELSU_AUTO_GET : "true" 
   KERNELSU_AUTO_FORK : "sukisu" 
 
@@ -54,7 +55,7 @@ env:
 
   PACK_METHOD: "Anykernel3" 
 
-  # 🔥 致命修复 1：必须用 shell 模式，否则不会下载 ksud 守护进程！
+  # 🔥 必须是 shell，这样它才会下载守护进程！
   KERNELSU_METHOD: "shell" 
 
   PATCHES_SOURCE: "author/source" 
@@ -65,6 +66,7 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
+  # 🔥 挂钩方式：最稳妥的 syscall
   HOOK_METHOD: "syscall" 
   HOOK_OLDER: "false" 
 
@@ -110,39 +112,9 @@ jobs:
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
 
-      # 🔥 你的神级操作：第一步先做最纯净的大扫除！
-      - name: ⏪ 先大扫除：回滚 KSU 与 SUSFS 提交
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo " 1. 拉取完整历史记录..."
-          git fetch --unshallow || echo "已经是完整克隆，继续..."
-          
-          echo " 2. 配置 Git 身份信息"
-          git config --global user.name "GitHub Action"
-          git config --global user.email "action@github.com"
-          
-          echo " 3. 开始按时间倒序(由新到旧)逐个执行 git revert..."
-          COMMITS="08af382 1171f23 c44e1ab 3912338 5cb6bd8d9d71 4da2bb2 be70102 73789c6 bc69b25 fe2ed1a"
-          
-          for commit in $COMMITS; do
-            echo " 正在尝试回滚提交: $commit"
-            git revert --no-edit "$commit" || {
-              echo " 警告：回滚 $commit 时发生合并冲突！"
-              git status
-              echo "由于自动流水线无法手动解决冲突，编译将在此终止。"
-              exit 1
-            }
-            echo " 成功回滚: $commit"
-          done
-
-      # 🔥 第二步：在干净的屋子里下载并安装 SukiSU (它会自动写好 Makefile 通道)
+      # 🔥 这一步现在非常无敌：它会先执行你写在里面的“大扫除”，然后再干净地下载 SukiSU 及其守护进程！
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
-
-      # 🔥 第三步：在 SukiSU 准备好之后，给它接上 syscall 点火线
-      - name: 🔗 Patch for no-kprobe
-        uses: ./.github/workflows/patch-no-kprobe
 
       - name: 🐍 Install Python 2
         run: |
@@ -150,13 +122,16 @@ jobs:
           sudo apt-get install -y python2 || apt-get install -y python2
           sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
 
-      # 🔥 第四步：推上总电闸（加双保险，确保万无一失）
+      # 🔥 推上电闸！
       - name: 🔌 接通 SukiSU 总电闸及手动挂钩
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo " 成功推上总电闸，手动挂钩配置完毕！"
+
+      - name: 🔗 Patch for no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe
 
       - name: 💊 Disable LTO to prevent OOM
         run: |
@@ -166,7 +141,7 @@ jobs:
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "# CONFIG_LTO is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "# CONFIG_LTO_CLANG is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo " LTO 优化已彻底关闭管够了！"
+          echo " LTO 优化已彻底关闭！"
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
