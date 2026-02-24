@@ -118,7 +118,7 @@ jobs:
       #- name: 🔗 Patch for no-kprobe
         #uses: ./.github/workflows/patch-no-kprobe
 
-      - name: ⏪ 优雅回滚 KSU 与 SUSFS 提交
+      - name: ⏪ 回滚 KSU 与 SUSFS 提交
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
