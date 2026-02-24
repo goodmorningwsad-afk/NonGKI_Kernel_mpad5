@@ -64,7 +64,7 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  HOOK_METHOD: "none" 
+  HOOK_METHOD: "tracepoint" 
   HOOK_OLDER: "false" 
 
   KERNEL_PATCH: "false" 
@@ -115,9 +115,6 @@ jobs:
       #- name: 🪝 Patch Kernel of SUSFS
         #uses: ./.github/workflows/patch-susfs
 
-      #- name: 🔗 Patch for no-kprobe
-        #uses: ./.github/workflows/patch-no-kprobe
-
       - name: ⏪ 回滚 KSU 与 SUSFS 提交
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
@@ -149,6 +146,8 @@ jobs:
           
           echo " 所有 KSU/SUSFS 相关提交回滚完毕，代码已恢复官方纯净状态！"
 
+      - name: 🔗 Patch for no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe
 
       - name: 🐍 Install Python 2
         run: |
