@@ -173,11 +173,11 @@ jobs:
               r'(unsigned int lookup_flags = LOOKUP_FOLLOW;\s+)(if \(mode & ~S_IRWXO\))',
               "#if defined(CONFIG_KSU)\n\tksu_handle_faccessat(&dfd, &filename, &mode, NULL);\n#endif\n")
 
-          # 3. stat.c (防检测隐藏，严格绑定 if ((flag... 指纹)
+          # 3. stat.c (防检测隐藏，放宽 if 匹配条件)
           apply_patch("fs/stat.c",
               r'(#include <linux/syscalls\.h>)',
               "#if defined(CONFIG_KSU)\nextern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\n#endif\n",
-              r'(unsigned int lookup_flags = 0;\s+)(if \(\(flag & ~\(AT_SYMLINK_NOFOLLOW \| AT_NO_AUTOMOUNT \|)',
+              r'(unsigned int lookup_flags = 0;\s+)(if \(\(flag &)',
               "#if defined(CONFIG_KSU)\n\tksu_handle_stat(&dfd, &filename, &flag);\n#endif\n")
 
           # 4. input.c (按键防救砖安全模式)
