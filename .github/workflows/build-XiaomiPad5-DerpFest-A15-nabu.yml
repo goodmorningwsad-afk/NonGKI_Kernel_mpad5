@@ -121,18 +121,19 @@ jobs:
           sudo apt-get install -y python2 || apt-get install -y python2
           sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
 
-      # 顺应官方文档，接通 Manual Hook，并赋予合法版本号！
-      - name: 🔌 推上官方原生 Manual Hook 电闸
+      #  接通 Manual Hook，无视路径全图锁定修复版本号！
+      - name: 🔌 推上官方原生 Manual Hook 电闸并修复版本号
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           echo " 正在写入 defconfig 配置..."
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "CONFIG_KSU_MANUAL_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
-          #  强制把内核版本号伪装成 11998！
-          echo "ccflags-y += -DKSU_VERSION=11998" >> drivers/kernelsu/Makefile
+          #  全图追踪：不管 SukiSU 被放在哪个文件夹，直接搜索 Kbuild 和 Makefile
+          # 把那句坑人的动态计算直接替换成死数字 40496！
+          find . -type f \( -name "Kbuild" -o -name "Makefile" \) -exec sed -i 's/-DKSU_VERSION=$(KSU_VERSION)/-DKSU_VERSION=40496/g' {} +
           
-          echo " 版本号，准备官方无文件原生注入！"
+          echo " 🎯 版本号 0 的 Bug 已被全图锁定并彻底抹杀，当前版本 40496！"
 
       # 💥免疫宏定义的正则级精准 
       - name: 🪛 实施正则级精准上下文
