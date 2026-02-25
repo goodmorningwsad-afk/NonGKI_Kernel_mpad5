@@ -137,7 +137,7 @@ jobs:
           name: Raw-stat-c
           path: device_kernel/fs/stat.c
 
-      # 💥 终极连招 B：绝对免疫宏定义的正则级精准盲狙手术
+      # 💥 终极连招 B：绝对免疫宏定义的正则级精准盲狙手术 (最终完美版)
       - name: 🪛 实施正则级精准上下文盲狙手术
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
@@ -173,19 +173,19 @@ jobs:
               r'(struct files_struct \*displaced;\s+int retval;\s+)(if \(IS_ERR\(filename\)\))',
               "#if defined(CONFIG_KSU)\n\t{\n\t\tint ksu_fd = fd;\n\t\tint ksu_flags = flags;\n\t\tvoid *ksu_argv = (void *)&argv;\n\t\tvoid *ksu_envp = (void *)&envp;\n\t\tif (unlikely(ksu_execveat_hook))\n\t\t\tksu_handle_execveat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\telse\n\t\t\tksu_handle_execveat_sucompat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\tfd = ksu_fd;\n\t\tflags = ksu_flags;\n\t}\n#endif\n")
 
-          # 2. open.c (防检测隐藏核心，严格绑定 if (mode... 指纹)
+          # 2. open.c (防检测隐藏核心)
           apply_patch("fs/open.c",
               r'(#include "internal\.h")',
               "#if defined(CONFIG_KSU)\nextern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n#endif\n",
               r'(unsigned int lookup_flags = LOOKUP_FOLLOW;\s+)(if \(mode & ~S_IRWXO\))',
               "#if defined(CONFIG_KSU)\n\tksu_handle_faccessat(&dfd, &filename, &mode, NULL);\n#endif\n")
 
-          # 3. stat.c (防检测隐藏，放宽 if 匹配条件)
+          # 3. stat.c (真相大白：基于 vfs_statx 的完美指纹)
           apply_patch("fs/stat.c",
               r'(#include <linux/syscalls\.h>)',
               "#if defined(CONFIG_KSU)\nextern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\n#endif\n",
-              r'(unsigned int lookup_flags = 0;\s+)(if \(\(flag &)',
-              "#if defined(CONFIG_KSU)\n\tksu_handle_stat(&dfd, &filename, &flag);\n#endif\n")
+              r'(unsigned int lookup_flags = LOOKUP_FOLLOW \| LOOKUP_AUTOMOUNT;\s+)(if \(\(flags & ~\()',
+              "#if defined(CONFIG_KSU)\n\tksu_handle_stat(&dfd, &filename, &flags);\n#endif\n")
 
           # 4. input.c (按键防救砖安全模式)
           apply_patch("drivers/input/input.c",
@@ -196,7 +196,7 @@ jobs:
           EOF
           
           python3 patch_ksu.py
-          echo " 🎯 正则级精准上下文盲狙手术完成！"
+          echo "  所有文件指纹匹配完毕！"
           
       # 💥 终极连招 C：防止 OOM 内存爆炸
       - name: 💊 Disable LTO to prevent OOM
