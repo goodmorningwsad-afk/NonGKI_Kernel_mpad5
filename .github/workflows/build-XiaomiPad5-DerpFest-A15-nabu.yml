@@ -130,7 +130,7 @@ jobs:
           echo "CONFIG_KSU_MANUAL_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo " 🎯 电闸已接通，准备官方无文件原生注入！"
 
-      # 💥 终极连招 B：基于 AST 抽象语法树的智能代码解析与注入
+      # 💥 终极连招 B：基于 AST 抽象语法树的智能代码解析与注入 (剔除弃用钩子)
       - name: 🪛 实施真正的 AST 级智能注入手术
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
@@ -159,7 +159,6 @@ jobs:
               braces = 0
               injected = False
               for i, line in enumerate(lines):
-                  # 1. 寻找确切的函数入口
                   if line.startswith(func_name) or (f" {func_name}(" in line and not line.endswith(";\n")):
                       in_func = True
                       
@@ -168,11 +167,9 @@ jobs:
                       braces -= line.count("}")
                       
                       stripped = line.strip()
-                      # 涵盖 Linux 内核所有的变量声明类型
                       types = ("int ", "char ", "struct ", "void ", "bool ", "unsigned ", "const ", "ssize_t ", "long ", "loff_t ", "size_t ", "pid_t ", "uid_t ", "mode_t ", "umode_t ")
                       is_decl = stripped.startswith(types)
                       
-                      # 2. 找到第一个不是变量声明的“真正逻辑代码行”，精准插入！
                       if braces >= 1 and stripped and not is_decl and stripped != "{":
                           if braces == 1:
                               lines.insert(i, f"{marker}\n{hook_code}\n")
@@ -184,35 +181,34 @@ jobs:
                           
               if injected:
                   with open(file_path, "w") as f: f.writelines(lines)
-                  print(f" 成功注入 -> {func_name} 函数 @ {file_path}")
+                  print(f"✅ 成功注入 -> {func_name} 函数 @ {file_path}")
               else:
-                  print(f" 注入失败或已存在 -> {func_name} @ {file_path}")
+                  print(f"❌ 注入失败或已存在 -> {func_name} @ {file_path}")
 
           # ================== 开始全自动智能注入 ==================
 
-          # 1. exec.c
+          # 1. exec.c (Root 授权核心，已完美链接)
           add_includes("fs/exec.c", "#if defined(CONFIG_KSU)\nextern bool ksu_execveat_hook __read_mostly;\nextern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\nextern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\n#endif")
           patch_func("fs/exec.c", "do_execveat_common", "#if defined(CONFIG_KSU)\n\t{\n\t\tint ksu_fd = fd;\n\t\tint ksu_flags = flags;\n\t\tvoid *ksu_argv = (void *)&argv;\n\t\tvoid *ksu_envp = (void *)&envp;\n\t\tif (unlikely(ksu_execveat_hook))\n\t\t\tksu_handle_execveat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\telse\n\t\t\tksu_handle_execveat_sucompat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\tfd = ksu_fd;\n\t\tflags = ksu_flags;\n\t}\n#endif")
 
-          # 2. open.c (彻底消灭 5 个报错)
+          # 2. open.c (防检测隐藏，已完美链接)
           add_includes("fs/open.c", "#if defined(CONFIG_KSU)\nextern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n#endif")
           patch_func("fs/open.c", "do_faccessat", "#if defined(CONFIG_KSU)\n\tksu_handle_faccessat(&dfd, &filename, &mode, NULL);\n#endif")
 
-          # 3. read_write.c
-          add_includes("fs/read_write.c", "#if defined(CONFIG_KSU)\nextern bool ksu_vfs_read_hook __read_mostly;\nextern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos);\n#endif")
-          patch_func("fs/read_write.c", "vfs_read", "#if defined(CONFIG_KSU)\n\t{\n\t\tstruct file *ksu_file = file;\n\t\tloff_t *ksu_pos = pos;\n\t\tif (unlikely(ksu_vfs_read_hook))\n\t\t\tksu_handle_vfs_read(&ksu_file, &buf, &count, &ksu_pos);\n\t\tfile = ksu_file;\n\t\tpos = ksu_pos;\n\t}\n#endif")
+          # 3. read_write.c (⚠️ 此钩子在无 SuSFS 的 SukiSU 中已被弃用，安全移除！)
+          # 已物理拔除此处的注入代码
 
-          # 4. stat.c
+          # 4. stat.c (防检测隐藏，已完美链接)
           add_includes("fs/stat.c", "#if defined(CONFIG_KSU)\nextern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\n#endif")
           patch_func("fs/stat.c", "vfs_fstatat", "#if defined(CONFIG_KSU)\n\tksu_handle_stat(&dfd, &filename, &flag);\n#endif")
 
-          # 5. input.c
+          # 5. input.c (按键安全模式，已完美链接)
           add_includes("drivers/input/input.c", "#if defined(CONFIG_KSU)\nextern bool ksu_input_hook __read_mostly;\nextern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);\n#endif")
           patch_func("drivers/input/input.c", "input_handle_event", "#if defined(CONFIG_KSU)\n\tif (unlikely(ksu_input_hook))\n\t\tksu_handle_input_handle_event(&type, &code, &value);\n#endif")
           EOF
           
           python3 patch_ksu.py
-          echo "  AST 级智能手术完成！代码已实现像素级对焦！"
+          echo " 🎯 AST 级智能手术完成！弃用钩子已被精准拔除！"
 
       # 💥 终极连招 C：防止 OOM 内存爆炸
       - name: 💊 Disable LTO to prevent OOM
