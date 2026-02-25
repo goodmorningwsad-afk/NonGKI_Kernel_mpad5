@@ -188,7 +188,7 @@ jobs:
               r'(unsigned int lookup_flags = LOOKUP_FOLLOW;\s+)(if \(mode & ~S_IRWXO\))',
               "#if defined(CONFIG_KSU)\n\tksu_handle_faccessat(&dfd, &filename, &mode, NULL);\n#endif\n")
 
-          # 3. stat.c (真相大白：基于 vfs_statx 的完美指纹)
+          # 3. stat.c (基于 vfs_statx 的指纹)
           apply_patch("fs/stat.c",
               r'(#include <linux/syscalls\.h>)',
               "#if defined(CONFIG_KSU)\nextern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\n#endif\n",
