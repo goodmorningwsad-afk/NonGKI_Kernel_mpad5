@@ -32,7 +32,7 @@ env:
   KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
 
-  #  基石既然改好了，这里放心地交给系统自动获取！
+  # 基石既然改好了，这里放心地交给系统自动获取！
   KERNELSU_AUTO_GET : "true" 
   KERNELSU_AUTO_FORK : "sukisu" 
 
@@ -55,7 +55,7 @@ env:
 
   PACK_METHOD: "Anykernel3" 
 
-  #  必须是 shell，这样它才会下载守护进程！
+  # 必须是 shell，这样它才会下载守护进程！
   KERNELSU_METHOD: "shell" 
 
   PATCHES_SOURCE: "author/source" 
@@ -66,7 +66,7 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  #  挂钩方式：最稳妥的 syscall
+  # 挂钩方式： tracepoint
   HOOK_METHOD: "tracepoint" 
   HOOK_OLDER: "false" 
 
@@ -112,7 +112,6 @@ jobs:
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
 
-      #  这一步现在非常无敌：它会先执行你写在里面的“大扫除”，然后再干净地下载 SukiSU 及其守护进程！
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
@@ -122,22 +121,25 @@ jobs:
           sudo apt-get install -y python2 || apt-get install -y python2
           sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
 
-      # 🔥 步骤 A：推上 SukiSU Tracepoint 专属电闸，并物理击杀！
-      - name: 🔌 接通 SukiSU Tracepoint 专属
+      # 💥 终极连招 A：给安检员办合法证件！（解决 Kconfig 自动删配置问题）
+      - name: 🔌 教育安检员并推上合法电闸
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo " 正在强行向 Kconfig 字典中录入 Tracepoint 的合法身份..."
+          echo "config KSU_TRACEPOINT_HOOK" >> drivers/kernelsu/Kconfig
+          echo "    bool \"SukiSU Tracepoint Hook\"" >> drivers/kernelsu/Kconfig
+          echo "    depends on KSU" >> drivers/kernelsu/Kconfig
+          echo "    default y" >> drivers/kernelsu/Kconfig
+          
+          echo " 正在写入 defconfig 配置..."
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          
-          # 1. 明确告诉编译器：千万别给我开默认的 Manual Hook！
-          echo "# CONFIG_KSU_MANUAL_HOOK is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          
-          # 2. 开启官方指定的 Tracepoint 总开关！
           echo "CONFIG_KSU_TRACEPOINT_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
-          echo " 成功推上总电闸，幽灵 Manual 已被强制超度！"
+          echo " 🎯 安检员已被成功洗脑，合法放行 Tracepoint！"
 
-     # 💥 步骤 B：基于原厂源码定制的精确代码注入！
-      - name: 🪛 亲手注入 SukiSU 官方 Tracepoint 补丁
+      # 💥 终极连招 B：100% 命中的 C 语言物理缝合手术
+      - name: 🪛 实施 C 语言底层物理缝合手术
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           python3 -c '
@@ -149,43 +151,33 @@ jobs:
                   if old in data:
                       data = data.replace(old, new)
                       with open(file, "w") as f: f.write(data)
-                      print(f" 成功注入: {file}")
+                      print(f"✅ 成功物理注入: {file}")
                   else:
-                      print(f" 找不到注入点: {file}")
+                      print(f"❌ 找不到注入点: {file}")
 
-          # 1. fs/exec.c (精准匹配)
+          # 1. fs/exec.c
           patch("fs/exec.c", "#include <linux/binfmts.h>", "#include <linux/binfmts.h>\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif")
           patch("fs/exec.c", "return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_execveat_hook((int *)AT_FDCWD, &filename, &argv, &envp, 0);\n#endif\n\treturn do_execveat_common(AT_FDCWD, filename, argv, envp, 0);")
 
-          # 2. fs/open.c (精准匹配)
+          # 2. fs/open.c
           patch("fs/open.c", "#include \"internal.h\"", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif\n\n#include \"internal.h\"")
           patch("fs/open.c", "unsigned int lookup_flags = LOOKUP_FOLLOW;", "unsigned int lookup_flags = LOOKUP_FOLLOW;\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_faccessat_hook(&dfd, &filename, &mode, NULL);\n#endif")
 
-          # 3. fs/read_write.c (精准匹配)
+          # 3. fs/read_write.c
           patch("fs/read_write.c", "#include <asm/unistd.h>", "#include <asm/unistd.h>\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif")
           patch("fs/read_write.c", "loff_t pos = file_pos_read(f.file);", "loff_t pos = file_pos_read(f.file);\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\t\ttrace_ksu_trace_sys_read_hook(fd, &buf, &count);\n#endif")
 
-          # 4. fs/stat.c (精准匹配)
+          # 4. fs/stat.c
           patch("fs/stat.c", "#include <linux/syscalls.h>", "#include <linux/syscalls.h>\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif")
           patch("fs/stat.c", "error = vfs_fstatat(dfd, filename, &stat, flag);", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_stat_hook(&dfd, &filename, &flag);\n#endif\n\terror = vfs_fstatat(dfd, filename, &stat, flag);")
 
-          # 5. drivers/input/input.c (精准匹配)
+          # 5. drivers/input/input.c
           patch("drivers/input/input.c", "MODULE_AUTHOR(\"Vojtech Pavlik <vojtech@suse.cz>\");", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../../drivers/kernelsu/ksu_trace.h>\n#endif\n\nMODULE_AUTHOR(\"Vojtech Pavlik <vojtech@suse.cz>\");")
           patch("drivers/input/input.c", "if (is_event_supported(type, dev->evbit, EV_MAX)) {", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_input_hook(&type, &code, &value);\n#endif\n\tif (is_event_supported(type, dev->evbit, EV_MAX)) {")
           '
-          echo "  完美！ Python 手术结束！"
+          echo " 🎯 完美！所有 C 语言接口已被强制接管！"
 
-      - name: 📤 提取编译前最终源码与配置 (终极排查)
-        uses: actions/upload-artifact@v4
-        with:
-          name: Final-PreCompile-Files
-          path: |
-            device_kernel/fs/exec.c
-            device_kernel/fs/open.c
-            device_kernel/fs/read_write.c
-            device_kernel/fs/stat.c
-            device_kernel/drivers/input/input.c
-            device_kernel/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+      # 💥 终极连招 C：防止 OOM 内存爆炸
       - name: 💊 Disable LTO to prevent OOM
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
