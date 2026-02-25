@@ -130,86 +130,67 @@ jobs:
           echo "CONFIG_KSU_MANUAL_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo " 🎯 电闸已接通，准备官方无文件原生注入！"
 
-      # 💥 终极连招 B：基于 AST 抽象语法树的智能代码解析与注入 (剔除弃用钩子)
-      - name: 🪛 实施真正的 AST 级智能注入手术
+      # 💥 终极连招 B：绝对免疫宏定义的正则级精准盲狙手术
+      - name: 🪛 实施正则级精准上下文盲狙手术
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           cat << 'EOF' > patch_ksu.py
-          import os
+          import os, re
 
-          def add_includes(file_path, ext_code):
-              if not os.path.exists(file_path): return
-              with open(file_path, "r") as f: data = f.read()
-              if "KSU_INC_" in data: return
-              lines = data.split('\n')
-              last_inc = 0
-              for i, l in enumerate(lines):
-                  if l.startswith("#include"): last_inc = i
-              lines.insert(last_inc + 1, "/* KSU_INC_ */\n" + ext_code)
-              with open(file_path, "w") as f: f.write('\n'.join(lines))
+          def apply_patch(file_path, header_search, header_code, logic_search, logic_code):
+              if not os.path.exists(file_path):
+                  return
+              with open(file_path, "r") as f:
+                  data = f.read()
 
-          def patch_func(file_path, func_name, hook_code):
-              if not os.path.exists(file_path): return
-              with open(file_path, "r") as f: lines = f.readlines()
+              if "KSU_HOOK_APPLIED" in data:
+                  print(f"✅ 已注入过: {file_path}")
+                  return
+
+              # 注入头文件外部声明
+              data = re.sub(header_search, r'\1\n/* KSU_HOOK_APPLIED */\n' + header_code, data, count=1)
+              # 注入核心逻辑代码 (依靠严格的上下文指纹匹配)
+              new_data = re.sub(logic_search, r'\1' + logic_code + r'\n\t\2', data, count=1)
               
-              marker = f"/* KSU_HOOK_{func_name} */"
-              if marker in "".join(lines): return
-              
-              in_func = False
-              braces = 0
-              injected = False
-              for i, line in enumerate(lines):
-                  if line.startswith(func_name) or (f" {func_name}(" in line and not line.endswith(";\n")):
-                      in_func = True
-                      
-                  if in_func:
-                      braces += line.count("{")
-                      braces -= line.count("}")
-                      
-                      stripped = line.strip()
-                      types = ("int ", "char ", "struct ", "void ", "bool ", "unsigned ", "const ", "ssize_t ", "long ", "loff_t ", "size_t ", "pid_t ", "uid_t ", "mode_t ", "umode_t ")
-                      is_decl = stripped.startswith(types)
-                      
-                      if braces >= 1 and stripped and not is_decl and stripped != "{":
-                          if braces == 1:
-                              lines.insert(i, f"{marker}\n{hook_code}\n")
-                              injected = True
-                              break
-                              
-                      if braces == 0 and in_func and "}" in line:
-                          break
-                          
-              if injected:
-                  with open(file_path, "w") as f: f.writelines(lines)
-                  print(f"✅ 成功注入 -> {func_name} 函数 @ {file_path}")
+              if new_data != data:
+                  with open(file_path, "w") as f:
+                      f.write(new_data)
+                  print(f"✅ 成功物理注入: {file_path}")
               else:
-                  print(f"❌ 注入失败或已存在 -> {func_name} @ {file_path}")
+                  print(f"❌ 找不到注入点(指纹不匹配): {file_path}")
 
-          # ================== 开始全自动智能注入 ==================
+          # 1. exec.c (Root 授权核心)
+          apply_patch("fs/exec.c", 
+              r'(#include <linux/binfmts\.h>)',
+              "#if defined(CONFIG_KSU)\nextern bool ksu_execveat_hook __read_mostly;\nextern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\nextern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\n#endif\n",
+              r'(struct files_struct \*displaced;\s+int retval;\s+)(if \(IS_ERR\(filename\)\))',
+              "#if defined(CONFIG_KSU)\n\t{\n\t\tint ksu_fd = fd;\n\t\tint ksu_flags = flags;\n\t\tvoid *ksu_argv = (void *)&argv;\n\t\tvoid *ksu_envp = (void *)&envp;\n\t\tif (unlikely(ksu_execveat_hook))\n\t\t\tksu_handle_execveat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\telse\n\t\t\tksu_handle_execveat_sucompat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\tfd = ksu_fd;\n\t\tflags = ksu_flags;\n\t}\n#endif\n")
 
-          # 1. exec.c (Root 授权核心，已完美链接)
-          add_includes("fs/exec.c", "#if defined(CONFIG_KSU)\nextern bool ksu_execveat_hook __read_mostly;\nextern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\nextern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\n#endif")
-          patch_func("fs/exec.c", "do_execveat_common", "#if defined(CONFIG_KSU)\n\t{\n\t\tint ksu_fd = fd;\n\t\tint ksu_flags = flags;\n\t\tvoid *ksu_argv = (void *)&argv;\n\t\tvoid *ksu_envp = (void *)&envp;\n\t\tif (unlikely(ksu_execveat_hook))\n\t\t\tksu_handle_execveat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\telse\n\t\t\tksu_handle_execveat_sucompat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\tfd = ksu_fd;\n\t\tflags = ksu_flags;\n\t}\n#endif")
+          # 2. open.c (防检测隐藏核心，严格绑定 if (mode... 指纹)
+          apply_patch("fs/open.c",
+              r'(#include "internal\.h")',
+              "#if defined(CONFIG_KSU)\nextern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n#endif\n",
+              r'(unsigned int lookup_flags = LOOKUP_FOLLOW;\s+)(if \(mode & ~S_IRWXO\))',
+              "#if defined(CONFIG_KSU)\n\tksu_handle_faccessat(&dfd, &filename, &mode, NULL);\n#endif\n")
 
-          # 2. open.c (防检测隐藏，已完美链接)
-          add_includes("fs/open.c", "#if defined(CONFIG_KSU)\nextern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n#endif")
-          patch_func("fs/open.c", "do_faccessat", "#if defined(CONFIG_KSU)\n\tksu_handle_faccessat(&dfd, &filename, &mode, NULL);\n#endif")
+          # 3. stat.c (防检测隐藏，严格绑定 if ((flag... 指纹)
+          apply_patch("fs/stat.c",
+              r'(#include <linux/syscalls\.h>)',
+              "#if defined(CONFIG_KSU)\nextern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\n#endif\n",
+              r'(unsigned int lookup_flags = 0;\s+)(if \(\(flag & ~\(AT_SYMLINK_NOFOLLOW \| AT_NO_AUTOMOUNT \|)',
+              "#if defined(CONFIG_KSU)\n\tksu_handle_stat(&dfd, &filename, &flag);\n#endif\n")
 
-          # 3. read_write.c (⚠️ 此钩子在无 SuSFS 的 SukiSU 中已被弃用，安全移除！)
-          # 已物理拔除此处的注入代码
-
-          # 4. stat.c (防检测隐藏，已完美链接)
-          add_includes("fs/stat.c", "#if defined(CONFIG_KSU)\nextern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\n#endif")
-          patch_func("fs/stat.c", "vfs_fstatat", "#if defined(CONFIG_KSU)\n\tksu_handle_stat(&dfd, &filename, &flag);\n#endif")
-
-          # 5. input.c (按键安全模式，已完美链接)
-          add_includes("drivers/input/input.c", "#if defined(CONFIG_KSU)\nextern bool ksu_input_hook __read_mostly;\nextern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);\n#endif")
-          patch_func("drivers/input/input.c", "input_handle_event", "#if defined(CONFIG_KSU)\n\tif (unlikely(ksu_input_hook))\n\t\tksu_handle_input_handle_event(&type, &code, &value);\n#endif")
+          # 4. input.c (按键防救砖安全模式)
+          apply_patch("drivers/input/input.c",
+              r'(MODULE_AUTHOR\("Vojtech Pavlik <vojtech@suse\.cz>"\);)',
+              "#if defined(CONFIG_KSU)\nextern bool ksu_input_hook __read_mostly;\nextern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);\n#endif\n",
+              r'(int disposition = input_get_disposition\(dev, type, code, &value\);\s+)(if \(disposition != INPUT_IGNORE_EVENT && type != EV_SYN\))',
+              "#if defined(CONFIG_KSU)\n\tif (unlikely(ksu_input_hook))\n\t\tksu_handle_input_handle_event(&type, &code, &value);\n#endif\n")
           EOF
           
           python3 patch_ksu.py
-          echo " 🎯 AST 级智能手术完成！弃用钩子已被精准拔除！"
-
+          echo " 🎯 正则级精准上下文盲狙手术完成！"
+          
       # 💥 终极连招 C：防止 OOM 内存爆炸
       - name: 💊 Disable LTO to prevent OOM
         run: |
