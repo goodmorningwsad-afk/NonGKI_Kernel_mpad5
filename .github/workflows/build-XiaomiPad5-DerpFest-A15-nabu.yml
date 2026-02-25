@@ -130,6 +130,13 @@ jobs:
           echo "CONFIG_KSU_MANUAL_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo " 🎯 电闸已接通，准备官方无文件原生注入！"
 
+      # 💥 插入一个“战前侦察”步骤，把原版 stat.c 偷出来！
+      - name: 📤 提取原始 stat.c (战前侦察)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Raw-stat-c
+          path: device_kernel/fs/stat.c
+
       # 💥 终极连招 B：绝对免疫宏定义的正则级精准盲狙手术
       - name: 🪛 实施正则级精准上下文盲狙手术
         run: |
