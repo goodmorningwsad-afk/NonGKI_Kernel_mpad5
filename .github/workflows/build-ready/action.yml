@@ -35,6 +35,23 @@ runs:
           echo "==== 🧹 大扫除完毕，内核恢复纯净！ ===="
           # ==========================================
 
+      - name: 🕵️ 校验内核环境 (输出 exec.c 和 stat.c 真实内容)
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "======================================================"
+          echo " 正在检查 fs/exec.c 里的 CONFIG_KSU 存留情况："
+          echo "======================================================"
+          # 查找 CONFIG_KSU，并打印它上下 5 行的内容
+          grep -n -C 5 "CONFIG_KSU" fs/exec.c || echo " ✅ 报告：fs/exec.c 里没有找到 CONFIG_KSU，非常纯净！"
+          
+          echo ""
+          echo "======================================================"
+          echo " 正在检查 fs/stat.c 里的 CONFIG_KSU 存留情况："
+          echo "======================================================"
+          grep -n -C 5 "CONFIG_KSU" fs/stat.c || echo " ✅ 报告：fs/stat.c 里没有找到 CONFIG_KSU，非常纯净！"
+          echo "======================================================"
+
       - name: Get Kernel Arch
         shell: bash
         run: |
