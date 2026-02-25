@@ -27,7 +27,7 @@ runs:
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
           
-          COMMITS="08af382 1171f23 c44e1ab 3912338 5cb6bd8d9d71 4da2bb2 be70102 73789c6 bc69b25 fe2ed1a"
+          COMMITS="08af382 1171f23 c44e1ab 3912338 5cb6bd8d9d71 4da2bb2 73789c6 bc69b25 fe2ed1a"
           for commit in $COMMITS; do
             echo "正在回滚 $commit ..."
             git revert --no-edit "$commit" || { echo "回滚失败！"; exit 1; }
