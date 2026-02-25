@@ -138,7 +138,7 @@ jobs:
           
           echo " 🎯 安检员已被成功洗脑，合法放行 Tracepoint！"
 
-      # 💥 终极连招 B：100% 命中的 C 语言物理缝合手术
+      # 💥 终极连招 B： 命中 C 语言物理缝合手术 
       - name: 🪛 实施 C 语言底层物理缝合手术
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
@@ -156,23 +156,23 @@ jobs:
                       print(f"❌ 找不到注入点: {file}")
 
           # 1. fs/exec.c
-          patch("fs/exec.c", "#include <linux/binfmts.h>", "#include <linux/binfmts.h>\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif")
+          patch("fs/exec.c", "#include <linux/binfmts.h>", "#include <linux/binfmts.h>\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include \"../drivers/kernelsu/ksu_trace.h\"\n#endif")
           patch("fs/exec.c", "return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_execveat_hook((int *)AT_FDCWD, &filename, &argv, &envp, 0);\n#endif\n\treturn do_execveat_common(AT_FDCWD, filename, argv, envp, 0);")
 
           # 2. fs/open.c
-          patch("fs/open.c", "#include \"internal.h\"", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif\n\n#include \"internal.h\"")
+          patch("fs/open.c", "#include \"internal.h\"", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include \"../drivers/kernelsu/ksu_trace.h\"\n#endif\n\n#include \"internal.h\"")
           patch("fs/open.c", "unsigned int lookup_flags = LOOKUP_FOLLOW;", "unsigned int lookup_flags = LOOKUP_FOLLOW;\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_faccessat_hook(&dfd, &filename, &mode, NULL);\n#endif")
 
           # 3. fs/read_write.c
-          patch("fs/read_write.c", "#include <asm/unistd.h>", "#include <asm/unistd.h>\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif")
+          patch("fs/read_write.c", "#include <asm/unistd.h>", "#include <asm/unistd.h>\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include \"../drivers/kernelsu/ksu_trace.h\"\n#endif")
           patch("fs/read_write.c", "loff_t pos = file_pos_read(f.file);", "loff_t pos = file_pos_read(f.file);\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\t\ttrace_ksu_trace_sys_read_hook(fd, &buf, &count);\n#endif")
 
           # 4. fs/stat.c
-          patch("fs/stat.c", "#include <linux/syscalls.h>", "#include <linux/syscalls.h>\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../drivers/kernelsu/ksu_trace.h>\n#endif")
+          patch("fs/stat.c", "#include <linux/syscalls.h>", "#include <linux/syscalls.h>\n#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include \"../drivers/kernelsu/ksu_trace.h\"\n#endif")
           patch("fs/stat.c", "error = vfs_fstatat(dfd, filename, &stat, flag);", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_stat_hook(&dfd, &filename, &flag);\n#endif\n\terror = vfs_fstatat(dfd, filename, &stat, flag);")
 
           # 5. drivers/input/input.c
-          patch("drivers/input/input.c", "MODULE_AUTHOR(\"Vojtech Pavlik <vojtech@suse.cz>\");", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include <../../drivers/kernelsu/ksu_trace.h>\n#endif\n\nMODULE_AUTHOR(\"Vojtech Pavlik <vojtech@suse.cz>\");")
+          patch("drivers/input/input.c", "MODULE_AUTHOR(\"Vojtech Pavlik <vojtech@suse.cz>\");", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n#include \"../../drivers/kernelsu/ksu_trace.h\"\n#endif\n\nMODULE_AUTHOR(\"Vojtech Pavlik <vojtech@suse.cz>\");")
           patch("drivers/input/input.c", "if (is_event_supported(type, dev->evbit, EV_MAX)) {", "#if defined(CONFIG_KSU) && defined(CONFIG_KSU_TRACEPOINT_HOOK)\n\ttrace_ksu_trace_input_hook(&type, &code, &value);\n#endif\n\tif (is_event_supported(type, dev->evbit, EV_MAX)) {")
           '
           echo " 🎯 完美！所有 C 语言接口已被强制接管！"
