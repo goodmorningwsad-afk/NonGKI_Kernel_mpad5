@@ -52,6 +52,17 @@ runs:
           grep -n -C 5 "CONFIG_KSU" fs/stat.c || echo " ✅ 报告：fs/stat.c 里没有找到 CONFIG_KSU，非常纯净！"
           echo "======================================================"
 
+      - name: 📤 提取纯净内核源文件用于精准定位
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nabu-Kernel-Source-Files
+          path: |
+            device_kernel/fs/exec.c
+            device_kernel/fs/open.c
+            device_kernel/fs/read_write.c
+            device_kernel/fs/stat.c
+            device_kernel/drivers/input/input.c
+
       - name: Get Kernel Arch
         shell: bash
         run: |
