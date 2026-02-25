@@ -175,7 +175,7 @@ jobs:
           '
           echo "  完美！ Python 手术结束！"
 
-          - name: 📤 提取编译前最终源码与配置 (终极排查)
+          - name: 📤 提取编译前最终源码与配置
                uses: actions/upload-artifact@v4
                with:
           name: Final-PreCompile-Files
