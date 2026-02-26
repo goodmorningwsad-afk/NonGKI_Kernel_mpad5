@@ -131,7 +131,6 @@ jobs:
           
           # 1. 启动 SukiSU 核心
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_MANUAL_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
           # 2. 💥 唤醒被咱们截留下来的 SuSFS 全套隐身装甲！
           echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
@@ -141,6 +140,22 @@ jobs:
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          
+          # ==========================================
+          echo "==== 🔪 正在强行切断导致 4.14 崩溃的 Inline Hook ===="
+          # 在配置文件中彻底否定 Inline Hook
+          echo "# CONFIG_KSU_SUSFS_INLINE_HOOK is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "# CONFIG_SUSFS_INLINE_HOOK is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          
+          # 篡改 SukiSU 源码里的 Kconfig，拔掉遇到 SuSFS 就自动开启的设定
+          if [ -f "drivers/kernelsu/Kconfig" ]; then
+              sed -i 's/default y if KSU_SUSFS/default n/g' drivers/kernelsu/Kconfig
+          fi
+          
+          # 确保用 Python 做的 Manual Hook 成为唯一生效的挂钩方式！
+          echo "CONFIG_KSU_MANUAL_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          # ==========================================
+          
           echo " 🎯 SukiSU-Ultra 核心 + SuSFS 挂载引擎已接驳完毕！"
           
       # 💥免疫宏定义的正则级精准 
