@@ -32,7 +32,7 @@ env:
   KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
 
-  # 基石既然改好了，这里放心地交给系统自动获取！
+  # 逐字保留你验证通过的自动获取逻辑
   KERNELSU_AUTO_GET : "true" 
   KERNELSU_AUTO_FORK : "sukisu" 
 
@@ -122,7 +122,7 @@ jobs:
           sudo apt-get install -y python2 || apt-get install -y python2
           sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
 
-      # 💥 融合 Kprobes 引擎的最终电闸
+      # 第一步：只负责写入 Bash 电闸配置
       - name: 🔌 推上原生 Manual Hook 电闸并激活隐藏 SuSFS
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
@@ -135,8 +135,6 @@ jobs:
           
           # 2. 彻底粉碎 SuSFS 强制注入的 Inline Hook 宏！(这是 4.14 崩溃的元凶)
           find drivers/kernelsu -type f -name "Makefile" -exec sed -i '/SUSFS_INLINE_HOOK/d' {} +
-          
-          # 警告：绝不能像上次那样屏蔽 Kprobes！我们要靠原生 Kprobes 拯救 SuSFS！
           
           echo "==== 📝 正在写入内核配置 ===="
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
@@ -158,40 +156,67 @@ jobs:
           # 保护咱们完美的手动挂钩
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
-          # 5. 💥 上帝指令：彻底解除内核日志锁（以后免 Root 也能直接抓内核日志！）
+          # 5. 💥 上帝指令：彻底解除内核日志锁
           echo "# CONFIG_SECURITY_DMESG_RESTRICT is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
           echo " 🎯 SukiSU-Ultra 核心 + SuSFS 挂载引擎 + Kprobes 引擎已接驳完毕！"
-          
-          # 1. exec.c (Root 授权核心)
+
+      # 第二步：专门运行独立的 Python 物理注入脚本 (补回了被遗漏的包裹代码)
+      - name: 🪛 实施正则级精准上下文
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          cat << 'EOF' > patch_ksu.py
+          import os, re
+
+          def apply_patch(file_path, header_search, header_code, logic_search, logic_code):
+              if not os.path.exists(file_path):
+                  return
+              with open(file_path, "r") as f:
+                  data = f.read()
+
+              if "KSU_HOOK_APPLIED" in data:
+                  print(f" 已注入过: {file_path}")
+                  return
+
+              data = re.sub(header_search, r'\1\n/* KSU_HOOK_APPLIED */\n' + header_code, data, count=1)
+              new_data = re.sub(logic_search, r'\1' + logic_code + r'\n\t\2', data, count=1)
+              
+              if new_data != data:
+                  with open(file_path, "w") as f:
+                      f.write(new_data)
+                  print(f" 成功物理注入: {file_path}")
+              else:
+                  print(f" 找不到注入点(指纹不匹配): {file_path}")
+
+          # 1. exec.c
           apply_patch("fs/exec.c", 
               r'(#include <linux/binfmts\.h>)',
               "#if defined(CONFIG_KSU)\nextern bool ksu_execveat_hook __read_mostly;\nextern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\nextern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\n#endif\n",
               r'(struct files_struct \*displaced;\s+int retval;\s+)(if \(IS_ERR\(filename\)\))',
               "#if defined(CONFIG_KSU)\n\t{\n\t\tint ksu_fd = fd;\n\t\tint ksu_flags = flags;\n\t\tvoid *ksu_argv = (void *)&argv;\n\t\tvoid *ksu_envp = (void *)&envp;\n\t\tif (unlikely(ksu_execveat_hook))\n\t\t\tksu_handle_execveat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\telse\n\t\t\tksu_handle_execveat_sucompat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\tfd = ksu_fd;\n\t\tflags = ksu_flags;\n\t}\n#endif\n")
 
-          # 2. open.c (防检测隐藏核心)
+          # 2. open.c
           apply_patch("fs/open.c",
               r'(#include "internal\.h")',
               "#if defined(CONFIG_KSU)\nextern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n#endif\n",
               r'(unsigned int lookup_flags = LOOKUP_FOLLOW;\s+)(if \(mode & ~S_IRWXO\))',
               "#if defined(CONFIG_KSU)\n\tksu_handle_faccessat(&dfd, &filename, &mode, NULL);\n#endif\n")
 
-          # 3. stat.c (基于 vfs_statx 的指纹)
+          # 3. stat.c
           apply_patch("fs/stat.c",
               r'(#include <linux/syscalls\.h>)',
               "#if defined(CONFIG_KSU)\nextern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\n#endif\n",
               r'(unsigned int lookup_flags = LOOKUP_FOLLOW \| LOOKUP_AUTOMOUNT;\s+)(if \(\(flags & ~\()',
               "#if defined(CONFIG_KSU)\n\tksu_handle_stat(&dfd, &filename, &flags);\n#endif\n")
 
-          # 4. input.c (按键防救砖安全模式)
+          # 4. input.c
           apply_patch("drivers/input/input.c",
               r'(MODULE_AUTHOR\("Vojtech Pavlik <vojtech@suse\.cz>"\);)',
               "#if defined(CONFIG_KSU)\nextern bool ksu_input_hook __read_mostly;\nextern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);\n#endif\n",
               r'(int disposition = input_get_disposition\(dev, type, code, &value\);\s+)(if \(disposition != INPUT_IGNORE_EVENT && type != EV_SYN\))',
               "#if defined(CONFIG_KSU)\n\tif (unlikely(ksu_input_hook))\n\t\tksu_handle_input_handle_event(&type, &code, &value);\n#endif\n")
 
-          # 5. cmdline.c (抢救 SuSFS 2.0.00 唯一失败的补丁 - 修复转义符灾难)
+          # 5. cmdline.c
           apply_patch("fs/proc/cmdline.c",
               r'(#include <linux/seq_file\.h>)',
               "#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\nextern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);\n#endif\n",
@@ -229,7 +254,6 @@ jobs:
             device_kernel/fs/proc/cmdline.c
             device_kernel/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
             device_kernel/drivers/kernelsu/Kconfig
-      # ==== 提取结束 ====
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
