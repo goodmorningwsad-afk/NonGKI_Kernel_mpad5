@@ -58,8 +58,8 @@ env:
   # 必须是 shell，这样它才会下载守护进程！
   KERNELSU_METHOD: "shell" 
 
-  PATCHES_SOURCE: "author/source" 
-  PATCHES_BRANCH: "branch" 
+  PATCHES_SOURCE: "JackA1ltman/NonGKI_Kernel_Patches"
+  PATCHES_BRANCH: "main" 
 
   SUSFS_FOLDER_FIXED: "" 
   SUSFS_PATCH_FIXED: "" 
