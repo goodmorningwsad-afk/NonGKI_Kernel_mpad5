@@ -162,6 +162,7 @@ jobs:
           echo "# CONFIG_SECURITY_DMESG_RESTRICT is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
           echo " 🎯 SukiSU-Ultra 核心 + SuSFS 挂载引擎 + Kprobes 引擎已接驳完毕！"
+          
           # 1. exec.c (Root 授权核心)
           apply_patch("fs/exec.c", 
               r'(#include <linux/binfmts\.h>)',
