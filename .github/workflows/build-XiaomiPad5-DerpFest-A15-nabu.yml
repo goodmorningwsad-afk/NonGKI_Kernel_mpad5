@@ -174,9 +174,11 @@ jobs:
           echo " 🎯 SukiSU-Ultra 核心 + SuSFS 挂载引擎 + Kprobes 引擎已接驳完毕！"
 
           echo "==== 💥 物理摧毁内核日志沙箱 ===="
-          sed -i 's/if (dmesg_restrict && !priv)/if (0)/g' kernel/printk/printk.c || true
-          sed -i 's/if (dmesg_restrict && !syslog_action_restricted(type))/if (0)/g' kernel/printk/printk.c || true
-          sed -i 's/dmesg_restrict = 1/dmesg_restrict = 0/g' kernel/sysctl.c || true
+          sed -i 's/if (dmesg_restrict && !priv)/if (0)/g' kernel/printk/printk.c
+          sed -i 's/if (dmesg_restrict && !syslog_action_restricted(type))/if (0)/g' kernel/printk/printk.c
+          sed -i 's/dmesg_restrict = 1/dmesg_restrict = 0/g' kernel/sysctl.c
+          echo "CONFIG_CMDLINE=\"androidboot.selinux=permissive\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "CONFIG_CMDLINE_EXTEND=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
 
       # 第二步：专门运行独立的 Python 物理注入脚本 (补回了被遗漏的包裹代码)
       - name: 🪛 实施正则级精准上下文
