@@ -36,9 +36,9 @@ env:
   KERNELSU_AUTO_GET : "true" 
   KERNELSU_AUTO_FORK : "sukisu" 
 
-  SUSFS_ENABLE : "false" 
-  SUSFS_UPDATE : "false"
-  SUSFS_FIXED : "false"
+  SUSFS_ENABLE : "true" 
+  SUSFS_UPDATE : "true"
+  SUSFS_FIXED : "true"
 
   AK3_SOURCE : "https://github.com/osm0sis/AnyKernel3.git"
   AK3_BRANCH : "master"
@@ -211,11 +211,11 @@ jobs:
               "#if defined(CONFIG_KSU)\n\tif (unlikely(ksu_input_hook))\n\t\tksu_handle_input_handle_event(&type, &code, &value);\n#endif\n")
 
           # 5. cmdline.c (抢救 SuSFS 2.0.00 唯一失败的补丁 - 修复转义符灾难)
-          #apply_patch("fs/proc/cmdline.c",
-          #    r'(#include <linux/seq_file\.h>)',
-          #    "#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\nextern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);\n#endif\n",
-          #    r'(static int cmdline_proc_show\(struct seq_file \*m, void \*v\)\n\{\n)(#ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG|	seq_printf)',
-          #    "#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\n\tif (!susfs_spoof_cmdline_or_bootconfig(m)) {\n\t\tseq_putc(m, '\\\\n');\n\t\treturn 0;\n\t}\n#endif")
+          apply_patch("fs/proc/cmdline.c",
+              r'(#include <linux/seq_file\.h>)',
+              "#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\nextern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);\n#endif\n",
+              r'(static int cmdline_proc_show\(struct seq_file \*m, void \*v\)\n\{\n)(#ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG|	seq_printf)',
+              "#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\n\tif (!susfs_spoof_cmdline_or_bootconfig(m)) {\n\t\tseq_putc(m, '\\\\n');\n\t\treturn 0;\n\t}\n#endif")
           EOF
           
           python3 patch_ksu.py
