@@ -129,13 +129,15 @@ jobs:
           
           echo "==== 🔪 抢救 SukiSU 源码层面的低级语法 Bug ===="
           if [ -f "drivers/kernelsu/app_profile.c" ]; then
-              # 1. 修复 profile 结构体调用错误
+              # 1. 修复 profile 结构体调用错误 (全局替换没问题)
               sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
-              # 2. 修复 newcreds 指针调用错误 (一次性修复 cap_effective, cap_permitted, cap_bset)
+              
+              # 2. 修复 newcreds 指针调用错误 (全局替换没问题)
               sed -i 's/newcreds\.cap_/newcreds->cap_/g' drivers/kernelsu/app_profile.c
-              # 3. 修复未声明的 cred 变量名错误
-              sed -i 's/setup_groups(&profile, cred)/setup_groups(\&profile, newcreds)/g' drivers/kernelsu/app_profile.c
-              echo "✅ app_profile.c 语法修复完毕！"
+              
+              # 3. 🎯 【精准修复】只修改 300 行以后的错误，绝对不误伤 197 行！
+              sed -i '300,$s/setup_groups(&profile, cred)/setup_groups(\&profile, newcreds)/g' drivers/kernelsu/app_profile.c
+              echo "✅ app_profile.c 语法精确修复完毕！"
           fi
           
           echo "==== 🔪 修正挂钩策略：启用 Kprobes 替代崩溃的 Inline Hook ===="
