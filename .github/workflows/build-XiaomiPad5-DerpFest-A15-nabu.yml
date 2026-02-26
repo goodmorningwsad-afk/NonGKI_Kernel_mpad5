@@ -206,10 +206,29 @@ jobs:
           python3 patch_ksu.py
           echo "  所有文件指纹匹配完毕！"
 
-      # 防止 OOM 内存爆炸
-      - name:  Disable LTO to prevent OOM
+      - name: 看内核里的 SuSFS 源码全貌
         run: |
+          cd $GITHUB_WORKSPACE/device_kernel
           
+          echo "======================================================"
+          echo " 正在查阅底层 API：include/linux/susfs.h"
+          echo "======================================================"
+          if [ -f "include/linux/susfs.h" ]; then
+              cat include/linux/susfs.h
+          else
+              echo " 找不到 include/linux/susfs.h！"
+          fi
+          
+          echo ""
+          echo "======================================================"
+          echo " 正在查阅 SukiSU 调用源码：drivers/kernelsu/supercalls.c 的开头部分"
+          echo "======================================================"
+          if [ -f "drivers/kernelsu/supercalls.c" ]; then
+              head -n 50 drivers/kernelsu/supercalls.c
+          else
+              echo " 警告：找不到 supercalls.c！"
+          fi
+        
       #  防止 OOM 内存爆炸
       - name:  Disable LTO to prevent OOM
         run: |
