@@ -127,17 +127,18 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
-          echo "==== 🔪 修正挂钩策略：启用 Kprobes 替代崩溃的 Inline Hook ===="
-          # 1. 强改默认挂钩为 Manual (保护 KSU 核心)
-          if [ -f "drivers/kernelsu/Kconfig" ]; then
-              sed -i 's/default KSU_NONE_HOOK/default KSU_MANUAL_HOOK/g' drivers/kernelsu/Kconfig
+          echo "==== 🔪 抢救 SukiSU 源码层面的低级语法 Bug ===="
+          if [ -f "drivers/kernelsu/app_profile.c" ]; then
+              # 1. 修复 profile 结构体调用错误
+              sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
+              # 2. 修复 newcreds 指针调用错误 (一次性修复 cap_effective, cap_permitted, cap_bset)
+              sed -i 's/newcreds\.cap_/newcreds->cap_/g' drivers/kernelsu/app_profile.c
+              # 3. 修复未声明的 cred 变量名错误
+              sed -i 's/setup_groups(&profile, cred)/setup_groups(\&profile, newcreds)/g' drivers/kernelsu/app_profile.c
+              echo "✅ app_profile.c 语法修复完毕！"
           fi
           
-          # 2. 彻底粉碎 SuSFS 强制注入的 Inline Hook 宏！(这是 4.14 崩溃的元凶)
-          find drivers/kernelsu -type f -name "Makefile" -exec sed -i '/SUSFS_INLINE_HOOK/d' {} +
-          
-          echo "==== 📝 正在写入内核配置 ===="
-          echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "==== 🔪 修正挂钩策略：启用 Kprobes 替代崩溃的 Inline Hook ===="
           
           # 3. 💥 开启内核原生的 Kprobes 引擎，让 SuSFS 满血复活！
           echo "CONFIG_KPROBES=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
