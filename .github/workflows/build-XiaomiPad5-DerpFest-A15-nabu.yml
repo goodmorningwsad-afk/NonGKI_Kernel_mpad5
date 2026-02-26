@@ -136,11 +136,7 @@ jobs:
               sed -i 's/default KSU_NONE_HOOK/default KSU_MANUAL_HOOK/g' drivers/kernelsu/Kconfig
               echo "✅ 已将默认挂钩强制锁定为 Manual Hook！"
           fi
-          
-           2. 采用社区方案：暴力屏蔽导致老内核崩溃的 kprobe 挂钩机制，断绝它想用高级挂钩的念头
-          find drivers/kernelsu -type f -name "*.c" -exec sed -i 's/#ifdef CONFIG_KPROBES/#if 0/g' {} +
-          echo "✅ 已彻底物理切断 Kprobe 挂钩机制！"
-              echo "==== 📝 正在写入内核配置 ===="
+           echo "====  正在写入内核配置 ===="
           
           # 启动 SukiSU 核心
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
