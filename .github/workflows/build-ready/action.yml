@@ -42,7 +42,7 @@ runs:
             "be70102"      # drivers: Set proper version
             "73789c6"      # drivers: Import KernelSU Next... (这是原本的 KSU 驱动)
             "bc69b25"      # drivers: Add KSU config path
-            # ⛔️ STOP! 下一个就是 fe2ed1a (SUSFS)，千万别撤销它！
+            "fe2ed1a"
           )
           
           for commit in "${COMMITS_TO_REVERT[@]}"; do
