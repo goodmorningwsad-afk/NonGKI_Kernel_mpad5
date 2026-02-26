@@ -143,6 +143,7 @@ jobs:
           if [ -f "drivers/kernelsu/supercalls.c" ]; then
               # 解决作者手滑导致的宏定义双重前缀套娃 Bug
               sed -i 's/KSU_IOCTL(KSU_IOCTL_/KSU_IOCTL(/g' drivers/kernelsu/supercalls.c
+              sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
               echo "✅ supercalls.c 宏定义套娃精确修复完毕！"
           fi
           
