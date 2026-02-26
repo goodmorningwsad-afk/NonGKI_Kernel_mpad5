@@ -138,6 +138,7 @@ jobs:
               # 3. 🎯 【精准修复】只修改 300 行以后的错误，绝对不误伤 197 行！
               sed -i '300,$s/setup_groups(&profile, cred)/setup_groups(\&profile, newcreds)/g' drivers/kernelsu/app_profile.c
               echo "✅ app_profile.c 语法精确修复完毕！"
+          fi  # <==== 就是补了这一行！
               
           if [ -f "drivers/kernelsu/supercalls.c" ]; then
               # 解决作者手滑导致的宏定义双重前缀套娃 Bug
