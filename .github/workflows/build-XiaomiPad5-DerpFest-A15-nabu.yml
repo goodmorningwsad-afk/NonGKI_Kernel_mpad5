@@ -115,6 +115,9 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 🪝 Patch Kernel of SUSFS
+        uses: ./.github/workflows/patch-susfs
+
       - name: 🐍 Install Python 2
         run: |
           sudo apt-get update || apt-get update
