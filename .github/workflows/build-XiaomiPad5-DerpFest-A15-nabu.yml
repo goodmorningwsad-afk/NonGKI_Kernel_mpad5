@@ -36,9 +36,8 @@ env:
   KERNELSU_AUTO_GET : "true" 
   KERNELSU_AUTO_FORK : "sukisu" 
 
-  # 💥 1. 重启 SuSFS 引擎！
-  SUSFS_ENABLE : "true" 
-  SUSFS_UPDATE : "true"
+  SUSFS_ENABLE : "false" 
+  SUSFS_UPDATE : "false"
   SUSFS_FIXED : "false"
 
   AK3_SOURCE : "https://github.com/osm0sis/AnyKernel3.git"
@@ -117,8 +116,8 @@ jobs:
         uses: ./.github/workflows/build-ready
 
       # 💥 2. 恢复官方的 SuSFS 补丁注入！
-      - name: 🪝 Patch Kernel of SUSFS
-        uses: ./.github/workflows/patch-susfs
+      #- name: 🪝 Patch Kernel of SUSFS
+      #  uses: ./.github/workflows/patch-susfs
 
       - name: 🐍 Install Python 2
         run: |
@@ -138,23 +137,22 @@ jobs:
               echo "✅ 已将默认挂钩强制锁定为 Manual Hook！"
           fi
           
-          # 2. 采用社区方案：暴力屏蔽导致老内核崩溃的 kprobe 挂钩机制，断绝它想用高级挂钩的念头
+           2. 采用社区方案：暴力屏蔽导致老内核崩溃的 kprobe 挂钩机制，断绝它想用高级挂钩的念头
           find drivers/kernelsu -type f -name "*.c" -exec sed -i 's/#ifdef CONFIG_KPROBES/#if 0/g' {} +
           echo "✅ 已彻底物理切断 Kprobe 挂钩机制！"
-          
-          echo "==== 📝 正在写入内核配置 ===="
+              echo "==== 📝 正在写入内核配置 ===="
           
           # 启动 SukiSU 核心
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
           # 唤醒 SuSFS 隐身装甲
-          echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          #echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          #echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          #echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          #echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          #echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          #echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          #echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
           # 就算配置文件被忽略，我们的双保险（手动挂钩优先 + 禁止内联）依旧在
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
@@ -221,11 +219,11 @@ jobs:
               "#if defined(CONFIG_KSU)\n\tif (unlikely(ksu_input_hook))\n\t\tksu_handle_input_handle_event(&type, &code, &value);\n#endif\n")
 
           # 5. cmdline.c (抢救 SuSFS 2.0.00 唯一失败的补丁 - 修复转义符灾难)
-          apply_patch("fs/proc/cmdline.c",
-              r'(#include <linux/seq_file\.h>)',
-              "#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\nextern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);\n#endif\n",
-              r'(static int cmdline_proc_show\(struct seq_file \*m, void \*v\)\n\{\n)(#ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG|	seq_printf)',
-              "#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\n\tif (!susfs_spoof_cmdline_or_bootconfig(m)) {\n\t\tseq_putc(m, '\\\\n');\n\t\treturn 0;\n\t}\n#endif")
+          #apply_patch("fs/proc/cmdline.c",
+          #    r'(#include <linux/seq_file\.h>)',
+          #    "#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\nextern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);\n#endif\n",
+          #    r'(static int cmdline_proc_show\(struct seq_file \*m, void \*v\)\n\{\n)(#ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG|	seq_printf)',
+          #    "#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\n\tif (!susfs_spoof_cmdline_or_bootconfig(m)) {\n\t\tseq_putc(m, '\\\\n');\n\t\treturn 0;\n\t}\n#endif")
           EOF
           
           python3 patch_ksu.py
