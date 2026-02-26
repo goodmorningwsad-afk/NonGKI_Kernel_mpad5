@@ -206,33 +206,6 @@ jobs:
           python3 patch_ksu.py
           echo "  所有文件指纹匹配完毕！"
 
-      - name: 🚑 抢救 SuSFS：热更新 API 适配 SukiSU
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 诊断到 SuSFS 1.5.5 版本过旧，正在热更新 API ===="
-          
-          # 自动从 Makefile 提取内核大版本号 (例如 4.14)
-          KERNEL_VERSION=$(head -n 3 Makefile | grep -E 'VERSION|PATCHLEVEL' | awk '{print $3}' | paste -sd '.')
-          SUS_BRANCH="kernel-${KERNEL_VERSION}"
-          echo "[+] 正在从 simonpunk 仓库的 $SUS_BRANCH 分支拉取最新 SuSFS..."
-          
-          # 1. 覆盖头文件 (补全 SUSFS_MAGIC 等 SukiSU 需要的宏)
-          curl -sSL "https://raw.githubusercontent.com/simonpunk/susfs4ksu/${SUS_BRANCH}/kernel_patches/include/linux/susfs.h" -o include/linux/susfs.h
-          
-          # 2. 覆盖 C 文件 (补全底层逻辑)
-          curl -sSL "https://raw.githubusercontent.com/simonpunk/susfs4ksu/${SUS_BRANCH}/kernel_patches/fs/susfs.c" -o fs/susfs.c
-          
-          # 3. 终极兜底：强行让编译器闭嘴，忽略 SukiSU 和 SuSFS 之间的指针类型差异警告
-          if [ -d "drivers/kernelsu" ]; then
-              echo "ccflags-y += -Wno-incompatible-pointer-types" >> drivers/kernelsu/Makefile
-              echo "✅ 已向 KernelSU Makefile 注入无视指针警告规则！"
-          else
-              echo "❌ 找不到 drivers/kernelsu 目录，请检查之前的克隆步骤！"
-              exit 1
-          fi
-          
-          echo "==== 🎯 SuSFS 核心 API 更新完成，编译冲突已解除！ ===="
-
       # 防止 OOM 内存爆炸
       - name:  Disable LTO to prevent OOM
         run: |
