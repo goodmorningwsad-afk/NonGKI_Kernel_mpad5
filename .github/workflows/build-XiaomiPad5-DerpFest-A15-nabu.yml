@@ -55,7 +55,6 @@ env:
 
   PACK_METHOD: "Anykernel3" 
 
-  # 必须是 shell，这样它才会下载守护进程！
   KERNELSU_METHOD: "shell" 
 
   PATCHES_SOURCE: "JackA1ltman/NonGKI_Kernel_Patches"
@@ -66,7 +65,6 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  # 挂钩方式： tracepoint
   HOOK_METHOD: "tracepoint" 
   HOOK_OLDER: "false" 
 
@@ -115,9 +113,8 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-      # 💥 2. 恢复官方的 SuSFS 补丁注入！
-      #- name: 🪝 Patch Kernel of SUSFS
-      #  uses: ./.github/workflows/patch-susfs
+      - name: 🪝 Patch Kernel of SUSFS
+        uses: ./.github/workflows/patch-susfs
 
       - name: 🐍 Install Python 2
         run: |
@@ -130,34 +127,33 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
-          echo "==== 🔪 执行社区成熟方案：源码级物理篡改 ===="
-          # 1. 物理篡改 SukiSU 的单选菜单，把默认的“无挂钩(NONE)”强行改成“手动挂钩(MANUAL)”！
+          echo "==== 🔪 执行终极斩首：物理抹除所有流氓挂钩机制 ===="
+          # 强改默认挂钩为 Manual
           if [ -f "drivers/kernelsu/Kconfig" ]; then
               sed -i 's/default KSU_NONE_HOOK/default KSU_MANUAL_HOOK/g' drivers/kernelsu/Kconfig
-              echo "✅ 已将默认挂钩强制锁定为 Manual Hook！"
           fi
-           echo "====  正在写入内核配置 ===="
           
-          # 启动 SukiSU 核心
+          #补丁
+          find drivers/kernelsu -type f -name "Makefile" -exec sed -i '/SUSFS_INLINE_HOOK/d' {} +
+          
+          # 断
+          find drivers/kernelsu -type f -name "*.c" -exec sed -i 's/#ifdef CONFIG_KPROBES/#if 0/g' {} +
+          
+          echo "==== 📝 正在写入内核配置 ===="
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
-          # 唤醒 SuSFS 隐身装甲
-          #echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          #echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          #echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          #echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          #echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          #echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          #echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
-          # 就算配置文件被忽略，我们的双保险（手动挂钩优先 + 禁止内联）依旧在
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "# CONFIG_KSU_SUSFS_INLINE_HOOK is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "# CONFIG_SUSFS_INLINE_HOOK is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          
           echo " 🎯 SukiSU-Ultra 核心 + SuSFS 挂载引擎已接驳完毕！"
           
-      # 💥 4. 包含 5 大文件完整抢救的 Python 脚本
+      #  4. 包含 5 大文件完整抢救的 Python 脚本
       - name: 🪛 实施正则级精准上下文
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
