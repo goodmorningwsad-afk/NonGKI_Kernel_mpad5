@@ -237,9 +237,6 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
-      - name: 🚀 Build Process
-        uses: ./.github/workflows/build-process
-
       - name: 🔩 Pack Process
         uses: ./.github/workflows/pack-process
 
