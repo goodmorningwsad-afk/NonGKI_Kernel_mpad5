@@ -226,6 +226,10 @@ jobs:
           echo "# CONFIG_LTO is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "# CONFIG_LTO_CLANG is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo " LTO 优化已彻底关闭！"
+          echo "==== 正在注入编译器警告豁免 ===="
+          echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
+          echo "ccflags-y += -Wno-error" >> fs/Makefile
+          echo " 已成功废除 fs 目录下的闲置函数报错！"
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
