@@ -126,11 +126,23 @@ jobs:
           sudo apt-get install -y python2 || apt-get install -y python2
           sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
 
-      # 💥 3. 推上包含阉割 Inline Hook 的完全体电闸！
+      # 💥 融合 GitHub 社区成熟方案的暴力电闸
       - name: 🔌 推上原生 Manual Hook 电闸并激活隐藏 SuSFS
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo " 正在写入 defconfig 配置..."
+          
+          echo "==== 🔪 执行社区成熟方案：源码级物理篡改 ===="
+          # 1. 物理篡改 SukiSU 的单选菜单，把默认的“无挂钩(NONE)”强行改成“手动挂钩(MANUAL)”！
+          if [ -f "drivers/kernelsu/Kconfig" ]; then
+              sed -i 's/default KSU_NONE_HOOK/default KSU_MANUAL_HOOK/g' drivers/kernelsu/Kconfig
+              echo "✅ 已将默认挂钩强制锁定为 Manual Hook！"
+          fi
+          
+          # 2. 采用社区方案：暴力屏蔽导致老内核崩溃的 kprobe 挂钩机制，断绝它想用高级挂钩的念头
+          find drivers/kernelsu -type f -name "*.c" -exec sed -i 's/#ifdef CONFIG_KPROBES/#if 0/g' {} +
+          echo "✅ 已彻底物理切断 Kprobe 挂钩机制！"
+          
+          echo "==== 📝 正在写入内核配置 ===="
           
           # 启动 SukiSU 核心
           echo "CONFIG_KSU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
@@ -144,16 +156,10 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
-          # 物理阉割 SuSFS 自带的流氓 Inline Hook (导致崩溃的元凶)
-          echo "==== 🔪 正在强行切断导致 4.14 崩溃的 Inline Hook ===="
+          # 就算配置文件被忽略，我们的双保险（手动挂钩优先 + 禁止内联）依旧在
+          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "# CONFIG_KSU_SUSFS_INLINE_HOOK is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "# CONFIG_SUSFS_INLINE_HOOK is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          if [ -f "drivers/kernelsu/Kconfig" ]; then
-              sed -i 's/default y if KSU_SUSFS/default n/g' drivers/kernelsu/Kconfig
-          fi
-          
-          # 激活正确的手动挂钩总闸！(咱们刚才修好的最大功臣)
-          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           
           echo " 🎯 SukiSU-Ultra 核心 + SuSFS 挂载引擎已接驳完毕！"
           
