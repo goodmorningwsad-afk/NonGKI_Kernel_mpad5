@@ -22,7 +22,7 @@ runs:
           cd $GITHUB_WORKSPACE/device_kernel
           
           echo "拉取完整历史..."
-          git fetch --unshallow || echo "已经是完整克隆，继续..."
+          git fetch --depth=100 || echo "已经是完整克隆，继续..."
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
           
