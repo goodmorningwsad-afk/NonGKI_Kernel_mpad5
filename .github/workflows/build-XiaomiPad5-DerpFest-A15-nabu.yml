@@ -152,8 +152,8 @@ jobs:
               sed -i 's/default y if KSU_SUSFS/default n/g' drivers/kernelsu/Kconfig
           fi
           
-          # 确保用 Python 做的 Manual Hook 成为唯一生效的挂钩方式！
-          echo "CONFIG_KSU_MANUAL_SU=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          #  修正致命拼写错误！激活正确的总！
+          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           # ==========================================
           
           echo " 🎯 SukiSU-Ultra 核心 + SuSFS 挂载引擎已接驳完毕！"
