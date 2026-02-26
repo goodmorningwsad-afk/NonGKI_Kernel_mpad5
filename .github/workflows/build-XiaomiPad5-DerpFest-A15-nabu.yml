@@ -59,7 +59,7 @@ env:
   KERNELSU_METHOD: "shell" 
 
   PATCHES_SOURCE: "JackA1ltman/NonGKI_Kernel_Patches"
-  PATCHES_BRANCH: "main" 
+  PATCHES_BRANCH: "mi_kernel" 
 
   SUSFS_FOLDER_FIXED: "" 
   SUSFS_PATCH_FIXED: "" 
