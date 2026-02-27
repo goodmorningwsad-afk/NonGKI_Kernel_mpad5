@@ -16,9 +16,11 @@ env:
   NEED_DTBO : false
   NEED_SAFE_DTBO : false
   ROM_TEXT : "derpfest_a15" 
-
-  # (注意：你之前加的 PYTHON_VERSION: "2" 千万别删！继续保留！)
-
+  KERNELSU_METHOD: "shell" 
+  REKERNEL_ENABLE: "false" 
+  HOOK_METHOD: "syscall"    
+  HOOK_OLDER: "false" 
+  KERNEL_PATCH: "false"
   CUSTOM_CMDS : "CLANG_TRIPLE=aarch64-linux-gnu-"
   EXTRA_CMDS : "LD=ld.lld LLVM=1 LLVM_IAS=1"
 
