@@ -6,9 +6,8 @@ on:
 
 env:
   # Device env
-  DEVICE_NAME : "device_name"
-  DEVICE_CODENAME : "device_codename"
-  PYTHON_VERSION : "2"
+  DEVICE_NAME : "Xiaomi Pad 5"
+  DEVICE_CODENAME : "nabu"
 
   CUSTOM_CMDS : "CLANG_TRIPLE=aarch64-linux-gnu-"
   EXTRA_CMDS : "LD=ld.lld LLVM=1 LLVM_IAS=1"
@@ -33,67 +32,68 @@ env:
   KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
 
-  KERNELSU_AUTO_GET : "true" # if u want easy setting kernelsu, u can true.
-  KERNELSU_AUTO_FORK : "sukisu" # magic, rsuntk, next, resukisu and sukisu
+  KERNELSU_AUTO_GET : "true" 
+  KERNELSU_AUTO_FORK : "sukisu" 
 
-  SUSFS_ENABLE : false
-  SUSFS_FIXED : false
+  SUSFS_ENABLE : "false"
+  SUSFS_FIXED : "false"
 
   AK3_SOURCE : "https://github.com/osm0sis/AnyKernel3.git"
   AK3_BRANCH : "master"
 
   BOOT_SOURCE : ""
 
-  NEED_DTBO : false
-  NEED_SAFE_DTBO : false
+  NEED_DTBO : "false"
+  NEED_SAFE_DTBO : "false"
 
-  ROM_TEXT : "rom_android"
+  ROM_TEXT : "derpfest_a15"
 
-  # Other env
-  PYTHON_VERSION: "3" # Only 2(Ubuntu 22.04 and Ubuntu 20.04) or 3(Any OS Versions).
+  # Other env - 锁定 Python 2 拯救老内核
+  PYTHON_VERSION: "2" 
 
-  PACK_METHOD: "Anykernel3" # Anykernel3 need SOURCE and BRANCH, MKBOOTIMG needn't it.
+  PACK_METHOD: "Anykernel3" 
 
-  KERNELSU_METHOD: "shell" # shell, manual and only.
+  KERNELSU_METHOD: "shell" 
 
-  PATCHES_SOURCE: "author/source" # [your_name]/[your_patch] -> gooder123/NonGKI_Patcher
-  PATCHES_BRANCH: "branch" # [your_branch] -> main
+  PATCHES_SOURCE: "author/source" 
+  PATCHES_BRANCH: "branch" 
 
-  SUSFS_FOLDER_FIXED: "" # Fill in your patch prefix directory here. Leave it blank if there isn't one. -> your_folder
-  SUSFS_PATCH_FIXED: "" # Fill in your patches here. If there are multiple patches, please separate them with a comma. Leave it blank if there isn't one. -> patch1,patch2
+  SUSFS_FOLDER_FIXED: "" 
+  SUSFS_PATCH_FIXED: "" 
 
-  REKERNEL_ENABLE: "false" # if u need Re:Kernel.
+  REKERNEL_ENABLE: "false" 
 
-  HOOK_METHOD: "syscall" # Manual hook method -> syscall.
-  HOOK_OLDER: "false" # contain backport older patch and syscall older patch.
+  HOOK_METHOD: "syscall" 
+  HOOK_OLDER: "false" 
 
-  KERNEL_PATCH: "false" # If your kernel version is <= 4.9, you have the option of enabling the patch to patch the kernel_write and kernel_read functions.
+  KERNEL_PATCH: "false" 
 
-  KPM_ENABLE: "false" # Anyone devices.
-  KPM_INLINE: "false" # Only use it for SukiSU-Ultra.
-  KPM_KPATCH_NEXT: "false" # If u want hook KPatch-Next in build step.
-  KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" # If u want to use KPM Inline,so you need set patch exec file source -> raw.githubusercontent.com/Test/Test/patch .
+  # 👇 纯血 KPM 全力全开！ 👇
+  KPM_ENABLE: "true" 
+  KPM_INLINE: "true" 
+  KPM_KPATCH_NEXT: "false" 
+  KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" 
 
-  BASEBAND_GUARD_ENABLE: "false" #if u want prevent unauthorized writes to critical partitions/device nodes.
-  BASEBAND_GUARD_BOOT: "false" #if u want to protect boot partition.
+  BASEBAND_GUARD_ENABLE: "false" 
+  BASEBAND_GUARD_BOOT: "false" 
 
-  HIDE_STUFF: "false" # hide some of the features
+  HIDE_STUFF: "false" 
 
-  GENERATE_DTB: "false" # if u kernel need DTB , but cannot auto generate it. (Only Anykernel3).
-  GENERATE_CHIP: "qcom" # only supported for qcom and mediatek.
+  GENERATE_DTB: "false" 
+  GENERATE_CHIP: "qcom" 
 
-  BUILD_DEBUGGER: "false" # Output build errors.
-  SKIP_PATCH: "false" # Ignore errors found in Patch Debugger.
+  BUILD_DEBUGGER: "false" 
+  SKIP_PATCH: "false" 
 
-  BUILD_OTHER_CONFIG: "false" # Merge config files.
+  BUILD_OTHER_CONFIG: "false" 
   MERGE_CONFIG_FILES: "vendor/debugfs.config,vendor/lahaina_QGKI.config"
 
-  FREE_MORE_SPACE: "false" # if u want get more space, enabled it.
-
+  FREE_MORE_SPACE: "false" 
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-kernel:
+    name: Build Kernel
+    runs-on: ubuntu-latest 
     env:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
@@ -112,14 +112,13 @@ jobs:
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
-      # 👇 重点来了！一切挂钩逻辑都交给官方的免 kprobe 模块去处理！
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
 
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          # 屏蔽烦人的闲置函数报错，防止编译中断
+          # 屏蔽闲置报错
           echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
           echo "ccflags-y += -Wno-error" >> fs/Makefile
 
@@ -130,13 +129,13 @@ jobs:
         uses: ./.github/workflows/patch-baseband-guard
 
       - name: 🔧 Patch Hide Stuff
-        uses: ./.github/workflows/patch-hide
+        uses: ./.github/workflows/patch-hide-stuff
 
-      - name: 🏗️ Start Compilation Process
-        uses: ./.github/workflows/build-start
+      - name: 🚀 Build Process
+        uses: ./.github/workflows/build-process
 
-      - name: 📦 Check Files And Pack AnyKernel3
-        uses: ./.github/workflows/build-pack
+      - name: 🔩 Pack Process
+        uses: ./.github/workflows/pack-process
 
-      - name: 📤 Upload Build Complete Kernel
-        uses: ./.github/workflows/build-upload
+      - name: ✏️ Upload Artifacts
+        uses: ./.github/workflows/upload-files
