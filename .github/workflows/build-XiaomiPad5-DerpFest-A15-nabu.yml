@@ -245,6 +245,11 @@ jobs:
           
           python3 patch_ksu.py
           echo "  所有文件指纹匹配完毕！"
+
+          # 👇 ==== 🎯 外科手术：仅对 142 号暗号（reboot）进行 Seccomp 豁免 ====
+          echo "==== 💥 精准放行 SukiSU 的 142 号隐身暗号 ===="
+          sed -i 's/switch (action)/if (sd->nr == 142) action = SECCOMP_RET_ALLOW;\n\tswitch (action)/g' kernel/seccomp.c || true
+          echo " 🎯 已被修改，仅放行 142 系统调用！"
         
       #  防止 OOM 内存爆炸
       - name:  Disable LTO to prevent OOM
