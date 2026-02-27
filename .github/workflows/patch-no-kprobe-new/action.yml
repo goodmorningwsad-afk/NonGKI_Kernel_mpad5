@@ -120,11 +120,11 @@ runs:
             echo "==== 🎯 开启 SukiSU-Ultra 专属 Tracepoint 钩子物理注入 ===="
             
             # 方案 A：直接用 sed 对 4 个核心文件进行自动化精准手术 (默认方案)
-            sed -i '/#include <linux\/fs.h>/a #include <../drivers/kernelsu/ksu_trace.h>' fs/exec.c fs/open.c fs/read_write.c fs/stat.c || true
-            sed -i 's/retval = bprm_execve(bprm, fd, filename, flags);/ksu_handle_execveat(\&fd, \&filename, \&flags, \&bprm);\n\tretval = bprm_execve(bprm, fd, filename, flags);/g' fs/exec.c || true
-            sed -i 's/long ret = do_sys_open(dfd, filename, flags, mode);/ksu_handle_faccessat(\&dfd, \&filename);\n\tlong ret = do_sys_open(dfd, filename, flags, mode);/g' fs/open.c || true
-            sed -i 's/ret = vfs_read(file, buf, count, pos);/ksu_handle_vfs_read(\&file, \&buf, \&count, pos);\n\tret = vfs_read(file, buf, count, pos);/g' fs/read_write.c || true
-            sed -i 's/error = vfs_statx(dfd, filename, flags, stat, mask);/ksu_handle_stat(\&dfd, \&filename, \&flags);\n\terror = vfs_statx(dfd, filename, flags, stat, mask);/g' fs/stat.c || true
+            sed -i '/#include <linux\/fs.h>/a #include <../drivers/kernelsu/ksu_trace.h>' fs/exec.c fs/open.c fs/read_write.c fs/stat.c
+            sed -i 's/retval = bprm_execve(bprm, fd, filename, flags);/ksu_handle_execveat(\&fd, \&filename, \&flags, \&bprm);\n\tretval = bprm_execve(bprm, fd, filename, flags);/g' fs/exec.c
+            sed -i 's/long ret = do_sys_open(dfd, filename, flags, mode);/ksu_handle_faccessat(\&dfd, \&filename);\n\tlong ret = do_sys_open(dfd, filename, flags, mode);/g' fs/open.c 
+            sed -i 's/ret = vfs_read(file, buf, count, pos);/ksu_handle_vfs_read(\&file, \&buf, \&count, pos);\n\tret = vfs_read(file, buf, count, pos);/g' fs/read_write.c
+            sed -i 's/error = vfs_statx(dfd, filename, flags, stat, mask);/ksu_handle_stat(\&dfd, \&filename, \&flags);\n\terror = vfs_statx(dfd, filename, flags, stat, mask);/g' fs/stat.c
             
             # 方案 B：如果您在其他地方托管了现成的 .patch 文件，可以取消注释下面这两行使用：
             # wget -qO tracepoint.patch "https://你的补丁直链地址"
