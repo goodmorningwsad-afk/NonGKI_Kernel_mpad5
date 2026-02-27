@@ -8,6 +8,7 @@ env:
   # === 1. 设备与内核基础环境 ===
   DEVICE_NAME : "Xiaomi Pad 5"
   DEVICE_CODENAME : "nabu"
+  PYTHON_VERSION : "2"
 
   CUSTOM_CMDS : "CLANG_TRIPLE=aarch64-linux-gnu-"
   EXTRA_CMDS : "LD=ld.lld LLVM=1 LLVM_IAS=1"
