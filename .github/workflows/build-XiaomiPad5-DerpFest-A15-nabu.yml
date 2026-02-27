@@ -68,7 +68,6 @@ env:
 
   KERNEL_PATCH: "false" 
 
-  # 👇 纯血 KPM 全力全开！ 👇
   KPM_ENABLE: "true" 
   KPM_INLINE: "true" 
   KPM_KPATCH_NEXT: "false" 
@@ -93,7 +92,8 @@ env:
 jobs:
   build-kernel:
     name: Build Kernel
-    runs-on: ubuntu-20.04 
+    runs-on: ubuntu-latest 
+    container: ubuntu:focal
     env:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
