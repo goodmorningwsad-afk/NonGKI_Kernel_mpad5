@@ -238,12 +238,6 @@ jobs:
               r'(int disposition = input_get_disposition\(dev, type, code, &value\);\s+)(if \(disposition != INPUT_IGNORE_EVENT && type != EV_SYN\))',
               "#if defined(CONFIG_KSU)\n\tif (unlikely(ksu_input_hook))\n\t\tksu_handle_input_handle_event(&type, &code, &value);\n#endif\n")
 
-          # 5. cmdline.c
-          apply_patch("fs/proc/cmdline.c",
-              r'(#include <linux/seq_file\.h>)',
-              "#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\nextern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);\n#endif\n",
-              r'(static int cmdline_proc_show\(struct seq_file \*m, void \*v\)\n\{\n)(#ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG|	seq_printf)',
-              "#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\n\tif (!susfs_spoof_cmdline_or_bootconfig(m)) {\n\t\tseq_putc(m, '\\\\n');\n\t\treturn 0;\n\t}\n#endif")
           EOF
           
           python3 patch_ksu.py
