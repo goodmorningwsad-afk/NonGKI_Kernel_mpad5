@@ -9,6 +9,15 @@ env:
   DEVICE_NAME : "Xiaomi Pad 5"
   DEVICE_CODENAME : "nabu"
   PYTHON_VERSION : "2"
+  PACK_METHOD: "Anykernel3" 
+  AK3_SOURCE : "https://github.com/osm0sis/AnyKernel3.git"
+  AK3_BRANCH : "master"
+  BOOT_SOURCE : ""
+  NEED_DTBO : false
+  NEED_SAFE_DTBO : false
+  ROM_TEXT : "derpfest_a15" 
+
+  # (注意：你之前加的 PYTHON_VERSION: "2" 千万别删！继续保留！)
 
   CUSTOM_CMDS : "CLANG_TRIPLE=aarch64-linux-gnu-"
   EXTRA_CMDS : "LD=ld.lld LLVM=1 LLVM_IAS=1"
