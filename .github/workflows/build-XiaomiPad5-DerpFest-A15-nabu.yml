@@ -6,17 +6,17 @@ on:
 
 env:
   # Device env
-  DEVICE_NAME : "Xiaomi Pad 5"
-  DEVICE_CODENAME : "nabu"
+  DEVICE_NAME : "device_name"
+  DEVICE_CODENAME : "device_codename"
 
   CUSTOM_CMDS : "CLANG_TRIPLE=aarch64-linux-gnu-"
   EXTRA_CMDS : "LD=ld.lld LLVM=1 LLVM_IAS=1"
 
-  KERNEL_SOURCE : "https://github.com/goodmorningwsad-afk/kernel_xiaomi_nabu-ki"
-  KERNEL_BRANCH : "derp15.1"
+  KERNEL_SOURCE : "https://github.com/kernel_author/android_kernel_codename.git"
+  KERNEL_BRANCH : "system_os"
 
-  CLANG_SOURCE : "https://github.com/kdrag0n/proton-clang.git"
-  CLANG_BRANCH : "master"
+  CLANG_SOURCE : "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/LLVM-19.1.7-Linux-X64.tar.xz"
+  CLANG_BRANCH : ""
 
   GCC_GNU : false
   GCC_64_SOURCE : "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9.git"
@@ -25,77 +25,75 @@ env:
   GCC_32_BRANCH : "android12L-release"
 
   DEFCONFIG_SOURCE: ""
-  DEFCONFIG_NAME : "vendor/xiaomi/nabu_inflated_defconfig" 
+  DEFCONFIG_NAME : "codename_defconfig"
   DEFCONFIG_ORIGIN_IMAGE: ""
   DEFCONFIG_FROM_BOOT: false
 
   KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
 
-  # 逐字保留你验证通过的自动获取逻辑
-  KERNELSU_AUTO_GET : "true" 
-  KERNELSU_AUTO_FORK : "sukisu" 
+  KERNELSU_AUTO_GET : "true" # if u want easy setting kernelsu, u can true.
+  KERNELSU_AUTO_FORK : "rsuntk" # magic, rsuntk, next, resukisu and sukisu
 
-  SUSFS_ENABLE : "false" 
-  SUSFS_UPDATE : "false"
-  SUSFS_FIXED : "false"
+  SUSFS_ENABLE : false
+  SUSFS_FIXED : false
 
   AK3_SOURCE : "https://github.com/osm0sis/AnyKernel3.git"
   AK3_BRANCH : "master"
 
   BOOT_SOURCE : ""
 
-  NEED_DTBO : "false"
-  NEED_SAFE_DTBO : "false"
+  NEED_DTBO : false
+  NEED_SAFE_DTBO : false
 
   ROM_TEXT : "rom_android"
 
   # Other env
-  PYTHON_VERSION: "3" 
+  PYTHON_VERSION: "3" # Only 2(Ubuntu 22.04 and Ubuntu 20.04) or 3(Any OS Versions).
 
-  PACK_METHOD: "Anykernel3" 
+  PACK_METHOD: "Anykernel3" # Anykernel3 need SOURCE and BRANCH, MKBOOTIMG needn't it.
 
-  KERNELSU_METHOD: "shell" 
+  KERNELSU_METHOD: "shell" # shell, manual and only.
 
-  PATCHES_SOURCE: "JackA1ltman/NonGKI_Kernel_Patches"
-  PATCHES_BRANCH: "mi_kernel" 
+  PATCHES_SOURCE: "author/source" # [your_name]/[your_patch] -> gooder123/NonGKI_Patcher
+  PATCHES_BRANCH: "branch" # [your_branch] -> main
 
-  SUSFS_FOLDER_FIXED: "" 
-  SUSFS_PATCH_FIXED: "" 
+  SUSFS_FOLDER_FIXED: "" # Fill in your patch prefix directory here. Leave it blank if there isn't one. -> your_folder
+  SUSFS_PATCH_FIXED: "" # Fill in your patches here. If there are multiple patches, please separate them with a comma. Leave it blank if there isn't one. -> patch1,patch2
 
-  REKERNEL_ENABLE: "false" 
+  REKERNEL_ENABLE: "false" # if u need Re:Kernel.
 
-  HOOK_METHOD: "tracepoint" 
-  HOOK_OLDER: "false" 
+  HOOK_METHOD: "syscall" # Manual hook method -> syscall.
+  HOOK_OLDER: "false" # contain backport older patch and syscall older patch.
 
-  KERNEL_PATCH: "false" 
+  KERNEL_PATCH: "false" # If your kernel version is <= 4.9, you have the option of enabling the patch to patch the kernel_write and kernel_read functions.
 
-  KPM_ENABLE: true 
-  KPM_INLINE: "true"
-  KPM_KPATCH_NEXT: "false" 
-  KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" 
+  KPM_ENABLE: "false" # Anyone devices.
+  KPM_INLINE: "false" # Only use it for SukiSU-Ultra.
+  KPM_KPATCH_NEXT: "false" # If u want hook KPatch-Next in build step.
+  KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" # If u want to use KPM Inline,so you need set patch exec file source -> raw.githubusercontent.com/Test/Test/patch .
 
-  BASEBAND_GUARD_ENABLE: "false" 
-  BASEBAND_GUARD_BOOT: "false" 
+  BASEBAND_GUARD_ENABLE: "false" #if u want prevent unauthorized writes to critical partitions/device nodes.
+  BASEBAND_GUARD_BOOT: "false" #if u want to protect boot partition.
 
-  HIDE_STUFF: "false" 
+  HIDE_STUFF: "false" # hide some of the features
 
-  GENERATE_DTB: "false" 
-  GENERATE_CHIP: "qcom" 
+  GENERATE_DTB: "false" # if u kernel need DTB , but cannot auto generate it. (Only Anykernel3).
+  GENERATE_CHIP: "qcom" # only supported for qcom and mediatek.
 
-  BUILD_DEBUGGER: "true" 
-  SKIP_PATCH: "true" 
+  BUILD_DEBUGGER: "false" # Output build errors.
+  SKIP_PATCH: "false" # Ignore errors found in Patch Debugger.
 
-  BUILD_OTHER_CONFIG: "false" 
+  BUILD_OTHER_CONFIG: "false" # Merge config files.
   MERGE_CONFIG_FILES: "vendor/debugfs.config,vendor/lahaina_QGKI.config"
 
-  FREE_MORE_SPACE: "false"
+  FREE_MORE_SPACE: "false" # if u want get more space, enabled it.
 
 jobs:
   build-kernel:
     name: Build Kernel
-    runs-on: ubuntu-latest 
-    container: ubuntu:focal 
+    runs-on: ubuntu-latest # u can changed to ubuntu 22.04, and need container set ubuntu-latest
+    # container: archlinux/archlinux:latest # if u need use arch linux -> archlinux/archlinux:latest or ubuntu 20.04 -> ubuntu:focal
     env:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
@@ -104,8 +102,6 @@ jobs:
     steps:
       - name: ⏰ Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
@@ -116,152 +112,23 @@ jobs:
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
-      - name: 🐍 Install Python 2
-        run: |
-          sudo apt-get update || apt-get update
-          sudo apt-get install -y python2 || apt-get install -y python2
-          sudo ln -sf /usr/bin/python2 /usr/bin/python || ln -sf /usr/bin/python2 /usr/bin/python
+      - name: 🔗 Patch for no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe
 
-      # 第一步：只负责写入 Bash 电闸配置
-      - name: 🔌 推上原生 Manual Hook 电闸并激活隐藏 SuSFS
+      - name: 🪛 Extra Kernel Options
         run: |
+          # Only ${{ env.DEVICE_NAME }} use it.
           cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "==== 🔪 抢救 SukiSU 源码层面的低级语法 Bug ===="
-          if [ -f "drivers/kernelsu/app_profile.c" ]; then
-              # 1. 修复 profile 结构体调用错误 (全局替换没问题)
-              sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
-              
-              # 2. 修复 newcreds 指针调用错误 (全局替换没问题)
-              sed -i 's/newcreds\.cap_/newcreds->cap_/g' drivers/kernelsu/app_profile.c
-              
-              # 3. 🎯 【精准修复】只修改 300 行以后的错误，绝对不误伤 197 行！
-              sed -i '300,$s/setup_groups(&profile, cred)/setup_groups(\&profile, newcreds)/g' drivers/kernelsu/app_profile.c
-              echo "✅ app_profile.c 语法精确修复完毕！"
-          fi  # <==== 就是补了这一行！
-              
-          if [ -f "drivers/kernelsu/supercalls.c" ]; then
-              # 解决作者手滑导致的宏定义双重前缀套娃 Bug
-              sed -i 's/KSU_IOCTL(KSU_IOCTL_/KSU_IOCTL(/g' drivers/kernelsu/supercalls.c
-              sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
-              echo "✅ supercalls.c 宏定义套娃精确修复完毕！"
-          fi
-          
-          echo "==== 🔪 修正挂钩策略：启用 Kprobes 替代崩溃的 Inline Hook ===="
-          
-          # 3. 💥 开启内核原生的 Kprobes 引擎，让 SuSFS 满血复活！
-          echo "CONFIG_KPROBES=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KRETPROBES=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KPM=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          
-          # 保护咱们完美的手动挂钩
-          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          
-          # 5. 💥 上帝指令：彻底解除内核日志锁
-          echo "# CONFIG_SECURITY_DMESG_RESTRICT is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          
-          echo " 🎯 SukiSU-Ultra 核心 + SuSFS 挂载引擎 + Kprobes 引擎已接驳完毕！"
+          # Nothing
 
-          echo "==== 💥 物理摧毁内核日志沙箱 ===="
-          sed -i 's/if (dmesg_restrict && !priv)/if (0)/g' kernel/printk/printk.c
-          sed -i 's/if (dmesg_restrict && !syslog_action_restricted(type))/if (0)/g' kernel/printk/printk.c
-          
-          echo "==== 💥 精准定位并放行 142 号暗号 ===="
-          sed -i -E 's/(action = filter_ret . SECCOMP_RET_ACTION(_FULL)?;)/\1\n\tif (this_syscall == 142) action = SECCOMP_RET_ALLOW;/g' kernel/seccomp.c
-          
-          echo "CONFIG_CMDLINE=\"androidboot.selinux=permissive\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_CMDLINE_EXTEND=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+      - name: 🧰 Patch Kernel of Re:Kernel
+        uses: ./.github/workflows/patch-rekernel
 
-      # 第二步：专门运行独立的 Python 物理注入脚本 (补回了被遗漏的包裹代码)
-      - name: 🪛 实施正则级精准上下文
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          cat << 'EOF' > patch_ksu.py
-          import os, re
+      - name: 🔒 Patch Kernel of Baseband Guard
+        uses: ./.github/workflows/patch-baseband-guard
 
-          def apply_patch(file_path, header_search, header_code, logic_search, logic_code):
-              if not os.path.exists(file_path):
-                  return
-              with open(file_path, "r") as f:
-                  data = f.read()
-
-              if "KSU_HOOK_APPLIED" in data:
-                  print(f" 已注入过: {file_path}")
-                  return
-
-              data = re.sub(header_search, r'\1\n/* KSU_HOOK_APPLIED */\n' + header_code, data, count=1)
-              new_data = re.sub(logic_search, r'\1' + logic_code + r'\n\t\2', data, count=1)
-              
-              if new_data != data:
-                  with open(file_path, "w") as f:
-                      f.write(new_data)
-                  print(f" 成功物理注入: {file_path}")
-              else:
-                  print(f" 找不到注入点(指纹不匹配): {file_path}")
-
-          # 1. exec.c
-          apply_patch("fs/exec.c", 
-              r'(#include <linux/binfmts\.h>)',
-              "#if defined(CONFIG_KSU)\nextern bool ksu_execveat_hook __read_mostly;\nextern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\nextern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\n#endif\n",
-              r'(struct files_struct \*displaced;\s+int retval;\s+)(if \(IS_ERR\(filename\)\))',
-              "#if defined(CONFIG_KSU)\n\t{\n\t\tint ksu_fd = fd;\n\t\tint ksu_flags = flags;\n\t\tvoid *ksu_argv = (void *)&argv;\n\t\tvoid *ksu_envp = (void *)&envp;\n\t\tif (unlikely(ksu_execveat_hook))\n\t\t\tksu_handle_execveat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\telse\n\t\t\tksu_handle_execveat_sucompat(&ksu_fd, &filename, ksu_argv, ksu_envp, &ksu_flags);\n\t\tfd = ksu_fd;\n\t\tflags = ksu_flags;\n\t}\n#endif\n")
-
-          # 2. open.c
-          apply_patch("fs/open.c",
-              r'(#include "internal\.h")',
-              "#if defined(CONFIG_KSU)\nextern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n#endif\n",
-              r'(unsigned int lookup_flags = LOOKUP_FOLLOW;\s+)(if \(mode & ~S_IRWXO\))',
-              "#if defined(CONFIG_KSU)\n\tksu_handle_faccessat(&dfd, &filename, &mode, NULL);\n#endif\n")
-
-          # 3. stat.c
-          apply_patch("fs/stat.c",
-              r'(#include <linux/syscalls\.h>)',
-              "#if defined(CONFIG_KSU)\nextern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\n#endif\n",
-              r'(unsigned int lookup_flags = LOOKUP_FOLLOW \| LOOKUP_AUTOMOUNT;\s+)(if \(\(flags & ~\()',
-              "#if defined(CONFIG_KSU)\n\tksu_handle_stat(&dfd, &filename, &flags);\n#endif\n")
-
-          # 4. input.c
-          apply_patch("drivers/input/input.c",
-              r'(MODULE_AUTHOR\("Vojtech Pavlik <vojtech@suse\.cz>"\);)',
-              "#if defined(CONFIG_KSU)\nextern bool ksu_input_hook __read_mostly;\nextern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);\n#endif\n",
-              r'(int disposition = input_get_disposition\(dev, type, code, &value\);\s+)(if \(disposition != INPUT_IGNORE_EVENT && type != EV_SYN\))',
-              "#if defined(CONFIG_KSU)\n\tif (unlikely(ksu_input_hook))\n\t\tksu_handle_input_handle_event(&type, &code, &value);\n#endif\n")
-
-          EOF
-          
-          python3 patch_ksu.py
-          echo "  所有文件指纹匹配完毕！"
-        
-      #  防止 OOM 内存爆炸
-      - name:  Disable LTO to prevent OOM
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          echo " 正在切断 LTO 优化的电源..."
-          sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "# CONFIG_LTO is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "# CONFIG_LTO_CLANG is not set" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo " LTO 优化已彻底关闭！"
-          echo "==== 正在注入编译器警告豁免 ===="
-          echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
-          echo "ccflags-y += -Wno-error" >> fs/Makefile
-          echo " 已成功废除 fs 目录下的闲置函数报错！"
-
-      - name: 提取最终版核心文件
-        uses: actions/upload-artifact@v4
-        with:
-          name: Patched-Kernel-Files
-          path: |
-            device_kernel/fs/exec.c
-            device_kernel/fs/open.c
-            device_kernel/fs/stat.c
-            device_kernel/drivers/input/input.c
-            device_kernel/fs/proc/cmdline.c
-            device_kernel/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-            device_kernel/drivers/kernelsu/Kconfig
+      - name: 🔧 Patch Hide Stuff
+        uses: ./.github/workflows/patch-hide-stuff
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
