@@ -1,4 +1,4 @@
-name: 'Patch Kernel for no-kprobe.'
+name: 'Patch Kernel for no-kprobe (Tracepoint Supported).'
 
 runs:
   using: 'composite'
@@ -29,73 +29,69 @@ runs:
                     echo "[+] Your kernel have no any rej files, Skipped."
                 else
                     for CAT_REJ in "${REJ_FILES[@]}"; do
-                        echo "[-] Found .rej file: $CAT_REJ"
-                        cat $CAT_REJ
-                        echo "[+] =================================== "
+                        echo "[-] $CAT_REJ"
+                        cat "$CAT_REJ"
                     done
+                    if [[ "${{ env.SKIP_PATCH }}" != "true" ]]; then
+                        echo "[-] Please fix it, or skipped it."
+                        false
+                    else
+                        echo "[!] Skipped patch error."
+                    fi
                 fi
-
-                if [[ "${{ env.SKIP_PATCH }}" == "true" ]]; then
-                    echo "[+] SKIP_PATCH enabled, Skipped. "
-                    PACK_FILES
-                elif [[ "${{ env.SKIP_PATCH }}" != "true" ]]; then
-                    echo "[-] Found .rej files, Stopped! "
-                    PACK_FILES
-                    false
-                fi
+                echo "[+] =================================== "
             fi
           }
 
-          # Detect SuSFS is used to enable the SuSFS inline hook
-          if [[ ${{ env.SUSFS_ENABLE }} == "true" ]]; then
-            # Core
-            cp /tmp/Patches/susfs_inline_hook_patches.sh ./
-            bash susfs_inline_hook_patches.sh ./
-
-            echo "[+] executed SuSFS inline hook successfully."
-
-            if [[ ${{ env.FIRST_VERSION }} -le 4 ]] && [[ ${{ env.SECOND_VERSION }} -le 9 ]]; then
-                cp /tmp/Patches/backport_patches.sh ./
-
-                bash backport_patches.sh
-
-                if [[ "${{ env.BASEBAND_GUARD_ENABLE }}" != "true" ]]; then
-                    cp /tmp/Patches/backport_selinux_patches.sh ./
-
-                    bash backport_selinux_patches.sh
-                    echo "[+] Patched SELinux."
-                else
-                    echo "[-] Skipped SELinux Patch."
+          if [[ "${{ env.SUSFS_FIXED }}" == "true" ]]; then
+                if [[ -z "${{ env.SUSFS_PATCH_FIXED }}" ]]; then
+                    echo "[-] error, susfs fixed patches is empty."
+                    false
                 fi
+                IFS=',' read -r -a PATCH_ARRAY <<< "${{ env.SUSFS_PATCH_FIXED }}"
+                for PATCH in "${PATCH_ARRAY[@]}"; do
+                    if [[ -n "${{ env.SUSFS_FOLDER_FIXED }}" ]]; then
+                        wget -qO "$PATCH.patch" "https://raw.githubusercontent.com/${{ env.PATCHES_SOURCE }}/${{ env.PATCHES_BRANCH }}/${{ env.SUSFS_FOLDER_FIXED }}/$PATCH.patch"
+                    else
+                        wget -qO "$PATCH.patch" "https://raw.githubusercontent.com/${{ env.PATCHES_SOURCE }}/${{ env.PATCHES_BRANCH }}/$PATCH.patch"
+                    fi
+                    patch -p1 < "$PATCH.patch" || true
+                    echo "[+] patched $PATCH.patch."
+                done
+                REJ_FOUND
+          fi
 
-                if grep -q "kernel_read" "fs/read_write.c"; then
-                    echo ">>>>>>>>>>>>>>>Backport Patch<<<<<<<<<<<<<<<<"
-                    echo ">                                           <"
-                    echo "Your kernel is already backported, skipping"
-                    echo ">                                           <"
-                    echo ">>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<"
-                elif [[ "${{ env.KERNEL_PATCH }}" == "true" ]]; then
-                    if [[ ${{ env.FIRST_VERSION }} -lt 4 ]] && [[ ${{ env.SECOND_VERSION }} -lt 18 ]]; then
-                        echo "[-] Could not support ARMV7A kernel(Kernel Version < 3.18)."
+          if [[ "${{ env.HOOK_METHOD }}" == "syscall" ]]; then
+            if [[ "${{ env.HOOK_OLDER }}" != "true" ]]; then
+                KERNEL_VERSION=$(make kernelversion)
+                FIRST_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 1)
+                SECOND_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 2)
+                
+                wget -qO syscall_1_3_new.patch https://raw.githubusercontent.com/gooder123/NonGKI_Patcher/main/kernelsu_ksu_hook_1_3.patch
+                patch -p1 < syscall_1_3_new.patch || true
+                echo "[+] Patched syscall."
 
-                        false
-                    elif [[ ${{ env.FIRST_VERSION }} == 3 ]] && [[ ${{ env.SECOND_VERSION }} == 18 ]]; then
+                if [[ $FIRST_VERSION -lt 4 ]] || { [[ $FIRST_VERSION -eq 4 ]] && [[ $SECOND_VERSION -le 9 ]]; }; then
+                    echo "[-] Your Kernel Version is <= 4.9. Trying to Backport older patch..."
+                    wget -qO syscall_1_3_older.patch https://raw.githubusercontent.com/gooder123/NonGKI_Patcher/main/kernelsu_ksu_hook_1_3_older.patch
+                    patch -p1 < syscall_1_3_older.patch || true
+                    echo "[+] Patched older syscall."
+                    REJ_FOUND
+                fi
+                REJ_FOUND
+
+                if [[ "${{ env.KERNEL_PATCH }}" == "true" ]]; then
+                    wget -qO /tmp/Patches.zip https://github.com/gooder123/NonGKI_Patcher/archive/refs/heads/main.zip
+                    unzip -q /tmp/Patches.zip -d /tmp/Patches_Dir
+                    mv /tmp/Patches_Dir/NonGKI_Patcher-main /tmp/Patches
+                    
+                    if [[ $FIRST_VERSION == 3 ]] && [[ $SECOND_VERSION == 18 ]]; then
                         cp /tmp/Patches/Patch/backport_kernel_read_and_kernel_write_3.18.patch ./
-
                         patch -p1 < backport_kernel_read_and_kernel_write_3.18.patch || true
-
                         echo "[+] Patched kernel_write and kernel_read."
-                    elif [[ ${{ env.FIRST_VERSION }} == 4 ]] && [[ ${{ env.SECOND_VERSION }} == 4 ]]; then
-                        cp /tmp/Patches/Patch/backport_kernel_read_and_kernel_write_4.4.patch ./
-
-                        patch -p1 < backport_kernel_read_and_kernel_write_4.4.patch || true
-
-                        echo "[+] Patched kernel_write and kernel_read."
-                    elif [[ ${{ env.FIRST_VERSION }} == 4 ]] && [[ ${{ env.SECOND_VERSION }} == 9 ]]; then
+                    elif [[ $FIRST_VERSION == 4 ]] && [[ $SECOND_VERSION == 9 ]]; then
                         cp /tmp/Patches/Patch/backport_kernel_read_and_kernel_write_4.9.patch ./
-
                         patch -p1 < backport_kernel_read_and_kernel_write_4.9.patch || true
-
                         echo "[+] Patched kernel_write and kernel_read."
                     fi
                     REJ_FOUND
@@ -105,12 +101,10 @@ runs:
             else
                 cp /tmp/Patches/backport_patches.sh ./
                 bash backport_patches.sh
-
                 echo "executed backport patch successfully."
 
                 if [[ "${{ env.BASEBAND_GUARD_ENABLE }}" != "true" ]]; then
                     cp /tmp/Patches/backport_selinux_patches.sh ./
-
                     bash backport_selinux_patches.sh
                     echo "[+] Patched SELinux."
                 else
@@ -118,77 +112,26 @@ runs:
                 fi
             fi
 
-          # Check syscall hook
-          elif [[ ${{ env.HOOK_METHOD }} == "syscall" ]]; then
-            # Core
-            cp /tmp/Patches/syscall_hook_patches.sh ./
-            bash syscall_hook_patches.sh ./
+          elif [[ "${{ env.HOOK_METHOD }}" == "normal" ]]; then
+            echo "[+] Skipped, Kprobe method hasn't patch"
 
-            echo "[+] executed syscall hook successfully."
+          # 👇👇👇 核心改造：在这里植入你专属的 Tracepoint 分支！ 👇👇👇
+          elif [[ "${{ env.HOOK_METHOD }}" == "tracepoint" ]]; then
+            echo "==== 🎯 开启 SukiSU-Ultra 专属 Tracepoint 钩子物理注入 ===="
+            
+            # 方案 A：直接用 sed 对 4 个核心文件进行自动化精准手术 (默认方案)
+            sed -i '/#include <linux\/fs.h>/a #include <../drivers/kernelsu/ksu_trace.h>' fs/exec.c fs/open.c fs/read_write.c fs/stat.c || true
+            sed -i 's/retval = bprm_execve(bprm, fd, filename, flags);/ksu_handle_execveat(\&fd, \&filename, \&flags, \&bprm);\n\tretval = bprm_execve(bprm, fd, filename, flags);/g' fs/exec.c || true
+            sed -i 's/long ret = do_sys_open(dfd, filename, flags, mode);/ksu_handle_faccessat(\&dfd, \&filename);\n\tlong ret = do_sys_open(dfd, filename, flags, mode);/g' fs/open.c || true
+            sed -i 's/ret = vfs_read(file, buf, count, pos);/ksu_handle_vfs_read(\&file, \&buf, \&count, pos);\n\tret = vfs_read(file, buf, count, pos);/g' fs/read_write.c || true
+            sed -i 's/error = vfs_statx(dfd, filename, flags, stat, mask);/ksu_handle_stat(\&dfd, \&filename, \&flags);\n\terror = vfs_statx(dfd, filename, flags, stat, mask);/g' fs/stat.c || true
+            
+            # 方案 B：如果您在其他地方托管了现成的 .patch 文件，可以取消注释下面这两行使用：
+            # wget -qO tracepoint.patch "https://你的补丁直链地址"
+            # patch -p1 < tracepoint.patch || true
 
-            if [[ ${{ env.FIRST_VERSION }} -le 4 ]] && [[ ${{ env.SECOND_VERSION }} -le 9 ]]; then
-                cp /tmp/Patches/backport_patches.sh ./
-
-                bash backport_patches.sh
-
-                if [[ "${{ env.BASEBAND_GUARD_ENABLE }}" != "true" ]]; then
-                    cp /tmp/Patches/backport_selinux_patches.sh ./
-
-                    bash backport_selinux_patches.sh
-                    echo "[+] Patched SELinux."
-                else
-                    echo "[-] Skipped SELinux Patch."
-                fi
-
-                if grep -q "kernel_read" "fs/read_write.c"; then
-                    echo ">>>>>>>>>>>>>>>Backport Patch<<<<<<<<<<<<<<<<"
-                    echo ">                                           <"
-                    echo "Your kernel is already backported, skipping"
-                    echo ">                                           <"
-                    echo ">>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<"
-                elif [[ "${{ env.KERNEL_PATCH }}" == "true" ]]; then
-                    if [[ ${{ env.FIRST_VERSION }} -lt 4 ]] && [[ ${{ env.SECOND_VERSION }} -lt 18 ]]; then
-                        echo "[-] Could not support ARMV7A kernel(Kernel Version < 3.18)."
-
-                        false
-                    elif [[ ${{ env.FIRST_VERSION }} == 3 ]] && [[ ${{ env.SECOND_VERSION }} == 18 ]]; then
-                        cp /tmp/Patches/Patch/backport_kernel_read_and_kernel_write_3.18.patch ./
-
-                        patch -p1 < backport_kernel_read_and_kernel_write_3.18.patch || true
-
-                        echo "[+] Patched kernel_write and kernel_read."
-                    elif [[ ${{ env.FIRST_VERSION }} == 4 ]] && [[ ${{ env.SECOND_VERSION }} == 4 ]]; then
-                        cp /tmp/Patches/Patch/backport_kernel_read_and_kernel_write_4.4.patch ./
-
-                        patch -p1 < backport_kernel_read_and_kernel_write_4.4.patch || true
-
-                        echo "[+] Patched kernel_write and kernel_read."
-                    elif [[ ${{ env.FIRST_VERSION }} == 4 ]] && [[ ${{ env.SECOND_VERSION }} == 9 ]]; then
-                        cp /tmp/Patches/Patch/backport_kernel_read_and_kernel_write_4.9.patch ./
-
-                        patch -p1 < backport_kernel_read_and_kernel_write_4.9.patch || true
-
-                        echo "[+] Patched kernel_write and kernel_read."
-                    fi
-                    REJ_FOUND
-                fi
-
-                echo "[+] executed backport patch (contain kernel_read and kernel_write patch) successfully."
-            else
-                cp /tmp/Patches/backport_patches.sh ./
-                bash backport_patches.sh
-
-                echo "executed backport patch successfully."
-
-                if [[ "${{ env.BASEBAND_GUARD_ENABLE }}" != "true" ]]; then
-                    cp /tmp/Patches/backport_selinux_patches.sh ./
-
-                    bash backport_selinux_patches.sh
-                    echo "[+] Patched SELinux."
-                else
-                    echo "[-] Skipped SELinux Patch."
-                fi
-            fi
+            echo "[+] Tracepoint 钩子注入执行完毕！"
+            REJ_FOUND
 
           else
             echo "[-] please input a vaild option!"
@@ -203,4 +146,3 @@ runs:
           name: patch_kernel_write_read_rejected_files
           path: |
             device_kernel/rej_files_kernel_write_read.tar.gz
-
