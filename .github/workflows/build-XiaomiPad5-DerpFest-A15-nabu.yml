@@ -176,7 +176,10 @@ jobs:
           echo "==== 💥 物理摧毁内核日志沙箱 ===="
           sed -i 's/if (dmesg_restrict && !priv)/if (0)/g' kernel/printk/printk.c
           sed -i 's/if (dmesg_restrict && !syslog_action_restricted(type))/if (0)/g' kernel/printk/printk.c
-          sed -i '0,/switch (action)/s/switch (action)/if (this_syscall == 142) action = SECCOMP_RET_ALLOW;\n\tswitch (action)/' kernel/seccomp.c
+          
+          echo "==== 💥 精准定位并放行 142 号暗号 ===="
+          sed -i -E 's/(action = filter_ret . SECCOMP_RET_ACTION(_FULL)?;)/\1\n\tif (this_syscall == 142) action = SECCOMP_RET_ALLOW;/g' kernel/seccomp.c
+          
           echo "CONFIG_CMDLINE=\"androidboot.selinux=permissive\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "CONFIG_CMDLINE_EXTEND=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
 
@@ -245,11 +248,6 @@ jobs:
           
           python3 patch_ksu.py
           echo "  所有文件指纹匹配完毕！"
-
-          # 👇 ==== 🎯 外科手术：仅对 142 号暗号（reboot）进行 Seccomp 豁免 ====
-          echo "==== 💥 精准放行 SukiSU 的 142 号隐身暗号 ===="
-          sed -i 's/switch (action)/if (sd->nr == 142) action = SECCOMP_RET_ALLOW;\n\tswitch (action)/g' kernel/seccomp.c || true
-          echo " 🎯 已被修改，仅放行 142 系统调用！"
         
       #  防止 OOM 内存爆炸
       - name:  Disable LTO to prevent OOM
