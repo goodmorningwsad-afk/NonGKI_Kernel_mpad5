@@ -113,7 +113,7 @@ jobs:
         uses: ./.github/workflows/patch-susfs
 
       - name: 🔗 Patch for no-kprobe
-        uses: ./.github/workflows/patch-no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe-new
 
       - name: 🪛 Extra Kernel Options
         run: |
