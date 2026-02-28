@@ -145,7 +145,6 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 开始运行极客法医级 Bash 缝合脚本 ===="
 
-          # 修复了检测机制的打孔函数，使用第五个参数做专属特征检测，防止漏打！
           patch_file() {
               local file="$1"
               local search="$2"
@@ -177,63 +176,76 @@ jobs:
               echo "✅ 成功缝合: $file (在第 $target_line 行插入)"
           }
 
-          # 1. 缝合 fs/exec.c
+          # 1. 缝合 fs/exec.c (套上大括号，治愈 C90 洁癖)
           EXEC_HOOK="#ifdef CONFIG_KSU
-          extern bool ksu_execveat_hook __read_mostly;
-          extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-          extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-          if (unlikely(ksu_execveat_hook))
-              ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
-          else
-              ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
+          {
+              extern bool ksu_execveat_hook __read_mostly;
+              extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
+              extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
+              if (unlikely(ksu_execveat_hook))
+                  ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
+              else
+                  ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
+          }
           #endif"
           patch_file "fs/exec.c" "current->flags &= ~PF_NPROC_EXCEEDED;" 0 "$EXEC_HOOK" "ksu_execveat_hook"
 
           # 2. 缝合 fs/open.c
           OPEN_HOOK="#ifdef CONFIG_KSU
-          extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
-          ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
+          {
+              extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
+              ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
+          }
           #endif"
           patch_file "fs/open.c" "where's F_OK, X_OK, W_OK, R_OK?" 2 "$OPEN_HOOK" "ksu_handle_faccessat"
 
-          # 3. 缝合 fs/read_write.c - 读拦截
+          # 3. 缝合 fs/read_write.c - 读拦截 (暴力强转指针！)
           READ_HOOK="#ifdef CONFIG_KSU
-          extern bool ksu_vfs_read_hook __read_mostly;
-          extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos);
-          if (unlikely(ksu_vfs_read_hook))
-              ksu_handle_vfs_read(&file, &buf, &count, &pos);
+          {
+              extern bool ksu_vfs_read_hook __read_mostly;
+              extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos);
+              if (unlikely(ksu_vfs_read_hook))
+                  ksu_handle_vfs_read(&file, (char __user **)&buf, &count, &pos);
+          }
           #endif"
           patch_file "fs/read_write.c" "FMODE_CAN_READ" 2 "$READ_HOOK" "ksu_vfs_read_hook"
 
-          # 4. 缝合 fs/read_write.c - 写拦截 (由于检测了特有的 ksu_vfs_write_hook，这次绝对不会被跳过！)
+          # 4. 缝合 fs/read_write.c - 写拦截 (暴力强转指针！)
           WRITE_HOOK="#ifdef CONFIG_KSU
-          extern bool ksu_vfs_write_hook __read_mostly;
-          extern int ksu_handle_vfs_write(struct file **file_ptr, const char __user **buf_ptr, size_t *count_ptr, loff_t **pos);
-          if (unlikely(ksu_vfs_write_hook))
-              ksu_handle_vfs_write(&file, &buf, &count, &pos);
+          {
+              extern bool ksu_vfs_write_hook __read_mostly;
+              extern int ksu_handle_vfs_write(struct file **file_ptr, const char __user **buf_ptr, size_t *count_ptr, loff_t **pos);
+              if (unlikely(ksu_vfs_write_hook))
+                  ksu_handle_vfs_write(&file, (const char __user **)&buf, &count, &pos);
+          }
           #endif"
           patch_file "fs/read_write.c" "FMODE_CAN_WRITE" 2 "$WRITE_HOOK" "ksu_vfs_write_hook"
 
-          # 5. 缝合 fs/stat.c (🚨已修复 flag 漏字母的问题！)
+          # 5. 缝合 fs/stat.c
           STAT_HOOK="#ifdef CONFIG_KSU
-          extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
-          ksu_handle_stat(&dfd, &filename, &flags);
+          {
+              extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
+              ksu_handle_stat(&dfd, &filename, &flags);
+          }
           #endif"
           patch_file "fs/stat.c" "unsigned int lookup_flags" 1 "$STAT_HOOK" "ksu_handle_stat"
 
           # 6. 缝合 drivers/input/input.c
           INPUT_HOOK="#ifdef CONFIG_KSU
-          extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
-          ksu_handle_input_handle_event(&type, &code, &value);
+          {
+              extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
+              ksu_handle_input_handle_event(&type, &code, &value);
+          }
           #endif"
           patch_file "drivers/input/input.c" "add_input_randomness(type, code, value);" 1 "$INPUT_HOOK" "ksu_handle_input_handle_event"
 
-          # 7. 缝合 fs/devpts/inode.c
+          # 7. 缝合 fs/devpts/inode.c (修改了专属特征码，绝不跳过！)
           DEVPTS_HOOK="#ifdef CONFIG_KSU
+          /* ksu_devpts_hook */
           if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)
               return NULL;
           #endif"
-          patch_file "fs/devpts/inode.c" "void *devpts_get_priv(struct dentry *dentry)" 2 "$DEVPTS_HOOK" "DEVPTS_SUPER_MAGIC"
+          patch_file "fs/devpts/inode.c" "void *devpts_get_priv(struct dentry *dentry)" 2 "$DEVPTS_HOOK" "ksu_devpts_hook"
 
           echo "==== 8. 正在复活 path_umount 模块神技 ===="
           if ! grep -q "path_umount" fs/namespace.c; then
