@@ -53,7 +53,7 @@ env:
 
   PACK_METHOD: "Anykernel3" 
 
-  KERNELSU_METHOD: "manual" 
+  KERNELSU_METHOD: "shell" 
 
   PATCHES_SOURCE: "author/source" 
   PATCHES_BRANCH: "branch" 
@@ -117,47 +117,30 @@ jobs:
 
       - name: 🪛 Extra Kernel Options
         run: |
-         # 👇 提取流水线底层的黑盒脚本，直接打印到日志里！
-          echo "==== 🕵️ 正在截获并打印 syscall_hook_patches.sh 的源码 ===="
-          cat /tmp/Patches/syscall_hook_patches.sh
-          echo "==== 🕵️ 源码打印完毕 ===="
-          
-          # (顺手牵羊) 既然提取了，不如连带它那个针对 4.14 内核的后备补丁一起看了：
-          echo "==== 🕵️ 正在截获并打印 backport_patches.sh 的源码 ===="
-          cat /tmp/Patches/backport_patches.sh || echo "未找到 backport 脚本"
-          echo "==== 🕵️ 源码打印完毕 ===="
-          
           cd $GITHUB_WORKSPACE/device_kernel
           # 屏蔽烦人的闲置函数报错
           echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
           echo "ccflags-y += -Wno-error" >> fs/Makefile
           
-          #  微创手术 1：修复 app_profile.c 的 cred 错别字
+          # 微创手术 1：修复 app_profile.c 的 cred 错别字
           echo "====  正在对 app_profile.c 进行定点微创手术 ===="
           sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
           sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
           sed -i '350,400s/setup_groups(&profile, cred)/setup_groups(\&profile, newcreds)/g' drivers/kernelsu/app_profile.c
           
-          #  微创手术 2：修复 supercalls.c 的宏定义套娃重复前缀！
+          # 微创手术 2：修复 supercalls.c 的宏定义套娃重复前缀！
           echo "====  正在对 supercalls.c 修复宏展开套娃错误 ===="
           sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
           sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
           
-          #   3：暴力关闭 LTO，彻底解放云端服务器的内存！
+          # 3：暴力关闭 LTO，彻底解放云端服务器的内存！
           echo "====  正在强行关闭 LTO 以防止无限卡死 ===="
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           
-          # 👇 修复笔误：补上了 supercalls.c 的 c
+          # 4：修复 supercalls.c 链接丢失 Bug (补上了c)
           echo "====  正在修复 supercalls.c 链接丢失 Bug ===="
           sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
-          
-          # 👇 新增：纠正官方 syscall 补丁的老旧函数命名，对接 SukiSU-Ultra 4.1.1 的新标准
-          echo "==== 🎯 正在将 v1.3 旧函数名替换为 SukiSU 的 v1.4 新函数名 ===="
-          sed -i 's/ksu_vfs_read_hook/ksu_handle_vfs_read/g' fs/read_write.c
-          sed -i 's/ksu_execveat_hook/ksu_handle_execveat/g' fs/exec.c
-          sed -i 's/ksu_vfs_statx_hook/ksu_handle_stat/g' fs/stat.c
-          sed -i 's/ksu_faccessat_hook/ksu_handle_faccessat/g' fs/open.c
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
