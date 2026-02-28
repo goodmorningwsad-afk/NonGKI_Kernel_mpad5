@@ -110,6 +110,31 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 📦 提取核心源码进行验证 (包含 hooks.c)
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 正在提取 hooks.c 和 exec.c 进行验证 ===="
+          
+          # 创建一个临时文件夹用来存放要看的文件
+          mkdir -p verify_files/security/selinux
+          mkdir -p verify_files/fs
+          
+          # 提取免死金牌文件 hooks.c
+          cp device_kernel/security/selinux/hooks.c verify_files/security/selinux/ || echo "❌ 未找到 hooks.c"
+          
+          # 顺手把开机传感器 exec.c 也提取出来再确认一眼
+          cp device_kernel/fs/exec.c verify_files/fs/ || echo "❌ 未找到 exec.c"
+          
+          # 打包成 zip
+          cd verify_files
+          zip -r ../Kernel_Verify_Files.zip .
+
+      - name: 📤 上传源码验证包到云端
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kernel_Verify_Files
+          path: Kernel_Verify_Files.zip
+
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
