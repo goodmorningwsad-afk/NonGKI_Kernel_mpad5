@@ -63,7 +63,7 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  HOOK_METHOD: "tracepoint" 
+  HOOK_METHOD: "sukisu_manual" 
   HOOK_OLDER: "false" 
 
   KERNEL_PATCH: "false" 
@@ -132,10 +132,12 @@ jobs:
           echo "====  正在对 supercalls.c 修复宏展开套娃错误 ===="
           sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
           sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
-          # 👇 微创手术 3：暴力关闭 LTO，彻底解放云端服务器的内存！
-          echo "==== 🎯 正在强行关闭 LTO 以防止无限卡死 ===="
+          #   3：暴力关闭 LTO，彻底解放云端服务器的内存！
+          echo "====  正在强行关闭 LTO 以防止无限卡死 ===="
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
+          echo "====  正在修复 supercalls.c 链接丢失 Bug ===="
+          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
