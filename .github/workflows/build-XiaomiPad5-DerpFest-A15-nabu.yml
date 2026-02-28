@@ -143,6 +143,8 @@ jobs:
           sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
           echo "==== 🎯 正在实例化缺失的 read_hook 开关变量 ===="
           sed -i 's/extern bool ksu_vfs_read_hook __read_mostly;/bool ksu_vfs_read_hook __read_mostly = true;/g' fs/read_write.c
+          echo "==== 🔑 强开 ADB Root 后门 ===="
+          echo "CONFIG_KSU_DEBUG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
