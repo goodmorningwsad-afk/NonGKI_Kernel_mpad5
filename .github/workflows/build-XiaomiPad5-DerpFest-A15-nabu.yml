@@ -115,7 +115,7 @@ jobs:
       #- name: 🔗 Patch for no-kprobe
       #  uses: ./.github/workflows/patch-no-kprobe
 
-      #- name: 🩹 Fix SukiSU Source Bugs & Extra Options
+      - name: 🩹 Fix SukiSU Source Bugs & Extra Options
          run: |
           # 4. 防止 LTO 爆内存，并强开手动挂载引擎
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
