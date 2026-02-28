@@ -115,42 +115,32 @@ jobs:
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
 
-      - name: 🪛 Extra Kernel Options
+      - name: 📦 提取待修补文件 (准备打包)
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          # 屏蔽烦人的闲置函数报错
-          echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
-          echo "ccflags-y += -Wno-error" >> fs/Makefile
+          echo "==== 正在收集需要手动集成的核心文件 ===="
+          # 创建临时文件夹保持目录结构
+          mkdir -p extract_files/fs/devpts
+          mkdir -p extract_files/drivers/input
           
-          # 微创手术 1：修复 app_profile.c 的 cred 错别字
-          echo "====  正在对 app_profile.c 进行定点微创手术 ===="
-          sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
-          sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
-          sed -i '350,400s/setup_groups(&profile, cred)/setup_groups(\&profile, newcreds)/g' drivers/kernelsu/app_profile.c
+          # 复制文件
+          cp fs/exec.c extract_files/fs/ || echo "缺失 fs/exec.c"
+          cp fs/open.c extract_files/fs/ || echo "缺失 fs/open.c"
+          cp fs/read_write.c extract_files/fs/ || echo "缺失 fs/read_write.c"
+          cp fs/stat.c extract_files/fs/ || echo "缺失 fs/stat.c"
+          cp fs/namespace.c extract_files/fs/ || echo "缺失 fs/namespace.c"
+          cp fs/devpts/inode.c extract_files/fs/devpts/ || echo "缺失 inode.c"
+          cp drivers/input/input.c extract_files/drivers/input/ || echo "缺失 input.c"
           
-          # 微创手术 2：修复 supercalls.c 的宏定义套娃重复前缀！
-          echo "====  正在对 supercalls.c 修复宏展开套娃错误 ===="
-          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
-          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
-          
-          # 3：暴力关闭 LTO，彻底解放云端服务器的内存！
-          echo "====  正在强行关闭 LTO 以防止无限卡死 ===="
-          sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
-          sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
-          
-          # 4：修复 supercalls.c 链接丢失 Bug
-          echo "====  正在修复 supercalls.c 链接丢失 Bug ===="
-          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
+          # 打包成 zip
+          cd extract_files
+          zip -r ../Target_Files_To_Patch.zip .
 
-          #  核心修复区：只针对 Root 与模块 
-
-          # 5. 填补缺失的 read_hook 变量，但必须设为 false！(解决安卓 15 ART 机制闪退，恢复获取 Root)
-          echo "====  正在实例化 read_hook (设为 false 防崩溃) ===="
-          sed -i 's/extern bool ksu_vfs_read_hook __read_mostly;/bool ksu_vfs_read_hook __read_mostly = false;/g' fs/read_write.c
-          
-          # 6. 解决“能 Root 但模块为 0”的终极痛点！强开 Manual Hook 引擎！
-          echo "====  正在向内核配置强制唤醒 Manual Hook 挂载引擎 ===="
-          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
+      - name: 📤 上传提取文件 (生成下载链接)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Source-Files-To-Patch
+          path: device_kernel/Target_Files_To_Patch.zip
           
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
