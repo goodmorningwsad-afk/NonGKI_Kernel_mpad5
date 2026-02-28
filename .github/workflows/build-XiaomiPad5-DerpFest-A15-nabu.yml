@@ -115,7 +115,7 @@ jobs:
       #- name: 🔗 Patch for no-kprobe
       #  uses: ./.github/workflows/patch-no-kprobe
 
-      - name: 🩹 Fix SukiSU Source Bugs (微创手术修复作者笔误)
+      - name: 🩹 Fix SukiSU Source Bugs & Extra Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 开始修复 SukiSU 源码本身的低级语法错误 ===="
@@ -134,20 +134,11 @@ jobs:
           echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
           echo "ccflags-y += -Wno-error" >> fs/Makefile
           
-          # 4. 防止 LTO 爆内存
+          # 4. 防止 LTO 爆内存，并强开手动挂载引擎
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
-          
-          # 打包成 zip
-          cd extract_files
-          zip -r ../Target_Files_To_Patch.zip .
+          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
 
-      - name: 📤 上传提取文件 (生成下载链接)
-        uses: actions/upload-artifact@v4
-        with:
-          name: Source-Files-To-Patch
-          path: device_kernel/Target_Files_To_Patch.zip
-          
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
 
