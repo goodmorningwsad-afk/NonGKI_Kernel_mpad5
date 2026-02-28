@@ -176,7 +176,7 @@ jobs:
               echo "✅ 成功缝合: $file (在第 $target_line 行插入)"
           }
 
-          # 1. 缝合 fs/exec.c (套上大括号，治愈 C90 洁癖)
+          # 1. 缝合 fs/exec.c (掌管 Root 的绝对核心)
           EXEC_HOOK="#ifdef CONFIG_KSU
           {
               extern bool ksu_execveat_hook __read_mostly;
@@ -190,7 +190,7 @@ jobs:
           #endif"
           patch_file "fs/exec.c" "current->flags &= ~PF_NPROC_EXCEEDED;" 0 "$EXEC_HOOK" "ksu_execveat_hook"
 
-          # 2. 缝合 fs/open.c
+          # 2. 缝合 fs/open.c (权限探测核心)
           OPEN_HOOK="#ifdef CONFIG_KSU
           {
               extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
@@ -199,29 +199,9 @@ jobs:
           #endif"
           patch_file "fs/open.c" "where's F_OK, X_OK, W_OK, R_OK?" 2 "$OPEN_HOOK" "ksu_handle_faccessat"
 
-          # 3. 缝合 fs/read_write.c - 读拦截 (暴力强转指针！)
-          READ_HOOK="#ifdef CONFIG_KSU
-          {
-              extern bool ksu_vfs_read_hook __read_mostly;
-              extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos);
-              if (unlikely(ksu_vfs_read_hook))
-                  ksu_handle_vfs_read(&file, (char __user **)&buf, &count, &pos);
-          }
-          #endif"
-          patch_file "fs/read_write.c" "FMODE_CAN_READ" 2 "$READ_HOOK" "ksu_vfs_read_hook"
+          # (🚨 彻底移除 fs/read_write.c 的打孔，SukiSU 不需要它，打了反而报错！)
 
-          # 4. 缝合 fs/read_write.c - 写拦截 (暴力强转指针！)
-          WRITE_HOOK="#ifdef CONFIG_KSU
-          {
-              extern bool ksu_vfs_write_hook __read_mostly;
-              extern int ksu_handle_vfs_write(struct file **file_ptr, const char __user **buf_ptr, size_t *count_ptr, loff_t **pos);
-              if (unlikely(ksu_vfs_write_hook))
-                  ksu_handle_vfs_write(&file, (const char __user **)&buf, &count, &pos);
-          }
-          #endif"
-          patch_file "fs/read_write.c" "FMODE_CAN_WRITE" 2 "$WRITE_HOOK" "ksu_vfs_write_hook"
-
-          # 5. 缝合 fs/stat.c
+          # 3. 缝合 fs/stat.c (文件状态核心)
           STAT_HOOK="#ifdef CONFIG_KSU
           {
               extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
@@ -230,7 +210,7 @@ jobs:
           #endif"
           patch_file "fs/stat.c" "unsigned int lookup_flags" 1 "$STAT_HOOK" "ksu_handle_stat"
 
-          # 6. 缝合 drivers/input/input.c
+          # 4. 缝合 drivers/input/input.c (音量键救砖)
           INPUT_HOOK="#ifdef CONFIG_KSU
           {
               extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
@@ -239,7 +219,7 @@ jobs:
           #endif"
           patch_file "drivers/input/input.c" "add_input_randomness(type, code, value);" 1 "$INPUT_HOOK" "ksu_handle_input_handle_event"
 
-          # 7. 缝合 fs/devpts/inode.c (修改了专属特征码，绝不跳过！)
+          # 5. 缝合 fs/devpts/inode.c (修复终端)
           DEVPTS_HOOK="#ifdef CONFIG_KSU
           /* ksu_devpts_hook */
           if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)
@@ -247,7 +227,7 @@ jobs:
           #endif"
           patch_file "fs/devpts/inode.c" "void *devpts_get_priv(struct dentry *dentry)" 2 "$DEVPTS_HOOK" "ksu_devpts_hook"
 
-          echo "==== 8. 正在复活 path_umount 模块神技 ===="
+          echo "==== 6. 正在复活 path_umount 模块神技 ===="
           if ! grep -q "path_umount" fs/namespace.c; then
               cat << 'EOF' >> fs/namespace.c
 
