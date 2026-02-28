@@ -53,7 +53,7 @@ env:
 
   PACK_METHOD: "Anykernel3" 
 
-  KERNELSU_METHOD: "shell" 
+  KERNELSU_METHOD: "manual" 
 
   PATCHES_SOURCE: "author/source" 
   PATCHES_BRANCH: "branch" 
@@ -63,7 +63,7 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  HOOK_METHOD: "sukisu_manual" 
+  HOOK_METHOD: "tracepoint" 
   HOOK_OLDER: "false" 
 
   KERNEL_PATCH: "false" 
@@ -113,7 +113,7 @@ jobs:
         uses: ./.github/workflows/patch-susfs
 
       - name: 🔗 Patch for no-kprobe
-        uses: ./.github/workflows/patch-no-kprobe-new
+        uses: ./.github/workflows/patch-no-kprobe
 
       - name: 🪛 Extra Kernel Options
         run: |
