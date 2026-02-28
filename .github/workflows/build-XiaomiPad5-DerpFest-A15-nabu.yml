@@ -29,11 +29,11 @@ env:
   DEFCONFIG_ORIGIN_IMAGE: ""
   DEFCONFIG_FROM_BOOT: false
 
-  KERNELSU_SOURCE : ""
+  KERNELSU_SOURCE : "https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"
   KERNELSU_BRANCH : ""
 
-  KERNELSU_AUTO_GET : "true" 
-  KERNELSU_AUTO_FORK : "sukisu" 
+  KERNELSU_AUTO_GET : "false" 
+  KERNELSU_AUTO_FORK : "builtin" 
 
   SUSFS_ENABLE : "false"
   SUSFS_FIXED : "false"
@@ -53,7 +53,7 @@ env:
 
   PACK_METHOD: "Anykernel3" 
 
-  KERNELSU_METHOD: "shell" 
+  KERNELSU_METHOD: "manual" 
 
   PATCHES_SOURCE: "author/source" 
   PATCHES_BRANCH: "branch" 
