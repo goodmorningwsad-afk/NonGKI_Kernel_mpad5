@@ -117,22 +117,22 @@ runs:
 
           # 👇👇👇 核心改造：开启 SukiSU 专属 v1.4 现代 Manual Hook 👇👇👇
           elif [[ "${{ env.HOOK_METHOD }}" == "sukisu_manual" ]]; then
-            echo "==== 🎯 开启 SukiSU 专属 v1.4 现代 Manual Hook (终极雷达版) ===="
+            echo "==== 🎯 开启 SukiSU 专属 v1.4 现代 Manual Hook (锁定本体版) ===="
             
-            # 1. 启动全盘雷达，寻找核心大动脉 kernelsu.h 的绝对物理坐标！
-            echo "[+] 正在扫描 kernelsu.h 物理路径..."
-            KSU_HEADER_PATH=$(find $GITHUB_WORKSPACE/device_kernel -type f -name "kernelsu.h" | head -n 1)
+            # 1. 启动全盘雷达，直接寻找原始的 ksu.h！不再找那个不存在的替身！
+            echo "[+] 正在扫描 ksu.h 物理路径..."
+            KSU_HEADER_PATH=$(find $GITHUB_WORKSPACE/device_kernel -type f -name "ksu.h" | head -n 1)
             
             if [ -z "$KSU_HEADER_PATH" ]; then
-                echo "[-] 致命错误：整个内核源码里都找不到 kernelsu.h！"
+                echo "[-] 致命错误：整个内核源码里连 ksu.h 都找不到！说明拉取 SukiSU 源码彻底失败！"
                 false
             fi
-            echo "[+] 锁定核心头文件物理坐标：$KSU_HEADER_PATH"
+            echo "[+] 锁定核心头文件本体物理坐标：$KSU_HEADER_PATH"
             
-            # 2. 清除上一回合失败残留的尖括号 include（防止代码重复）
+            # 2. 清除上一回合失败残留的 include（防止代码重复）
             sed -i '/#include <linux\/kernelsu.h>/d' fs/exec.c fs/open.c fs/read_write.c fs/stat.c
             
-            # 3. 撕掉伪装，强行注入带绝对路径的 include！
+            # 3. 撕掉伪装，强行注入带绝对路径的 ksu.h！
             sed -i "/#include <linux\/fs.h>/a #include \"$KSU_HEADER_PATH\"" fs/exec.c fs/open.c fs/read_write.c fs/stat.c
             
             # 4. 注入 4.14 专属的底层拦截代码
