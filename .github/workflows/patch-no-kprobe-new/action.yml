@@ -115,27 +115,33 @@ runs:
           elif [[ "${{ env.HOOK_METHOD }}" == "normal" ]]; then
             echo "[+] Skipped, Kprobe method hasn't patch"
 
-          # 👇👇👇 核心改造：开启 SukiSU-Ultra 现代 v1.4 Manual Hook 👇👇👇
+          # 👇👇👇 核心改造：开启 SukiSU 专属 v1.4 现代 Manual Hook 👇👇👇
           elif [[ "${{ env.HOOK_METHOD }}" == "sukisu_manual" ]]; then
-            echo "==== 🎯 开启 SukiSU 专属 v1.4 现代 Manual Hook 物理注入 ===="
+            echo "==== 🎯 开启 SukiSU 专属 v1.4 现代 Manual Hook (终极雷达版) ===="
             
-            # 1. 注入官方 KernelSU 头文件 (编译时 setup.sh 会自动准备好这个文件，绝对不会 not found)
-            sed -i '/#include <linux\/fs.h>/a #include <linux/kernelsu.h>' fs/exec.c fs/open.c fs/read_write.c fs/stat.c
+            # 1. 启动全盘雷达，寻找核心大动脉 kernelsu.h 的绝对物理坐标！
+            echo "[+] 正在扫描 kernelsu.h 物理路径..."
+            KSU_HEADER_PATH=$(find $GITHUB_WORKSPACE/device_kernel -type f -name "kernelsu.h" | head -n 1)
             
-            # 2. 注入 4.14 专属的底层拦截代码 (避开旧版 v1.3 的报错名字)
-            # 处理 exec.c
+            if [ -z "$KSU_HEADER_PATH" ]; then
+                echo "[-] 致命错误：整个内核源码里都找不到 kernelsu.h！"
+                false
+            fi
+            echo "[+] 锁定核心头文件物理坐标：$KSU_HEADER_PATH"
+            
+            # 2. 清除上一回合失败残留的尖括号 include（防止代码重复）
+            sed -i '/#include <linux\/kernelsu.h>/d' fs/exec.c fs/open.c fs/read_write.c fs/stat.c
+            
+            # 3. 撕掉伪装，强行注入带绝对路径的 include！
+            sed -i "/#include <linux\/fs.h>/a #include \"$KSU_HEADER_PATH\"" fs/exec.c fs/open.c fs/read_write.c fs/stat.c
+            
+            # 4. 注入 4.14 专属的底层拦截代码
             sed -i 's/retval = bprm_execve(bprm, fd, filename, flags);/ksu_handle_execveat(\&fd, \&filename, \&flags, \&bprm);\n\tretval = bprm_execve(bprm, fd, filename, flags);/g' fs/exec.c
-            
-            # 处理 open.c (根据官方指南，4.14 是 do_faccessat)
             sed -i 's/return do_faccessat(dfd, filename, mode, 0);/ksu_handle_faccessat(\&dfd, \&filename, \&mode, NULL);\n\treturn do_faccessat(dfd, filename, mode, 0);/g' fs/open.c
-            
-            # 处理 read_write.c (根据官方指南，4.14 是 f.file)
             sed -i 's/ret = vfs_read(f.file, buf, count, \&pos);/ksu_handle_vfs_read(\&f.file, \&buf, \&count, \&pos);\n\t\tret = vfs_read(f.file, buf, count, \&pos);/g' fs/read_write.c
-            
-            # 处理 stat.c
             sed -i 's/error = vfs_fstatat(dfd, filename, \&stat, flag);/ksu_handle_stat(\&dfd, \&filename, \&flag);\n\terror = vfs_fstatat(dfd, filename, \&stat, flag);/g' fs/stat.c
 
-            echo "[+] 现代 Manual Hook 注入完毕！"
+            echo "[+] 现代 Manual Hook 物理注入完毕！"
             REJ_FOUND
             
           else
