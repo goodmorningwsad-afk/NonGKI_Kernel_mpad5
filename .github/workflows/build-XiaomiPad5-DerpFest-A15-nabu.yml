@@ -117,6 +117,16 @@ jobs:
 
       - name: 🪛 Extra Kernel Options
         run: |
+         # 👇 提取流水线底层的黑盒脚本，直接打印到日志里！
+          echo "==== 🕵️ 正在截获并打印 syscall_hook_patches.sh 的源码 ===="
+          cat /tmp/Patches/syscall_hook_patches.sh
+          echo "==== 🕵️ 源码打印完毕 ===="
+          
+          # (顺手牵羊) 既然提取了，不如连带它那个针对 4.14 内核的后备补丁一起看了：
+          echo "==== 🕵️ 正在截获并打印 backport_patches.sh 的源码 ===="
+          cat /tmp/Patches/backport_patches.sh || echo "未找到 backport 脚本"
+          echo "==== 🕵️ 源码打印完毕 ===="
+          
           cd $GITHUB_WORKSPACE/device_kernel
           # 屏蔽烦人的闲置函数报错
           echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
