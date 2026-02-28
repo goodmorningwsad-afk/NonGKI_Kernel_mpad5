@@ -293,7 +293,52 @@ jobs:
               echo "✅ fs/namespace.c (path_umount) 追加完成！"
           else
               echo "⚠️ fs/namespace.c 已存在 path_umount，跳过。"
-              # 6. 缝合 security/selinux/hooks.c (给 ksud 发放免死金牌，复活模块功能！)
+          fi
+
+          echo "==== 6. 正在复活 path_umount 模块神技 ===="
+          if ! grep -q "path_umount" fs/namespace.c; then
+              cat << 'EOF' >> fs/namespace.c
+
+          #ifdef CONFIG_KSU
+          static int can_umount(const struct path *path, int flags)
+          {
+              struct mount *mnt = real_mount(path->mnt);
+              if (flags & ~(MNT_FORCE | MNT_DETACH | MNT_EXPIRE | UMOUNT_NOFOLLOW))
+                  return -EINVAL;
+              if (!may_mount())
+                  return -EPERM;
+              if (path->dentry != path->mnt->mnt_root)
+                  return -EINVAL;
+              if (!check_mnt(mnt))
+                  return -EINVAL;
+              if (mnt->mnt.mnt_flags & MNT_LOCKED) /* Check optimistically */
+                  return -EINVAL;
+              if (flags & MNT_FORCE && !capable(CAP_SYS_ADMIN))
+                  return -EPERM;
+              return 0;
+          }
+
+          int path_umount(struct path *path, int flags)
+          {
+              struct mount *mnt = real_mount(path->mnt);
+              int ret;
+              ret = can_umount(path, flags);
+              if (!ret)
+                  ret = do_umount(mnt, flags);
+              /* we mustn't call path_put() as that would clear mnt_expiry_mark */
+              dput(path->dentry);
+              mntput_no_expire(mnt);
+              return ret;
+          }
+          EXPORT_SYMBOL(path_umount);
+          #endif
+          EOF
+              echo "✅ fs/namespace.c (path_umount) 追加完成！"
+          else
+              echo "⚠️ fs/namespace.c 已存在 path_umount，跳过。"
+          fi # 👈 注意！fi 必须在这里结束！
+
+          echo "==== 7. 缝合 security/selinux/hooks.c (复活 ksud 模块功能) ===="
           HOOKS_PATCH="
           {
               static u32 ksu_sid;
@@ -313,8 +358,7 @@ jobs:
               }
           }"
           patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH" "ksu_sid"
-          echo "✅ hook 追加完成！"
-          fi
+          echo "✅ SELinux hooks.c 免死金牌追加完成！"
 
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
