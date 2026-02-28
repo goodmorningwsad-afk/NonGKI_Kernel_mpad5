@@ -142,6 +142,18 @@ jobs:
           echo "====  正在修复 supercalls.c 链接丢失 Bug ===="
           sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
 
+          # ，咱们直接现场抓包，看看 SukiSU 源码里到底有没有这些变量！
+          echo "==== 🕵️ 正在现场截获并核对 setup.sh ===="
+          cat drivers/kernelsu/scripts/setup.sh || cat drivers/kernelsu/setup.sh || echo "未找到 setup.sh"
+          
+          echo "==== 🕵️ 正在 SukiSU 源码内进行地毯式搜索，寻找 Hook 开关变量本体 ===="
+          echo "[+] 搜索 ksu_vfs_read_hook :"
+          grep -rn "ksu_vfs_read_hook" drivers/kernelsu/ || echo "[-] 报告：ksu_vfs_read_hook 在 SukiSU 源码中彻底绝迹！"
+          
+          echo "[+] 搜索 ksu_execveat_hook :"
+          grep -rn "ksu_execveat_hook" drivers/kernelsu/ || echo "[-] 报告：ksu_execveat_hook 在 SukiSU 源码中彻底绝迹！"
+          echo "==== 🕵️ 搜查完毕 ===="
+
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
 
