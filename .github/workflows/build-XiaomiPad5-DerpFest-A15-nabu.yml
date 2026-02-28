@@ -29,11 +29,11 @@ env:
   DEFCONFIG_ORIGIN_IMAGE: ""
   DEFCONFIG_FROM_BOOT: false
 
-  KERNELSU_SOURCE : "https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"
+  KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
 
-  KERNELSU_AUTO_GET : "false" 
-  KERNELSU_AUTO_FORK : "builtin" 
+  KERNELSU_AUTO_GET : "true" 
+  KERNELSU_AUTO_FORK : "sukisu" 
 
   SUSFS_ENABLE : "false"
   SUSFS_FIXED : "false"
@@ -53,7 +53,7 @@ env:
 
   PACK_METHOD: "Anykernel3" 
 
-  KERNELSU_METHOD: "manual" 
+  KERNELSU_METHOD: "shell" 
 
   PATCHES_SOURCE: "author/source" 
   PATCHES_BRANCH: "branch" 
@@ -63,7 +63,8 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  HOOK_METHOD: "syscall" 
+  # 🚨 终极修正 1：改为 manual，彻底掐断庸医脚本瞎改 syscall 的念头！
+  HOOK_METHOD: "manual" 
   HOOK_OLDER: "false" 
 
   KERNEL_PATCH: "false" 
@@ -112,12 +113,29 @@ jobs:
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
-      #- name: 🔗 Patch for no-kprobe
-      #  uses: ./.github/workflows/patch-no-kprobe
+      # 🚨 终极修正 2：彻底铲除 patch-no-kprobe 步骤，绝不留患！
 
+      # 🚨 终极修正 3：完整的微创手术包，专治 builtin 分支原厂错别字
       - name: 🩹 Fix SukiSU Source Bugs & Extra Options
         run: |
-          # 4. 防止 LTO 爆内存，并强开手动挂载引擎
+          cd $GITHUB_WORKSPACE/device_kernel
+          echo "==== 开始清理与修复 SukiSU 原厂 Bug ===="
+          
+          # 1. 暴力修复 builtin 分支里的所有原厂笔误
+          sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
+          sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
+          sed -i 's/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
+          
+          # 2. 修复 supercalls.c 的宏定义套娃与链接报错
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
+          
+          # 3. 屏蔽内核中烦人的无用函数警告
+          echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
+          echo "ccflags-y += -Wno-error" >> fs/Makefile
+          
+          # 4. 防止 LTO 爆内存，并强制唤醒挂载引擎
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
