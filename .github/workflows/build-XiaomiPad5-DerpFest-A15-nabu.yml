@@ -293,6 +293,27 @@ jobs:
               echo "✅ fs/namespace.c (path_umount) 追加完成！"
           else
               echo "⚠️ fs/namespace.c 已存在 path_umount，跳过。"
+              # 6. 缝合 security/selinux/hooks.c (给 ksud 发放免死金牌，复活模块功能！)
+          HOOKS_PATCH="
+          {
+              static u32 ksu_sid;
+              char *secdata;
+              int error;
+              u32 seclen;
+              if(!ksu_sid){
+                  security_secctx_to_secid(\"u:r:su:s0\", strlen(\"u:r:su:s0\"), &ksu_sid);
+              }
+              error = security_secid_to_secctx(old_tsec->sid, &secdata, &seclen);
+              if (!error) {
+                  int rc_init = strcmp(\"u:r:init:s0\", secdata);
+                  security_release_secctx(secdata, seclen);
+                  if(rc_init == 0 && new_tsec->sid == ksu_sid){
+                      return 0;
+                  }
+              }
+          }"
+          patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH" "ksu_sid"
+          echo "✅ hook 追加完成！"
           fi
 
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
