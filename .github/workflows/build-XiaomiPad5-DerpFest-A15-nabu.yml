@@ -143,8 +143,15 @@ jobs:
           sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
           echo "==== 🎯 正在实例化缺失的 read_hook 开关变量 ===="
           sed -i 's/extern bool ksu_vfs_read_hook __read_mostly;/bool ksu_vfs_read_hook __read_mostly = true;/g' fs/read_write.c
-          echo "==== 🔑 强开 ADB Root 后门 ===="
-          echo "CONFIG_KSU_DEBUG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          # 直接提取 SukiSU 官方配置清单，看看挂载模块到底需要什么开关！
+          echo "====  正在截获 SukiSU 的官方 Kconfig 菜单 ===="
+          cat drivers/kernelsu/Kconfig || echo "[-] 未找到 Kconfig"
+          
+          echo "====  正在截获 SukiSU 的官方 Makefile 编译清单 ===="
+          cat drivers/kernelsu/Makefile || echo "[-] 未找到 Makefile"
+          
+          echo "====  检查当前内核 defconfig 中 OverlayFS 的原生状态 ===="
+          grep -i "OVERLAY_FS" arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig || echo "[-] defconfig 中未配置 OVERLAY_FS"
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
