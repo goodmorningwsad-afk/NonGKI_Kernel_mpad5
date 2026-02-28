@@ -115,16 +115,16 @@ jobs:
 
       # 🚨 终极修正 2：彻底铲除 patch-no-kprobe 步骤，绝不留患！
 
-      # 🚨 终极修正 3：完整的微创手术包，专治 builtin 分支原厂错别字
       - name: 🩹 Fix SukiSU Source Bugs & Extra Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 开始清理与修复 SukiSU 原厂 Bug ===="
           
-          # 1. 暴力修复 builtin 分支里的所有原厂笔误
+          # 1. 毫米级精准修复 builtin 分支里的原厂笔误
           sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
           sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
-          sed -i 's/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
+          # 🚨 致命修正：只替换 300 行以后的 cred！绝不误伤上半部分合法的 cred 变量！
+          sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
           
           # 2. 修复 supercalls.c 的宏定义套娃与链接报错
           sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
