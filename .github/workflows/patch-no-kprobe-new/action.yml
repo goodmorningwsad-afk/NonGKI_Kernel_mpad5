@@ -115,33 +115,27 @@ runs:
           elif [[ "${{ env.HOOK_METHOD }}" == "normal" ]]; then
             echo "[+] Skipped, Kprobe method hasn't patch"
 
-          # 👇👇👇 核心改造：全自动全地图雷达搜索挂钩法 👇👇👇
-          elif [[ "${{ env.HOOK_METHOD }}" == "tracepoint" ]]; then
-            echo "==== 🎯 开启 SukiSU-Ultra 专属 Tracepoint 钩子物理注入 ===="
+          # 👇👇👇 核心改造：开启 SukiSU-Ultra 现代 v1.4 Manual Hook 👇👇👇
+          elif [[ "${{ env.HOOK_METHOD }}" == "sukisu_manual" ]]; then
+            echo "==== 🎯 开启 SukiSU 专属 v1.4 现代 Manual Hook 物理注入 ===="
             
-            # 1. 开启全地图雷达，全盘扫描 ksu_trace.h 的真实坐标！
-            echo "[+] 正在全盘搜索 ksu_trace.h ..."
-            KSU_TRACE_PATH=$(find $GITHUB_WORKSPACE/device_kernel -type f -name "ksu_trace.h" | head -n 1)
+            # 1. 注入官方 KernelSU 头文件 (编译时 setup.sh 会自动准备好这个文件，绝对不会 not found)
+            sed -i '/#include <linux\/fs.h>/a #include <linux/kernelsu.h>' fs/exec.c fs/open.c fs/read_write.c fs/stat.c
             
-            # 2. 如果找不到，当场拉闸，绝不留到最后一步暴雷！
-            if [ -z "$KSU_TRACE_PATH" ]; then
-                echo "[-] 致命错误：雷达扫描完毕，整个内核源码里都找不到 ksu_trace.h！"
-                echo "[-] 可能是 SukiSU-Ultra 最新版删除了该文件，或者拉取源码失败！"
-                false
-            fi
-            
-            echo "[+] 找到 ksu_trace.h 真实路径：$KSU_TRACE_PATH"
-            
-            # 3. 强行写入真实绝对路径 (坚决不加 || true)
-            sed -i "/#include <linux\/fs.h>/a #include \"$KSU_TRACE_PATH\"" fs/exec.c fs/open.c fs/read_write.c fs/stat.c
-            
-            # 4. 注入挂钩代码 (坚决不加 || true)
+            # 2. 注入 4.14 专属的底层拦截代码 (避开旧版 v1.3 的报错名字)
+            # 处理 exec.c
             sed -i 's/retval = bprm_execve(bprm, fd, filename, flags);/ksu_handle_execveat(\&fd, \&filename, \&flags, \&bprm);\n\tretval = bprm_execve(bprm, fd, filename, flags);/g' fs/exec.c
-            sed -i 's/long ret = do_sys_open(dfd, filename, flags, mode);/ksu_handle_faccessat(\&dfd, \&filename);\n\tlong ret = do_sys_open(dfd, filename, flags, mode);/g' fs/open.c
-            sed -i 's/ret = vfs_read(file, buf, count, pos);/ksu_handle_vfs_read(\&file, \&buf, \&count, pos);\n\tret = vfs_read(file, buf, count, pos);/g' fs/read_write.c
-            sed -i 's/error = vfs_statx(dfd, filename, flags, stat, mask);/ksu_handle_stat(\&dfd, \&filename, \&flags);\n\terror = vfs_statx(dfd, filename, flags, stat, mask);/g' fs/stat.c
+            
+            # 处理 open.c (根据官方指南，4.14 是 do_faccessat)
+            sed -i 's/return do_faccessat(dfd, filename, mode, 0);/ksu_handle_faccessat(\&dfd, \&filename, \&mode, NULL);\n\treturn do_faccessat(dfd, filename, mode, 0);/g' fs/open.c
+            
+            # 处理 read_write.c (根据官方指南，4.14 是 f.file)
+            sed -i 's/ret = vfs_read(f.file, buf, count, \&pos);/ksu_handle_vfs_read(\&f.file, \&buf, \&count, \&pos);\n\t\tret = vfs_read(f.file, buf, count, \&pos);/g' fs/read_write.c
+            
+            # 处理 stat.c
+            sed -i 's/error = vfs_fstatat(dfd, filename, \&stat, flag);/ksu_handle_stat(\&dfd, \&filename, \&flag);\n\terror = vfs_fstatat(dfd, filename, \&stat, flag);/g' fs/stat.c
 
-            echo "[+] Tracepoint 钩子真实路径注入完毕！"
+            echo "[+] 现代 Manual Hook 注入完毕！"
             REJ_FOUND
             
           else
