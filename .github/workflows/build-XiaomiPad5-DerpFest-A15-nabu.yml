@@ -145,24 +145,24 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 开始运行极客法医级 Bash 缝合脚本 ===="
 
-          # 定义终极安全的打孔函数
+          # 修复了检测机制的打孔函数，使用第五个参数做专属特征检测，防止漏打！
           patch_file() {
               local file="$1"
               local search="$2"
               local offset="$3"
               local insert="$4"
+              local check_str="$5"
 
               if [ ! -f "$file" ]; then
                   echo "❌ 未找到文件: $file"
                   return
               fi
 
-              if grep -q "ksu_handle" "$file"; then
-                  echo "⚠️ $file 已经打过补丁，跳过。"
+              if grep -q "$check_str" "$file"; then
+                  echo "⚠️ $file 已经打过补丁 ($check_str)，跳过。"
                   return
               fi
 
-              # 核心绝技：使用 grep -F 进行绝对安全的字面量匹配，拒绝正则抽风！
               local line_num=$(grep -n -F "$search" "$file" | head -n 1 | cut -d: -f1)
 
               if [ -z "$line_num" ]; then
@@ -172,13 +172,12 @@ jobs:
 
               local target_line=$((line_num + offset))
 
-              # 使用 awk 精准跨行注入（免疫一切双引号和转义字符报错）
               awk -v n="$target_line" -v s="$insert" 'NR == n {print s} {print}' "$file" > "${file}.tmp"
               mv "${file}.tmp" "$file"
               echo "✅ 成功缝合: $file (在第 $target_line 行插入)"
           }
 
-          # 1. 缝合 fs/exec.c (掌管 Root 权限分配)
+          # 1. 缝合 fs/exec.c
           EXEC_HOOK="#ifdef CONFIG_KSU
           extern bool ksu_execveat_hook __read_mostly;
           extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
@@ -188,14 +187,14 @@ jobs:
           else
               ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
           #endif"
-          patch_file "fs/exec.c" "current->flags &= ~PF_NPROC_EXCEEDED;" 0 "$EXEC_HOOK"
+          patch_file "fs/exec.c" "current->flags &= ~PF_NPROC_EXCEEDED;" 0 "$EXEC_HOOK" "ksu_execveat_hook"
 
-          # 2. 缝合 fs/open.c (掌管权限拦截)
+          # 2. 缝合 fs/open.c
           OPEN_HOOK="#ifdef CONFIG_KSU
           extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
           ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
           #endif"
-          patch_file "fs/open.c" "where's F_OK, X_OK, W_OK, R_OK?" 2 "$OPEN_HOOK"
+          patch_file "fs/open.c" "where's F_OK, X_OK, W_OK, R_OK?" 2 "$OPEN_HOOK" "ksu_handle_faccessat"
 
           # 3. 缝合 fs/read_write.c - 读拦截
           READ_HOOK="#ifdef CONFIG_KSU
@@ -204,37 +203,37 @@ jobs:
           if (unlikely(ksu_vfs_read_hook))
               ksu_handle_vfs_read(&file, &buf, &count, &pos);
           #endif"
-          patch_file "fs/read_write.c" "FMODE_CAN_READ" 2 "$READ_HOOK"
+          patch_file "fs/read_write.c" "FMODE_CAN_READ" 2 "$READ_HOOK" "ksu_vfs_read_hook"
 
-          # 4. 缝合 fs/read_write.c - 写拦截
+          # 4. 缝合 fs/read_write.c - 写拦截 (由于检测了特有的 ksu_vfs_write_hook，这次绝对不会被跳过！)
           WRITE_HOOK="#ifdef CONFIG_KSU
           extern bool ksu_vfs_write_hook __read_mostly;
           extern int ksu_handle_vfs_write(struct file **file_ptr, const char __user **buf_ptr, size_t *count_ptr, loff_t **pos);
           if (unlikely(ksu_vfs_write_hook))
               ksu_handle_vfs_write(&file, &buf, &count, &pos);
           #endif"
-          patch_file "fs/read_write.c" "FMODE_CAN_WRITE" 2 "$WRITE_HOOK"
+          patch_file "fs/read_write.c" "FMODE_CAN_WRITE" 2 "$WRITE_HOOK" "ksu_vfs_write_hook"
 
-          # 5. 缝合 fs/stat.c (掌管文件状态)
+          # 5. 缝合 fs/stat.c (🚨已修复 flag 漏字母的问题！)
           STAT_HOOK="#ifdef CONFIG_KSU
           extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
-          ksu_handle_stat(&dfd, &filename, &flag);
+          ksu_handle_stat(&dfd, &filename, &flags);
           #endif"
-          patch_file "fs/stat.c" "unsigned int lookup_flags" 1 "$STAT_HOOK"
+          patch_file "fs/stat.c" "unsigned int lookup_flags" 1 "$STAT_HOOK" "ksu_handle_stat"
 
-          # 6. 缝合 drivers/input/input.c (音量键救砖)
+          # 6. 缝合 drivers/input/input.c
           INPUT_HOOK="#ifdef CONFIG_KSU
           extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
           ksu_handle_input_handle_event(&type, &code, &value);
           #endif"
-          patch_file "drivers/input/input.c" "add_input_randomness(type, code, value);" 1 "$INPUT_HOOK"
+          patch_file "drivers/input/input.c" "add_input_randomness(type, code, value);" 1 "$INPUT_HOOK" "ksu_handle_input_handle_event"
 
-          # 7. 缝合 fs/devpts/inode.c (修复终端 pm 命令)
+          # 7. 缝合 fs/devpts/inode.c
           DEVPTS_HOOK="#ifdef CONFIG_KSU
           if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)
               return NULL;
           #endif"
-          patch_file "fs/devpts/inode.c" "void *devpts_get_priv(struct dentry *dentry)" 2 "$DEVPTS_HOOK"
+          patch_file "fs/devpts/inode.c" "void *devpts_get_priv(struct dentry *dentry)" 2 "$DEVPTS_HOOK" "DEVPTS_SUPER_MAGIC"
 
           echo "==== 8. 正在复活 path_umount 模块神技 ===="
           if ! grep -q "path_umount" fs/namespace.c; then
@@ -278,6 +277,31 @@ jobs:
           else
               echo "⚠️ fs/namespace.c 已存在 path_umount，跳过。"
           fi
+
+      - name: 📤 提取并打包已打孔的源码 (用于人工审查)
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 正在收集打孔后的核心文件 ===="
+          mkdir -p patched_source_files/fs/devpts
+          mkdir -p patched_source_files/drivers/input
+          
+          # 复制打过孔的文件
+          cp device_kernel/fs/exec.c patched_source_files/fs/ || true
+          cp device_kernel/fs/open.c patched_source_files/fs/ || true
+          cp device_kernel/fs/read_write.c patched_source_files/fs/ || true
+          cp device_kernel/fs/stat.c patched_source_files/fs/ || true
+          cp device_kernel/fs/namespace.c patched_source_files/fs/ || true
+          cp device_kernel/fs/devpts/inode.c patched_source_files/fs/devpts/ || true
+          cp device_kernel/drivers/input/input.c patched_source_files/drivers/input/ || true
+          
+          cd patched_source_files
+          zip -r ../Patched_Source_Files.zip .
+
+      - name: 📦 上传打孔后源码验证包
+        uses: actions/upload-artifact@v4
+        with:
+          name: Patched_Source_Files
+          path: Patched_Source_Files.zip
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
