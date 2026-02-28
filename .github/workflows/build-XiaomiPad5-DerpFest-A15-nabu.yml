@@ -115,22 +115,28 @@ jobs:
       #- name: 🔗 Patch for no-kprobe
       #  uses: ./.github/workflows/patch-no-kprobe
 
-      - name: 📦 提取待修补文件 (准备打包)
+      - name: 🩹 Fix SukiSU Source Bugs (微创手术修复作者笔误)
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 正在收集需要手动集成的核心文件 ===="
-          # 创建临时文件夹保持目录结构
-          mkdir -p extract_files/fs/devpts
-          mkdir -p extract_files/drivers/input
+          echo "==== 开始修复 SukiSU 源码本身的低级语法错误 ===="
           
-          # 复制文件
-          cp fs/exec.c extract_files/fs/ || echo "缺失 fs/exec.c"
-          cp fs/open.c extract_files/fs/ || echo "缺失 fs/open.c"
-          cp fs/read_write.c extract_files/fs/ || echo "缺失 fs/read_write.c"
-          cp fs/stat.c extract_files/fs/ || echo "缺失 fs/stat.c"
-          cp fs/namespace.c extract_files/fs/ || echo "缺失 fs/namespace.c"
-          cp fs/devpts/inode.c extract_files/fs/devpts/ || echo "缺失 inode.c"
-          cp drivers/input/input.c extract_files/drivers/input/ || echo "缺失 input.c"
+          # 1. 修复 app_profile.c 的指针与变量名写错问题
+          sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
+          sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
+          sed -i '350,400s/setup_groups(&profile, cred)/setup_groups(\&profile, newcreds)/g' drivers/kernelsu/app_profile.c
+          
+          # 2. 修复 supercalls.c 的宏展开套娃错误和链接丢失
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
+          
+          # 3. 屏蔽无用函数报错
+          echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
+          echo "ccflags-y += -Wno-error" >> fs/Makefile
+          
+          # 4. 防止 LTO 爆内存
+          sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
+          sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           
           # 打包成 zip
           cd extract_files
