@@ -132,12 +132,22 @@ jobs:
           echo "====  正在对 supercalls.c 修复宏展开套娃错误 ===="
           sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
           sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
+          
           #   3：暴力关闭 LTO，彻底解放云端服务器的内存！
           echo "====  正在强行关闭 LTO 以防止无限卡死 ===="
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
+          
+          # 👇 修复笔误：补上了 supercalls.c 的 c
           echo "====  正在修复 supercalls.c 链接丢失 Bug ===="
           sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
+          
+          # 👇 新增：纠正官方 syscall 补丁的老旧函数命名，对接 SukiSU-Ultra 4.1.1 的新标准
+          echo "==== 🎯 正在将 v1.3 旧函数名替换为 SukiSU 的 v1.4 新函数名 ===="
+          sed -i 's/ksu_vfs_read_hook/ksu_handle_vfs_read/g' fs/read_write.c
+          sed -i 's/ksu_execveat_hook/ksu_handle_execveat/g' fs/exec.c
+          sed -i 's/ksu_vfs_statx_hook/ksu_handle_stat/g' fs/stat.c
+          sed -i 's/ksu_faccessat_hook/ksu_handle_faccessat/g' fs/open.c
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
