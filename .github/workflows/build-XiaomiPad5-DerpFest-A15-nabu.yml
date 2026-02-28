@@ -140,37 +140,46 @@ jobs:
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
 
-      - name: 🛠️ 终极神级打孔：纯手工缝合 SukiSU 四大金刚
+      - name: 🛠️ 终极神级打孔：纯手工缝合四大金刚 (Bash 原生版)
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 开始运行极客法医级 Python 缝合脚本 ===="
-          cat << 'EOF' > patch_sukisu.py
-          import os
+          echo "==== 开始运行极客法医级 Bash 缝合脚本 ===="
 
-          def patch_file(filepath, search_str, insert_str, offset_lines=0):
-              if not os.path.exists(filepath):
-                  print("未找到文件: " + filepath)
-                  return
-              with open(filepath, 'r') as f:
-                  lines = f.readlines()
-                  
-              content = "".join(lines)
-              if "ksu_handle" in insert_str and "ksu_handle" in content:
-                  print("⚠️ " + filepath + " 已经打过补丁，跳过。")
-                  return
+          # 定义终极安全的打孔函数
+          patch_file() {
+              local file="$1"
+              local search="$2"
+              local offset="$3"
+              local insert="$4"
 
-              for i, line in enumerate(lines):
-                  if search_str in line:
-                      lines.insert(i + offset_lines, insert_str + '\n')
-                      with open(filepath, 'w') as f:
-                          f.writelines(lines)
-                      print("✅ 成功缝合: " + filepath)
-                      return
-              print("❌ 致命错误：在 " + filepath + " 中找不到特征定位字符串！")
+              if [ ! -f "$file" ]; then
+                  echo "❌ 未找到文件: $file"
+                  return
+              fi
+
+              if grep -q "ksu_handle" "$file"; then
+                  echo "⚠️ $file 已经打过补丁，跳过。"
+                  return
+              fi
+
+              # 核心绝技：使用 grep -F 进行绝对安全的字面量匹配，拒绝正则抽风！
+              local line_num=$(grep -n -F "$search" "$file" | head -n 1 | cut -d: -f1)
+
+              if [ -z "$line_num" ]; then
+                  echo "❌ 致命错误：在 $file 中找不到特征定位字符串: $search"
+                  return
+              fi
+
+              local target_line=$((line_num + offset))
+
+              # 使用 awk 精准跨行注入（免疫一切双引号和转义字符报错）
+              awk -v n="$target_line" -v s="$insert" 'NR == n {print s} {print}' "$file" > "${file}.tmp"
+              mv "${file}.tmp" "$file"
+              echo "✅ 成功缝合: $file (在第 $target_line 行插入)"
+          }
 
           # 1. 缝合 fs/exec.c (掌管 Root 权限分配)
-          exec_hook = """
-          #ifdef CONFIG_KSU
+          EXEC_HOOK="#ifdef CONFIG_KSU
           extern bool ksu_execveat_hook __read_mostly;
           extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
           extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
@@ -178,73 +187,58 @@ jobs:
               ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
           else
               ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
-          #endif
-          """
-          patch_file('fs/exec.c', 'current->flags &= ~PF_NPROC_EXCEEDED;', exec_hook, 0)
+          #endif"
+          patch_file "fs/exec.c" "current->flags &= ~PF_NPROC_EXCEEDED;" 0 "$EXEC_HOOK"
 
           # 2. 缝合 fs/open.c (掌管权限拦截)
-          open_hook = """
-          #ifdef CONFIG_KSU
+          OPEN_HOOK="#ifdef CONFIG_KSU
           extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
           ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
-          #endif
-          """
-          patch_file('fs/open.c', "where's F_OK, X_OK, W_OK, R_OK?", open_hook, 2)
+          #endif"
+          patch_file "fs/open.c" "where's F_OK, X_OK, W_OK, R_OK?" 2 "$OPEN_HOOK"
 
-          # 3. 缝合 fs/read_write.c - 读拦截 (防安卓 15 闪退核心)
-          read_hook = """
-          #ifdef CONFIG_KSU
+          # 3. 缝合 fs/read_write.c - 读拦截
+          READ_HOOK="#ifdef CONFIG_KSU
           extern bool ksu_vfs_read_hook __read_mostly;
           extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos);
           if (unlikely(ksu_vfs_read_hook))
               ksu_handle_vfs_read(&file, &buf, &count, &pos);
-          #endif
-          """
-          patch_file('fs/read_write.c', 'FMODE_CAN_READ', read_hook, 2)
+          #endif"
+          patch_file "fs/read_write.c" "FMODE_CAN_READ" 2 "$READ_HOOK"
 
           # 4. 缝合 fs/read_write.c - 写拦截
-          write_hook = """
-          #ifdef CONFIG_KSU
+          WRITE_HOOK="#ifdef CONFIG_KSU
           extern bool ksu_vfs_write_hook __read_mostly;
           extern int ksu_handle_vfs_write(struct file **file_ptr, const char __user **buf_ptr, size_t *count_ptr, loff_t **pos);
           if (unlikely(ksu_vfs_write_hook))
               ksu_handle_vfs_write(&file, &buf, &count, &pos);
-          #endif
-          """
-          patch_file('fs/read_write.c', 'FMODE_CAN_WRITE', write_hook, 2)
+          #endif"
+          patch_file "fs/read_write.c" "FMODE_CAN_WRITE" 2 "$WRITE_HOOK"
 
           # 5. 缝合 fs/stat.c (掌管文件状态)
-          stat_hook = """
-          #ifdef CONFIG_KSU
+          STAT_HOOK="#ifdef CONFIG_KSU
           extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
           ksu_handle_stat(&dfd, &filename, &flag);
-          #endif
-          """
-          patch_file('fs/stat.c', 'user_path_at(dfd, filename, lookup_flags, &path);', stat_hook, 0)
+          #endif"
+          patch_file "fs/stat.c" "unsigned int lookup_flags" 1 "$STAT_HOOK"
 
           # 6. 缝合 drivers/input/input.c (音量键救砖)
-          input_hook = """
-          #ifdef CONFIG_KSU
+          INPUT_HOOK="#ifdef CONFIG_KSU
           extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
           ksu_handle_input_handle_event(&type, &code, &value);
-          #endif
-          """
-          patch_file('drivers/input/input.c', 'input_get_disposition(dev, type, code, &value);', input_hook, 1)
+          #endif"
+          patch_file "drivers/input/input.c" "add_input_randomness(type, code, value);" 1 "$INPUT_HOOK"
 
           # 7. 缝合 fs/devpts/inode.c (修复终端 pm 命令)
-          devpts_hook = """
-          #ifdef CONFIG_KSU
+          DEVPTS_HOOK="#ifdef CONFIG_KSU
           if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)
               return NULL;
-          #endif
-          """
-          patch_file('fs/devpts/inode.c', 'void *devpts_get_priv(struct dentry *dentry)', devpts_hook, 2)
-          EOF
-          
-          python3 patch_sukisu.py
+          #endif"
+          patch_file "fs/devpts/inode.c" "void *devpts_get_priv(struct dentry *dentry)" 2 "$DEVPTS_HOOK"
 
           echo "==== 8. 正在复活 path_umount 模块神技 ===="
-          cat << 'EOF' >> fs/namespace.c
+          if ! grep -q "path_umount" fs/namespace.c; then
+              cat << 'EOF' >> fs/namespace.c
 
           #ifdef CONFIG_KSU
           static int can_umount(const struct path *path, int flags)
@@ -280,7 +274,10 @@ jobs:
           EXPORT_SYMBOL(path_umount);
           #endif
           EOF
-          echo "✅ fs/namespace.c (path_umount) 追加完成！"
+              echo "✅ fs/namespace.c (path_umount) 追加完成！"
+          else
+              echo "⚠️ fs/namespace.c 已存在 path_umount，跳过。"
+          fi
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
