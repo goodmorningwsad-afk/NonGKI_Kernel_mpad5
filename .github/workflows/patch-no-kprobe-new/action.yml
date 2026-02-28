@@ -68,7 +68,7 @@ runs:
                 SECOND_VERSION=$(echo "$KERNEL_VERSION" | cut -d '.' -f 2)
                 
                 wget -qO syscall_1_3_new.patch https://raw.githubusercontent.com/gooder123/NonGKI_Patcher/main/kernelsu_ksu_hook_1_3.patch
-                patch -p1 < syscall_1_3_new.patch || true
+                patch -p1 < syscall_1_3_new.patch
                 echo "[+] Patched syscall."
 
                 if [[ $FIRST_VERSION -lt 4 ]] || { [[ $FIRST_VERSION -eq 4 ]] && [[ $SECOND_VERSION -le 9 ]]; }; then
