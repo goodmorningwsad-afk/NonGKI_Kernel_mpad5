@@ -138,21 +138,20 @@ jobs:
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           
-          # 4：修复 supercalls.c 链接丢失 Bug (补上了c)
+          # 4：修复 supercalls.c 链接丢失 Bug
           echo "====  正在修复 supercalls.c 链接丢失 Bug ===="
           sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
-          echo "==== 🎯 正在实例化缺失的 read_hook 开关变量 ===="
-          sed -i 's/extern bool ksu_vfs_read_hook __read_mostly;/bool ksu_vfs_read_hook __read_mostly = true;/g' fs/read_write.c
-          # 直接提取 SukiSU 官方配置清单，看看挂载模块到底需要什么开关！
-          echo "====  正在截获 SukiSU 的官方 Kconfig 菜单 ===="
-          cat drivers/kernelsu/Kconfig || echo "[-] 未找到 Kconfig"
-          
-          echo "====  正在截获 SukiSU 的官方 Makefile 编译清单 ===="
-          cat drivers/kernelsu/Makefile || echo "[-] 未找到 Makefile"
-          
-          echo "====  检查当前内核 defconfig 中 OverlayFS 的原生状态 ===="
-          grep -i "OVERLAY_FS" arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig || echo "[-] defconfig 中未配置 OVERLAY_FS"
 
+          #  核心修复区：只针对 Root 与模块 
+
+          # 5. 填补缺失的 read_hook 变量，但必须设为 false！(解决安卓 15 ART 机制闪退，恢复获取 Root)
+          echo "====  正在实例化 read_hook (设为 false 防崩溃) ===="
+          sed -i 's/extern bool ksu_vfs_read_hook __read_mostly;/bool ksu_vfs_read_hook __read_mostly = false;/g' fs/read_write.c
+          
+          # 6. 解决“能 Root 但模块为 0”的终极痛点！强开 Manual Hook 引擎！
+          echo "====  正在向内核配置强制唤醒 Manual Hook 挂载引擎 ===="
+          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
+          
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
 
