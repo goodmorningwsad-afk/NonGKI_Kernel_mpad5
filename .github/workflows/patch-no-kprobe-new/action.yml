@@ -115,16 +115,15 @@ runs:
           elif [[ "${{ env.HOOK_METHOD }}" == "normal" ]]; then
             echo "[+] Skipped, Kprobe method hasn't patch"
 
-          #  在这里植入专属的 Tracepoint 分支！ 
+          ## 👇👇👇 核心改造：绝对路径物理挂钩法 👇👇👇
           elif [[ "${{ env.HOOK_METHOD }}" == "tracepoint" ]]; then
             echo "==== 🎯 开启 SukiSU-Ultra 专属 Tracepoint 钩子物理注入 ===="
             
-            # 1. 治本之法：在 Makefile 里配置全局头文件路径（防止树外编译迷路）
-            echo 'ccflags-y += -I$(srctree)/drivers/kernelsu' >> fs/Makefile
-            echo 'ccflags-y += -I$(srctree)/KernelSU' >> fs/Makefile
+            # 1. 获取当前内核源码在服务器硬盘上的绝对物理路径！彻底根治迷路！
+            KSU_DIR="$GITHUB_WORKSPACE/device_kernel/drivers/kernelsu"
             
-            # 2. 直接注！ 
-            sed -i '/#include <linux\/fs.h>/a #include "ksu_trace.h"' fs/exec.c fs/open.c fs/read_write.c fs/stat.c
+            # 2. 强行写入绝对路径的 include (坚决不加 || true 掩盖错误)
+            sed -i "/#include <linux\/fs.h>/a #include \"$KSU_DIR/ksu_trace.h\"" fs/exec.c fs/open.c fs/read_write.c fs/stat.c
             
             # 3. 注入挂钩代码 (坚决不加 || true)
             sed -i 's/retval = bprm_execve(bprm, fd, filename, flags);/ksu_handle_execveat(\&fd, \&filename, \&flags, \&bprm);\n\tretval = bprm_execve(bprm, fd, filename, flags);/g' fs/exec.c
@@ -132,9 +131,9 @@ runs:
             sed -i 's/ret = vfs_read(file, buf, count, pos);/ksu_handle_vfs_read(\&file, \&buf, \&count, pos);\n\tret = vfs_read(file, buf, count, pos);/g' fs/read_write.c
             sed -i 's/error = vfs_statx(dfd, filename, flags, stat, mask);/ksu_handle_stat(\&dfd, \&filename, \&flags);\n\terror = vfs_statx(dfd, filename, flags, stat, mask);/g' fs/stat.c
 
-            echo "[+] Tracepoint 钩子注入执行完毕！"
+            echo "[+] Tracepoint 钩子绝对路径注入完毕！"
             REJ_FOUND
-
+            
           else
             echo "[-] please input a vaild option!"
             false
