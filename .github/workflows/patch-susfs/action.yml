@@ -107,23 +107,20 @@ runs:
           cd $GITHUB_WORKSPACE/device_kernel/
 
           if [[ -z "${{ env.SUSFS_PATCH_FIXED }}" ]]; then
-            echo "You didn't provide any patch file."
+            echo "[-] 兄弟，你还没配置自定义修复补丁，直接放行让它报错吧！"
           else
             IFS=',' read -ra FIXED_LIST <<< "${{ env.SUSFS_PATCH_FIXED }}"
-            echo "<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>"
+            echo "==== 开始打入本地专属修复补丁 ===="
             for i in "${!FIXED_LIST[@]}"; do
-              echo "Patching -> ${FIXED_LIST[$i]}"
-              if [[ -z "${{ env.SUSFS_FOLDER_FIXED }}" ]]; then
-                cp NonGKI_Kernel_Patches/${FIXED_LIST[$i]}.patch ./
-              else
-                cp NonGKI_Kernel_Patches/"${{ env.SUSFS_FOLDER_FIXED }}"/${FIXED_LIST[$i]}.patch ./
-              fi
+              echo "[+] 正在缝合本地补丁 -> ${FIXED_LIST[$i]}"
+              # 👇 核心改变：直接从你仓库根目录的 my_patches 文件夹里拿补丁！
+              cp $GITHUB_WORKSPACE/my_patches/${FIXED_LIST[$i]}.patch ./ 
               patch -p1 < ${FIXED_LIST[$i]}.patch || true
-              echo "Patching successful!"
-              echo "<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>"
+              echo "[+] 缝合完毕！"
             done
+            echo "==================================="
           fi
-
+          
       - name: Upload Build Patch Rejected Files
         if: env.BUILD_DEBUGGER == 'true'
         uses: actions/upload-artifact@v4
