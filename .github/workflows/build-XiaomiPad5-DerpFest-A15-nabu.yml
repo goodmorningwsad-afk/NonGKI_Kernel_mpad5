@@ -165,43 +165,33 @@ jobs:
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
 
-      - name: 🛠️ 终极神级打孔：纯手工缝合四大金刚 (Bash 原生版)
+      - name: 🛠️ 终极神级打孔 (KernelSU 非 GKI 官方标准对接)
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 开始运行极客法医级 Bash 缝合脚本 ===="
 
           patch_file() {
-              local file="$1"
-              local search="$2"
-              local offset="$3"
-              local insert="$4"
-              local check_str="$5"
-
-              if [ ! -f "$file" ]; then
-                  echo "❌ 未找到文件: $file"
+              local file=$1
+              local search_str=$2
+              local offset=$3
+              local insert_code=$4
+              local identifier=$5
+              if grep -q "$identifier" "$file"; then
+                  echo "⚠️ $file 已包含 $identifier，跳过。"
                   return
               fi
-
-              if grep -q "$check_str" "$file"; then
-                  echo "⚠️ $file 已经打过补丁 ($check_str)，跳过。"
-                  return
-              fi
-
-              local line_num=$(grep -n -F "$search" "$file" | head -n 1 | cut -d: -f1)
-
-              if [ -z "$line_num" ]; then
-                  echo "❌ 致命错误：在 $file 中找不到特征定位字符串: $search"
-                  return
-              fi
-
-              local target_line=$((line_num + offset))
-
-              awk -v n="$target_line" -v s="$insert" 'NR == n {print s} {print}' "$file" > "${file}.tmp"
-              mv "${file}.tmp" "$file"
-              echo "✅ 成功缝合: $file (在第 $target_line 行插入)"
+              awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
+              $0 ~ search {
+                  if (offset == 0) { print code; print; }
+                  else { print; count = offset; while(count > 0 && getline > 0) { print; count--; } print code; }
+                  next
+              }
+              { print }
+              ' "$file" > tmp_file && mv tmp_file "$file"
+              echo "✅ 成功缝合: $file"
           }
 
-          # 1. 缝合 fs/exec.c (精准拦截在 bprm 分配前，并恢复原生 argv 结构体传参)
+          # 1. 缝合 fs/exec.c (精准拦截在 do_execveat_common 逻辑最开头)
           EXEC_HOOK="
           #ifdef CONFIG_KSU
           {
@@ -214,52 +204,66 @@ jobs:
                   ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
           }
           #endif"
-          patch_file "fs/exec.c" "bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
+          patch_file "fs/exec.c" "if (IS_ERR(filename))" 0 "$EXEC_HOOK" "ksu_execveat_hook"
 
-          # 2. 缝合 fs/open.c (权限探测核心)
-          OPEN_HOOK="#ifdef CONFIG_KSU
+          # 2. 缝合 fs/open.c (拦截在 faccessat 中)
+          OPEN_HOOK="
+          #ifdef CONFIG_KSU
           {
               extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
               ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
           }
           #endif"
-          patch_file "fs/open.c" "where's F_OK, X_OK, W_OK, R_OK?" 2 "$OPEN_HOOK" "ksu_handle_faccessat"
+          patch_file "fs/open.c" "if (mode & ~S_IRWXO)" 0 "$OPEN_HOOK" "ksu_handle_faccessat"
 
-          # (🚨 彻底移除 fs/read_write.c 的打孔，SukiSU 不需要它，打了反而报错！)
+          # 3. 缝合 fs/read_write.c (拦截在 vfs_read 中)
+          RW_HOOK="
+          #ifdef CONFIG_KSU
+          {
+              extern bool ksu_vfs_read_hook __read_mostly;
+              extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos);
+              if (unlikely(ksu_vfs_read_hook))
+                  ksu_handle_vfs_read(&file, &buf, &count, &pos);
+          }
+          #endif"
+          patch_file "fs/read_write.c" "if (!(file->f_mode & FMODE_READ))" 0 "$RW_HOOK" "ksu_handle_vfs_read"
 
-          # 3. 缝合 fs/stat.c (文件状态核心)
-          STAT_HOOK="#ifdef CONFIG_KSU
+          # 4. 缝合 fs/stat.c (拦截在 vfs_statx 中)
+          STAT_HOOK="
+          #ifdef CONFIG_KSU
           {
               extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
               ksu_handle_stat(&dfd, &filename, &flags);
           }
           #endif"
-          patch_file "fs/stat.c" "unsigned int lookup_flags" 1 "$STAT_HOOK" "ksu_handle_stat"
+          patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
 
-          # 4. 缝合 drivers/input/input.c (音量键救砖)
-          INPUT_HOOK="#ifdef CONFIG_KSU
+          # 5. 缝合 drivers/input/input.c (安全模式防砖监听)
+          INPUT_HOOK="
+          #ifdef CONFIG_KSU
           {
+              extern bool ksu_input_hook __read_mostly;
               extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
-              ksu_handle_input_handle_event(&type, &code, &value);
+              if (unlikely(ksu_input_hook))
+                  ksu_handle_input_handle_event(&type, &code, &value);
           }
           #endif"
-          patch_file "drivers/input/input.c" "add_input_randomness(type, code, value);" 1 "$INPUT_HOOK" "ksu_handle_input_handle_event"
+          patch_file "drivers/input/input.c" "if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)" 0 "$INPUT_HOOK" "ksu_handle_input_handle_event"
 
-          # 5. 缝合 fs/devpts/inode.c (真正调用 KSU，修复 su 终端无输出的必现 BUG)
+          # 6. 缝合 fs/devpts/inode.c (严格遵循官方规范，修复哑巴终端)
           DEVPTS_HOOK="
           #ifdef CONFIG_KSU
           {
-              extern void *ksu_devpts_get_priv(struct dentry *dentry);
-              void *ksu_priv = ksu_devpts_get_priv(dentry);
-              if (ksu_priv) return ksu_priv;
+              extern int ksu_handle_devpts(struct inode*);
+              ksu_handle_devpts(dentry->d_inode);
           }
           #endif"
-          patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_devpts_get_priv"
-          echo "==== 6. 正在复活 path_umount 模块神技 ===="
+          patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
+
+          echo "==== 7. 正在复活 path_umount 模块神技 ===="
           if ! grep -q "path_umount" fs/namespace.c; then
               cat << 'EOF' >> fs/namespace.c
 
-          #ifdef CONFIG_KSU
           static int can_umount(const struct path *path, int flags)
           {
               struct mount *mnt = real_mount(path->mnt);
@@ -285,22 +289,17 @@ jobs:
               ret = can_umount(path, flags);
               if (!ret)
                   ret = do_umount(mnt, flags);
-              /* we mustn't call path_put() as that would clear mnt_expiry_mark */
               dput(path->dentry);
               mntput_no_expire(mnt);
               return ret;
           }
-          EXPORT_SYMBOL(path_umount);
-          #endif
           EOF
               echo "✅ fs/namespace.c (path_umount) 追加完成！"
           else
               echo "⚠️ fs/namespace.c 已存在 path_umount，跳过。"
-          fi # 👈 注意！fi 必须在这里结束！
+          fi
 
-          echo "==== 7. 缝合 security/selinux/hooks.c (双重免死金牌：彻底打通任督二脉) ===="
-          
-          # 7. 缝合 security/selinux/hooks.c (终极双重免死金牌：无论是开机还是App，凡是 su 一律闭眼放行)
+          echo "==== 8. 缝合 security/selinux/hooks.c (终极双重免死金牌) ===="
           HOOKS_PATCH="
           #ifdef CONFIG_KSU
           /* KSU_SELINUX_BYPASS_UNIVERSAL */
@@ -316,6 +315,8 @@ jobs:
           #endif"
           patch_file "security/selinux/hooks.c" "if (!nnp && !nosuid)" 0 "$HOOKS_PATCH" "KSU_SELINUX_BYPASS_UNIVERSAL"
           patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH" "KSU_SELINUX_BYPASS_UNIVERSAL"
+          
+          echo "✅ SELinux hooks.c 双重免死金牌追加完成！"
           
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
