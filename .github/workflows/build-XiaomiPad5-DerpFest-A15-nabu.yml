@@ -201,21 +201,17 @@ jobs:
               echo "✅ 成功缝合: $file (在第 $target_line 行插入)"
           }
 
-          # 1. 缝合 fs/exec.c (掌管 Root 的绝对核心 - 解决 Nabu 的 4.18 结构体逆向移植BUG！)
-          EXEC_HOOK="#ifdef CONFIG_KSU
+          # 1. 缝合 fs/exec.c (精准拦截在 bprm 分配前，并恢复原生 argv 结构体传参)
+          EXEC_HOOK="
+          #ifdef CONFIG_KSU
           {
               extern bool ksu_execveat_hook __read_mostly;
               extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
               extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-              
-              /* 专治小米魔改：将 user_arg_ptr 结构体拆解成 KSU 认识的原始指针 */
-              void *ksu_argv = (void *)argv.ptr.native;
-              void *ksu_envp = (void *)envp.ptr.native;
-              
               if (unlikely(ksu_execveat_hook))
-                  ksu_handle_execveat(&fd, &filename, &ksu_argv, &ksu_envp, &flags);
+                  ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
               else
-                  ksu_handle_execveat_sucompat(&fd, &filename, &ksu_argv, &ksu_envp, &flags);
+                  ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
           }
           #endif"
           patch_file "fs/exec.c" "bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
@@ -249,57 +245,16 @@ jobs:
           #endif"
           patch_file "drivers/input/input.c" "add_input_randomness(type, code, value);" 1 "$INPUT_HOOK" "ksu_handle_input_handle_event"
 
-          # 5. 缝合 fs/devpts/inode.c (修复终端)
-          DEVPTS_HOOK="#ifdef CONFIG_KSU
-          /* ksu_devpts_hook */
-          if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)
-              return NULL;
-          #endif"
-          patch_file "fs/devpts/inode.c" "void *devpts_get_priv(struct dentry *dentry)" 2 "$DEVPTS_HOOK" "ksu_devpts_hook"
-
-          echo "==== 6. 正在复活 path_umount 模块神技 ===="
-          if ! grep -q "path_umount" fs/namespace.c; then
-              cat << 'EOF' >> fs/namespace.c
-
+          # 5. 缝合 fs/devpts/inode.c (真正调用 KSU，修复 su 终端无输出的必现 BUG)
+          DEVPTS_HOOK="
           #ifdef CONFIG_KSU
-          static int can_umount(const struct path *path, int flags)
           {
-              struct mount *mnt = real_mount(path->mnt);
-              if (flags & ~(MNT_FORCE | MNT_DETACH | MNT_EXPIRE | UMOUNT_NOFOLLOW))
-                  return -EINVAL;
-              if (!may_mount())
-                  return -EPERM;
-              if (path->dentry != path->mnt->mnt_root)
-                  return -EINVAL;
-              if (!check_mnt(mnt))
-                  return -EINVAL;
-              if (mnt->mnt.mnt_flags & MNT_LOCKED) /* Check optimistically */
-                  return -EINVAL;
-              if (flags & MNT_FORCE && !capable(CAP_SYS_ADMIN))
-                  return -EPERM;
-              return 0;
+              extern void *ksu_devpts_get_priv(struct dentry *dentry);
+              void *ksu_priv = ksu_devpts_get_priv(dentry);
+              if (ksu_priv) return ksu_priv;
           }
-
-          int path_umount(struct path *path, int flags)
-          {
-              struct mount *mnt = real_mount(path->mnt);
-              int ret;
-              ret = can_umount(path, flags);
-              if (!ret)
-                  ret = do_umount(mnt, flags);
-              /* we mustn't call path_put() as that would clear mnt_expiry_mark */
-              dput(path->dentry);
-              mntput_no_expire(mnt);
-              return ret;
-          }
-          EXPORT_SYMBOL(path_umount);
-          #endif
-          EOF
-              echo "✅ fs/namespace.c (path_umount) 追加完成！"
-          else
-              echo "⚠️ fs/namespace.c 已存在 path_umount，跳过。"
-          fi
-
+          #endif"
+          patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_devpts_get_priv"
           echo "==== 6. 正在复活 path_umount 模块神技 ===="
           if ! grep -q "path_umount" fs/namespace.c; then
               cat << 'EOF' >> fs/namespace.c
@@ -345,34 +300,10 @@ jobs:
 
           echo "==== 7. 缝合 security/selinux/hooks.c (双重免死金牌：彻底打通任督二脉) ===="
           
-          # 第一块金牌：放行 init 进程执行 /data 下的 ksud (突破 nosuid 拦截)
-          HOOKS_PATCH_1="
+          # 7. 缝合 security/selinux/hooks.c (终极双重免死金牌：无论是开机还是App，凡是 su 一律闭眼放行)
+          HOOKS_PATCH="
           #ifdef CONFIG_KSU
-          /* KSU_SELINUX_BYPASS_NNP */
-          {
-              static u32 ksu_sid;
-              char *secdata;
-              u32 seclen;
-              int error;
-              if(!ksu_sid){
-                  security_secctx_to_secid(\"u:r:su:s0\", strlen(\"u:r:su:s0\"), &ksu_sid);
-              }
-              error = security_secid_to_secctx(old_tsec->sid, &secdata, &seclen);
-              if (!error) {
-                  int rc_ksu = strcmp(\"u:r:init:s0\",secdata);
-                  security_release_secctx(secdata, seclen);
-                  if(rc_ksu == 0 && new_tsec->sid == ksu_sid){
-                      return 0;
-                  }
-              }
-          }
-          #endif"
-          patch_file "security/selinux/hooks.c" "if (!nnp && !nosuid)" 0 "$HOOKS_PATCH_1" "KSU_SELINUX_BYPASS_NNP"
-
-          # 第二块金牌：放行权限跃迁 (突破凭证更改拦截)
-          HOOKS_PATCH_2="
-          #ifdef CONFIG_KSU
-          /* KSU_SELINUX_BYPASS_CRED */
+          /* KSU_SELINUX_BYPASS_UNIVERSAL */
           {
               static u32 ksu_sid;
               if(!ksu_sid){
@@ -383,9 +314,8 @@ jobs:
               }
           }
           #endif"
-          patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH_2" "KSU_SELINUX_BYPASS_CRED"
-          
-          echo " SELinux hooks.c 双重免死追加完成！"
+          patch_file "security/selinux/hooks.c" "if (!nnp && !nosuid)" 0 "$HOOKS_PATCH" "KSU_SELINUX_BYPASS_UNIVERSAL"
+          patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH" "KSU_SELINUX_BYPASS_UNIVERSAL"
           
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
