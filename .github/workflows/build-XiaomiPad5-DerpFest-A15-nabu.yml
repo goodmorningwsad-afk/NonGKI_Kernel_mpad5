@@ -170,32 +170,25 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 开始执行 SukiSU 官方自动化缝合脚本 ===="
           
-          # 🚨 严格遵照提取步骤：从临时目录把官方脚本全部端运到内核根目录
           echo "[-] 正在从 /tmp/Patches 提取官方脚本..."
           cp -r /tmp/Patches/* ./ || true
           
-          # 1. 基础特性向后移植 (自动搞定 path_umount 等)
           if [ -f "backport_patches.sh" ]; then
-              echo "[-] 正在执行 backport_patches.sh..."
               bash backport_patches.sh
-          else
-              echo "⚠️ 未找到 backport_patches.sh"
           fi
           
-          # 2. SELinux 结构体向后移植 (解决 4.14 老内核兼容)
           if [ -f "backport_selinux_patches.sh" ]; then
-              echo "[-] 正在执行 backport_selinux_patches.sh..."
               bash backport_selinux_patches.sh
-          else
-              echo "⚠️ 未找到 backport_selinux_patches.sh"
           fi
           
-          # 3. SukiSU 核心系统调用 Hook (官方自动接管 exec.c, open.c 等)
           if [ -f "syscall_hook_patches.sh" ]; then
               echo "[-] 正在执行 syscall_hook_patches.sh..."
               bash syscall_hook_patches.sh
-          else
-              echo "⚠️ 未找到 syscall_hook_patches.sh"
+              
+              # 👇 🚨 致命修正：同步脚本与 SukiSU 源码的变量名脱节！ 👇
+              echo "[-] 正在修复 read_write.c 中的变量名脱节问题..."
+              sed -i 's/ksu_vfs_read_hook/ksu_init_rc_hook/g' fs/read_write.c
+              # 👆 🚨 修正完毕 👆
           fi
           
           echo "==== 官方脚本执行完毕！ ===="
