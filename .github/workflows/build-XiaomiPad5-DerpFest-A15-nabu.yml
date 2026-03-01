@@ -127,7 +127,8 @@ jobs:
           
           # 顺手把开机传感器 exec.c 也提取出来再确认一眼
           cp device_kernel/fs/exec.c verify_files/fs/ || echo "❌ 未找到 exec.c"
-          
+          # 将内核底盘配置文件提取到打包目录中 (注意替换你的目标打包文件夹，比如 Official_Patches 或 patched_source_files)
+          cp device_kernel/arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig Official_Patches/ || echo "❌ 未找到 exec.c"
           # 打包成 zip
           cd verify_files
           zip -r ../Kernel_Verify_Files.zip .
