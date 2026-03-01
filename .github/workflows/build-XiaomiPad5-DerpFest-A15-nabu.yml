@@ -34,9 +34,12 @@ env:
 
   KERNELSU_AUTO_GET : "true" 
   KERNELSU_AUTO_FORK : "sukisu" 
+ 
+  
+  SUSFS_ENABLE : "true"
+  SUSFS_FIXED : "true"
+ 
 
-  SUSFS_ENABLE : "false"
-  SUSFS_FIXED : "false"
 
   AK3_SOURCE : "https://github.com/osm0sis/AnyKernel3.git"
   AK3_BRANCH : "master"
@@ -59,7 +62,7 @@ env:
   PATCHES_BRANCH: "branch" 
 
   SUSFS_FOLDER_FIXED: "" 
-  SUSFS_PATCH_FIXED: "" 
+  SUSFS_PATCH_FIXED: ""
 
   REKERNEL_ENABLE: "false" 
 
@@ -83,7 +86,7 @@ env:
   GENERATE_CHIP: "qcom" 
 
   BUILD_DEBUGGER: "false" 
-  SKIP_PATCH: "false" 
+  SKIP_PATCH: "true" 
 
   BUILD_OTHER_CONFIG: "false" 
   MERGE_CONFIG_FILES: "vendor/debugfs.config,vendor/lahaina_QGKI.config"
