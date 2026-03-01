@@ -28,6 +28,7 @@ env:
   DEFCONFIG_NAME : "vendor/xiaomi/nabu_inflated_defconfig"
   DEFCONFIG_ORIGIN_IMAGE: ""
   DEFCONFIG_FROM_BOOT: false
+  SUSFS_UPDATE : "false"
 
   KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
