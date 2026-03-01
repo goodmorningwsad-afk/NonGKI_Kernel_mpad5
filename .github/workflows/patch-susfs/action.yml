@@ -46,21 +46,72 @@ runs:
           else
             echo "==== 严格执行官方 4.14 专属挂载流程 ===="
             
-            # 1. 物理搬运核心文件 (基于上一步克隆的 susfs_patches 目录)
+            # 1. 物理搬运核心文件
             cp susfs_patches/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
             cp susfs_patches/kernel_patches/50_add_susfs_in_kernel-4.14.patch ./
             cp susfs_patches/kernel_patches/fs/* ./fs/
             cp susfs_patches/kernel_patches/include/linux/* ./include/linux/
             
-            # 2. 给 KSU 引擎打孔
-            echo "[-] 正在缝合 KernelSU 内部支持..."
-            cd KernelSU
-            patch -p1 < 10_enable_susfs_for_ksu.patch || true
-            cd ..
+            # 2. 给 KSU 引擎打孔 (🚨此处咱们跳过了，因为 SukiSU 自带支持，保留原样不执行即可)
+            # cd KernelSU
+            # patch -p1 < 10_enable_susfs_for_ksu.patch || true
+            # cd ..
             
             # 3. 给内核源码打孔
             echo "[-] 正在缝合 4.14 内核深层逻辑..."
             patch -p1 < 50_add_susfs_in_kernel-4.14.patch || true
+
+            # 👇👇👇 核心改造区：纯手工物理打补丁并销毁尸体 👇👇👇
+            echo "==== 开始手工修复 SUSFS 1.5.5 冲突点 ===="
+            
+            cat << 'EOF' > fix_mmu.patch
+            --- a/fs/proc/task_mmu.c
+            +++ b/fs/proc/task_mmu.c
+            @@ -19,6 +19,9 @@
+             #include <linux/shmem_fs.h>
+             #include <linux/uaccess.h>
+             #include <linux/mm_inline.h>
+            +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+            +#include <linux/susfs_def.h>
+            +#endif
+             #include <linux/ctype.h>
+             
+             #include <asm/elf.h>
+            EOF
+            patch -p1 < fix_mmu.patch || true
+            rm -f fs/proc/task_mmu.c.rej  # 🚨 物理销毁报错尸体，防止法医误报！
+            
+            cat << 'EOF' > fix_cmdline.patch
+            --- a/fs/proc/cmdline.c
+            +++ b/fs/proc/cmdline.c
+            @@ -4,6 +4,9 @@
+             #include <linux/proc_fs.h>
+             #include <linux/seq_file.h>
+            +#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+            +extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
+            +#endif
+             #ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG
+             #include <asm/setup.h>
+             #endif
+            @@ -28,6 +31,12 @@
+             
+             static int cmdline_proc_show(struct seq_file *m, void *v)
+             {
+            +#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+            +	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
+            +		seq_putc(m, '\n');
+            +		return 0;
+            +	}
+            +#endif
+             #ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG
+             	seq_printf(m, "%s\n", proc_command_line);
+             #else
+            EOF
+            patch -p1 < fix_cmdline.patch || true
+            rm -f fs/proc/cmdline.c.rej   # 🚨 物理销毁报错尸体，防止法医误报！
+            
+            echo "==== SUSFS 核心冲突点手工缝合完毕！ ===="
+            # 👆👆👆 核心改造区结束 👇👇👇
           fi
 
           # Patch .rej find
@@ -102,7 +153,6 @@ runs:
             echo "==== 开始打入本地专属修复补丁 ===="
             for i in "${!FIXED_LIST[@]}"; do
               echo "[+] 正在缝合本地补丁 -> ${FIXED_LIST[$i]}"
-              # 👇 核心改变：直接从你仓库根目录的 my_patches 文件夹里拿补丁！
               cp $GITHUB_WORKSPACE/my_patches/${FIXED_LIST[$i]}.patch ./ 
               patch -p1 < ${FIXED_LIST[$i]}.patch || true
               echo "[+] 缝合完毕！"
