@@ -176,19 +176,39 @@ jobs:
               local offset="$3"
               local insert_code="$4"
               local identifier="$5"
+              
+              echo "🔍 正在处理: $file"
+
+              # 【第一把锁】：检查是否已经打过（防重复）
               if grep -q "$identifier" "$file"; then
                   echo "⚠️ $file 已包含 $identifier，跳过。"
-                  return
+                  return 0
               fi
+
+              # 【第二把锁】：事前致命校验！用纯文本模式 (-F) 查找特征字符串，找不到直接杀进程！
+              if ! grep -Fq "$search_str" "$file"; then
+                  echo "❌ 致命错误: 在 $file 中根本找不到特征字符串 '$search_str'！"
+                  echo "🛑 流水线已被强制阻断，请检查源码版本是否匹配！"
+                  exit 1
+              fi
+
+              # 执行缝合 (使用纯文本精确匹配)
               awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
-              $0 ~ search {
+              index($0, search) {
                   if (offset == 0) { print code; print; }
                   else { print; count = offset; while(count > 0 && getline > 0) { print; count--; } print code; }
                   next
               }
               { print }
               ' "$file" > tmp_file && mv tmp_file "$file"
-              echo "✅ 成功缝合: $file"
+
+              # 【第三把锁】：事后致命校验！确保代码真的被写进去了
+              if grep -q "$identifier" "$file"; then
+                  echo "✅ 成功缝合: $file"
+              else
+                  echo "❌ 致命错误: $file 处理完毕，但未检测到写入的 $identifier！"
+                  exit 1
+              fi
           }
 
           # 1. 缝合 fs/exec.c (精准拦截在 do_execveat_common 逻辑最开头)
