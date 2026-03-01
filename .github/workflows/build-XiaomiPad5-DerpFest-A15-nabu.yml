@@ -388,6 +388,7 @@ jobs:
           echo "==== 正在收集打孔后的核心文件 ===="
           mkdir -p patched_source_files/fs/devpts
           mkdir -p patched_source_files/drivers/input
+          mkdir -p patched_source_files/security/selinux  # 👈 新增：创建目标文件夹
           
           # 复制打过孔的文件
           cp device_kernel/fs/exec.c patched_source_files/fs/ || true
@@ -397,6 +398,7 @@ jobs:
           cp device_kernel/fs/namespace.c patched_source_files/fs/ || true
           cp device_kernel/fs/devpts/inode.c patched_source_files/fs/devpts/ || true
           cp device_kernel/drivers/input/input.c patched_source_files/drivers/input/ || true
+          cp device_kernel/security/selinux/hooks.c patched_source_files/security/selinux/ || true # 👈 新增：把 hooks.c 拿出来
           
           cd patched_source_files
           zip -r ../Patched_Source_Files.zip .
