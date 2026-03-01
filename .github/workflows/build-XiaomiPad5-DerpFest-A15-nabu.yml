@@ -211,7 +211,7 @@ jobs:
               fi
           }
 
-          # 1. 缝合 fs/exec.c (精准拦截在 do_execveat_common 逻辑最开头)
+          # 1. 缝合 fs/exec.c (精准拦截在 bprm->argc 赋值前，完美避开多重 goto)
           EXEC_HOOK="
           #ifdef CONFIG_KSU
           {
@@ -224,7 +224,7 @@ jobs:
                   ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
           }
           #endif"
-          patch_file "fs/exec.c" "if (IS_ERR(filename))" 0 "$EXEC_HOOK" "ksu_execveat_hook"
+          patch_file "fs/exec.c" "bprm->argc = count(argv, MAX_ARG_STRINGS);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
 
           # 2. 缝合 fs/open.c (拦截在 faccessat 中)
           OPEN_HOOK="
@@ -274,7 +274,7 @@ jobs:
           DEVPTS_HOOK="
           #ifdef CONFIG_KSU
           {
-              extern int ksu_handle_devpts(struct inode*);
+              extern void ksu_handle_devpts(struct inode*);
               ksu_handle_devpts(dentry->d_inode);
           }
           #endif"
