@@ -171,11 +171,11 @@ jobs:
           echo "==== 开始运行极客法医级 Bash 缝合脚本 ===="
 
           patch_file() {
-              local file=$1
-              local search_str=$2
-              local offset=$3
-              local insert_code=$4
-              local identifier=$5
+              local file="$1"
+              local search_str="$2"
+              local offset="$3"
+              local insert_code="$4"
+              local identifier="$5"
               if grep -q "$identifier" "$file"; then
                   echo "⚠️ $file 已包含 $identifier，跳过。"
                   return
