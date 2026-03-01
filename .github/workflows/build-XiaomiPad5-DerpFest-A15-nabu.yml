@@ -138,9 +138,6 @@ jobs:
           name: Kernel_Verify_Files
           path: Kernel_Verify_Files.zip
 
-      - name: 🪝 Patch Kernel of SUSFS
-        uses: ./.github/workflows/patch-susfs
-
       # 🚨 终极修正 2：彻底铲除 patch-no-kprobe 步骤，绝不留患！
 
       - name: 🩹 Fix SukiSU Source Bugs & Extra Options
