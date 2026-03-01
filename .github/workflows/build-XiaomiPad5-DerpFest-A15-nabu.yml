@@ -236,18 +236,6 @@ jobs:
           #endif"
           patch_file "fs/open.c" "if (mode & ~S_IRWXO)" 0 "$OPEN_HOOK" "ksu_handle_faccessat"
 
-          # 3. 缝合 fs/read_write.c (拦截在 vfs_read 中)
-          RW_HOOK="
-          #ifdef CONFIG_KSU
-          {
-              extern bool ksu_vfs_read_hook __read_mostly;
-              extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos);
-              if (unlikely(ksu_vfs_read_hook))
-                  ksu_handle_vfs_read(&file, &buf, &count, &pos);
-          }
-          #endif"
-          patch_file "fs/read_write.c" "if (!(file->f_mode & FMODE_READ))" 0 "$RW_HOOK" "ksu_handle_vfs_read"
-
           # 4. 缝合 fs/stat.c (拦截在 vfs_statx 中)
           STAT_HOOK="
           #ifdef CONFIG_KSU
@@ -378,6 +366,29 @@ jobs:
         with:
           name: Patched_Source_Files
           path: Patched_Source_Files.zip
+
+      - name: 📤 提取官方 SukiSU 补丁脚本 (用于法医级审查)
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 正在查抄官方补丁目录 ===="
+          mkdir -p Official_Patches
+          
+          # 1. 尝试从 /tmp 临时目录把所有原版补丁和脚本端出来
+          cp -r /tmp/Patches/* Official_Patches/ || true
+          
+          # 2. 尝试从内核执行目录把刚才跑过的脚本抓出来
+          cp device_kernel/backport_patches.sh Official_Patches/ || true
+          cp device_kernel/backport_selinux_patches.sh Official_Patches/ || true
+          cp device_kernel/*.patch Official_Patches/ || true
+          
+          cd Official_Patches
+          zip -r ../Official_Patches.zip .
+
+      - name: 📦 上传官方补丁审查包
+        uses: actions/upload-artifact@v4
+        with:
+          name: Official_Patches
+          path: Official_Patches.zip
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
