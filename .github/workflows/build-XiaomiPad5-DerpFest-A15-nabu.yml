@@ -165,180 +165,40 @@ jobs:
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
 
-      - name: 🛠️ 终极神级打孔 (KernelSU 非 GKI 官方标准对接)
+      - name: 🛠️ 运行 SukiSU 官方底层打孔脚本 (纯净版)
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 开始运行极客法医级 Bash 缝合脚本 ===="
-
-          patch_file() {
-              local file="$1"
-              local search_str="$2"
-              local offset="$3"
-              local insert_code="$4"
-              local identifier="$5"
-              
-              echo "🔍 正在处理: $file"
-
-              # 【第一把锁】：检查是否已经打过
-              if grep -q "$identifier" "$file"; then
-                  echo "⚠️ $file 已包含 $identifier，跳过。"
-                  return 0
-              fi
-
-              # 【第二把锁】：事前致命校验
-              if ! grep -Fq "$search_str" "$file"; then
-                  echo "❌ 致命错误: 在 $file 中根本找不到特征字符串 '$search_str'！"
-                  exit 1
-              fi
-
-              # 👇 核心修复：加入 !done 限制，确保每个补丁只在“第一次遇到”特征时执行，绝不贪杯！
-              awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
-              index($0, search) && !done {
-                  if (offset == 0) { print code; print; }
-                  else { print; count = offset; while(count > 0 && getline > 0) { print; count--; } print code; }
-                  done = 1
-                  next
-              }
-              { print }
-              ' "$file" > tmp_file && mv tmp_file "$file"
-
-              # 【第三把锁】：事后致命校验
-              if grep -q "$identifier" "$file"; then
-                  echo "✅ 成功缝合: $file"
-              else
-                  echo "❌ 致命错误: $file 处理完毕，但未写入 $identifier！"
-                  exit 1
-              fi
-          }
+          echo "==== 开始执行 SukiSU 官方自动化缝合脚本 ===="
           
-          # 1. 缝合 fs/exec.c (精准拦截在 bprm->argc 赋值前，完美避开多重 goto)
-          EXEC_HOOK="
-          #ifdef CONFIG_KSU
-          {
-              extern bool ksu_execveat_hook __read_mostly;
-              extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-              extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-              if (unlikely(ksu_execveat_hook))
-                  ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
-              else
-                  ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
-          }
-          #endif"
-          patch_file "fs/exec.c" "bprm->argc = count(argv, MAX_ARG_STRINGS);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
-
-          # 2. 缝合 fs/open.c (拦截在 faccessat 中)
-          OPEN_HOOK="
-          #ifdef CONFIG_KSU
-          {
-              extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
-              ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
-          }
-          #endif"
-          patch_file "fs/open.c" "if (mode & ~S_IRWXO)" 0 "$OPEN_HOOK" "ksu_handle_faccessat"
-
-          # 4. 缝合 fs/stat.c (拦截在 vfs_statx 中)
-          STAT_HOOK="
-          #ifdef CONFIG_KSU
-          {
-              extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
-              ksu_handle_stat(&dfd, &filename, &flags);
-          }
-          #endif"
-          patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
-
-          # 5. 缝合 drivers/input/input.c (安全模式防砖监听)
-          INPUT_HOOK="
-          #ifdef CONFIG_KSU
-          {
-              extern bool ksu_input_hook __read_mostly;
-              extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
-              if (unlikely(ksu_input_hook))
-                  ksu_handle_input_handle_event(&type, &code, &value);
-          }
-          #endif"
-          patch_file "drivers/input/input.c" "if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)" 0 "$INPUT_HOOK" "ksu_handle_input_handle_event"
-
-          # 6. 缝合 fs/devpts/inode.c (严格遵循官方规范，修复哑巴终端)
-          DEVPTS_HOOK="
-          #ifdef CONFIG_KSU
-          {
-              extern void ksu_handle_devpts(struct inode*);
-              ksu_handle_devpts(dentry->d_inode);
-          }
-          #endif"
-          patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
-
-          echo "==== 7. 正在复活 path_umount 模块神技 ===="
-          if ! grep -q "path_umount" fs/namespace.c; then
-              cat << 'EOF' >> fs/namespace.c
-
-          static int can_umount(const struct path *path, int flags)
-          {
-              struct mount *mnt = real_mount(path->mnt);
-              if (flags & ~(MNT_FORCE | MNT_DETACH | MNT_EXPIRE | UMOUNT_NOFOLLOW))
-                  return -EINVAL;
-              if (!may_mount())
-                  return -EPERM;
-              if (path->dentry != path->mnt->mnt_root)
-                  return -EINVAL;
-              if (!check_mnt(mnt))
-                  return -EINVAL;
-              if (mnt->mnt.mnt_flags & MNT_LOCKED) /* Check optimistically */
-                  return -EINVAL;
-              if (flags & MNT_FORCE && !capable(CAP_SYS_ADMIN))
-                  return -EPERM;
-              return 0;
-          }
-
-          int path_umount(struct path *path, int flags)
-          {
-              struct mount *mnt = real_mount(path->mnt);
-              int ret;
-              ret = can_umount(path, flags);
-              if (!ret)
-                  ret = do_umount(mnt, flags);
-              dput(path->dentry);
-              mntput_no_expire(mnt);
-              return ret;
-          }
-          EOF
-              echo "✅ fs/namespace.c (path_umount) 追加完成！"
+          # 🚨 严格遵照提取步骤：从临时目录把官方脚本全部端运到内核根目录
+          echo "[-] 正在从 /tmp/Patches 提取官方脚本..."
+          cp -r /tmp/Patches/* ./ || true
+          
+          # 1. 基础特性向后移植 (自动搞定 path_umount 等)
+          if [ -f "backport_patches.sh" ]; then
+              echo "[-] 正在执行 backport_patches.sh..."
+              bash backport_patches.sh
           else
-              echo "⚠️ fs/namespace.c 已存在 path_umount，跳过。"
+              echo "⚠️ 未找到 backport_patches.sh"
           fi
-
-          echo "==== 8. 缝合 security/selinux/hooks.c (终极双重免死金牌) ===="
-          HOOKS_PATCH_1="
-          #ifdef CONFIG_KSU
-          /* KSU_SELINUX_BYPASS_UNIVERSAL_1 */
-          {
-              static u32 ksu_sid;
-              if(!ksu_sid){
-                  security_secctx_to_secid(\"u:r:su:s0\", strlen(\"u:r:su:s0\"), &ksu_sid);
-              }
-              if(new_tsec->sid == ksu_sid){
-                  return 0;
-              }
-          }
-          #endif"
-          patch_file "security/selinux/hooks.c" "if (!nnp && !nosuid)" 0 "$HOOKS_PATCH_1" "KSU_SELINUX_BYPASS_UNIVERSAL_1"
           
-          HOOKS_PATCH_2="
-          #ifdef CONFIG_KSU
-          /* KSU_SELINUX_BYPASS_UNIVERSAL_2 */
-          {
-              static u32 ksu_sid;
-              if(!ksu_sid){
-                  security_secctx_to_secid(\"u:r:su:s0\", strlen(\"u:r:su:s0\"), &ksu_sid);
-              }
-              if(new_tsec->sid == ksu_sid){
-                  return 0;
-              }
-          }
-          #endif"
-          patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH_2" "KSU_SELINUX_BYPASS_UNIVERSAL_2"
+          # 2. SELinux 结构体向后移植 (解决 4.14 老内核兼容)
+          if [ -f "backport_selinux_patches.sh" ]; then
+              echo "[-] 正在执行 backport_selinux_patches.sh..."
+              bash backport_selinux_patches.sh
+          else
+              echo "⚠️ 未找到 backport_selinux_patches.sh"
+          fi
           
-          echo "✅ SELinux hooks.c 双重免死金牌追加完成！"
+          # 3. SukiSU 核心系统调用 Hook (官方自动接管 exec.c, open.c 等)
+          if [ -f "syscall_hook_patches.sh" ]; then
+              echo "[-] 正在执行 syscall_hook_patches.sh..."
+              bash syscall_hook_patches.sh
+          else
+              echo "⚠️ 未找到 syscall_hook_patches.sh"
+          fi
+          
+          echo "==== 官方脚本执行完毕！ ===="
           
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
