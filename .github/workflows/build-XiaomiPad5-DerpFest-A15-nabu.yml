@@ -320,9 +320,9 @@ jobs:
           fi
 
           echo "==== 8. 缝合 security/selinux/hooks.c (终极双重免死金牌) ===="
-          HOOKS_PATCH="
+          HOOKS_PATCH_1="
           #ifdef CONFIG_KSU
-          /* KSU_SELINUX_BYPASS_UNIVERSAL */
+          /* KSU_SELINUX_BYPASS_UNIVERSAL_1 */
           {
               static u32 ksu_sid;
               if(!ksu_sid){
@@ -333,8 +333,22 @@ jobs:
               }
           }
           #endif"
-          patch_file "security/selinux/hooks.c" "if (!nnp && !nosuid)" 0 "$HOOKS_PATCH" "KSU_SELINUX_BYPASS_UNIVERSAL"
-          patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH" "KSU_SELINUX_BYPASS_UNIVERSAL"
+          patch_file "security/selinux/hooks.c" "if (!nnp && !nosuid)" 0 "$HOOKS_PATCH_1" "KSU_SELINUX_BYPASS_UNIVERSAL_1"
+          
+          HOOKS_PATCH_2="
+          #ifdef CONFIG_KSU
+          /* KSU_SELINUX_BYPASS_UNIVERSAL_2 */
+          {
+              static u32 ksu_sid;
+              if(!ksu_sid){
+                  security_secctx_to_secid(\"u:r:su:s0\", strlen(\"u:r:su:s0\"), &ksu_sid);
+              }
+              if(new_tsec->sid == ksu_sid){
+                  return 0;
+              }
+          }
+          #endif"
+          patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH_2" "KSU_SELINUX_BYPASS_UNIVERSAL_2"
           
           echo "✅ SELinux hooks.c 双重免死金牌追加完成！"
           
