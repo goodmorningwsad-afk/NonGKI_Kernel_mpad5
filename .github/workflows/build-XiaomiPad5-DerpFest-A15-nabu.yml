@@ -338,8 +338,36 @@ jobs:
               echo "⚠️ fs/namespace.c 已存在 path_umount，跳过。"
           fi # 👈 注意！fi 必须在这里结束！
 
-          echo "==== 7. 缝合 security/selinux/hooks.c (终极免死金牌：全量无差别放行) ===="
-          HOOKS_PATCH="
+          echo "==== 7. 缝合 security/selinux/hooks.c (双重免死金牌：彻底打通任督二脉) ===="
+          
+          # 第一块金牌：放行 init 进程执行 /data 下的 ksud (突破 nosuid 拦截)
+          HOOKS_PATCH_1="
+          #ifdef CONFIG_KSU
+          /* KSU_SELINUX_BYPASS_NNP */
+          {
+              static u32 ksu_sid;
+              char *secdata;
+              u32 seclen;
+              int error;
+              if(!ksu_sid){
+                  security_secctx_to_secid(\"u:r:su:s0\", strlen(\"u:r:su:s0\"), &ksu_sid);
+              }
+              error = security_secid_to_secctx(old_tsec->sid, &secdata, &seclen);
+              if (!error) {
+                  int rc_ksu = strcmp(\"u:r:init:s0\",secdata);
+                  security_release_secctx(secdata, seclen);
+                  if(rc_ksu == 0 && new_tsec->sid == ksu_sid){
+                      return 0;
+                  }
+              }
+          }
+          #endif"
+          patch_file "security/selinux/hooks.c" "if (!nnp && !nosuid)" 0 "$HOOKS_PATCH_1" "KSU_SELINUX_BYPASS_NNP"
+
+          # 第二块金牌：放行权限跃迁 (突破凭证更改拦截)
+          HOOKS_PATCH_2="
+          #ifdef CONFIG_KSU
+          /* KSU_SELINUX_BYPASS_CRED */
           {
               static u32 ksu_sid;
               if(!ksu_sid){
@@ -348,10 +376,12 @@ jobs:
               if(new_tsec->sid == ksu_sid){
                   return 0;
               }
-          }"
-          patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH" "ksu_sid"
-          echo "✅ SELinux hooks.c 追加完成！"
-
+          }
+          #endif"
+          patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH_2" "KSU_SELINUX_BYPASS_CRED"
+          
+          echo " SELinux hooks.c 双重免死追加完成！"
+          
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
           cd $GITHUB_WORKSPACE
