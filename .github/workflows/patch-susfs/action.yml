@@ -1,9 +1,10 @@
 name: 'Patch SuSFS for Kernel.'
+description: 'Patch SuSFS v1.5.5 for Kernel 4.14'
 
 runs:
   using: 'composite'
   steps:
-      -- name: Get SuSFS
+      - name: Get SuSFS
         if: env.SUSFS_ENABLE == 'true'
         shell: bash
         run: |
@@ -16,27 +17,6 @@ runs:
           # 把下载好的补丁移动到工作目录备用
           cp -r susfs_patches/kernel_patches/* ./
           echo "[+] 官方 1.5.5 (4.14分支) 补丁已就位！"
-          
-      - name: Set KSU and SUSFS for DEFCONFIG
-        if: env.SUSFS_ENABLE == 'true'
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-
-          echo "CONFIG_KSU_SUSFS=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-
-          if grep -q "THREAD_INFO_IN_TASK" "drivers/kernelsu/Kconfig"; then
-            echo "CONFIG_THREAD_INFO_IN_TASK=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-          fi
 
       - name: Patch SuSFS
         if: env.SUSFS_ENABLE == 'true'
@@ -116,21 +96,18 @@ runs:
           cd $GITHUB_WORKSPACE/device_kernel/
 
           if [[ -z "${{ env.SUSFS_PATCH_FIXED }}" ]]; then
-            echo "You didn't provide any patch file."
+            echo "[-] 兄弟，你还没配置自定义修复补丁，直接放行让它报错吧！"
           else
             IFS=',' read -ra FIXED_LIST <<< "${{ env.SUSFS_PATCH_FIXED }}"
-            echo "<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>"
+            echo "==== 开始打入本地专属修复补丁 ===="
             for i in "${!FIXED_LIST[@]}"; do
-              echo "Patching -> ${FIXED_LIST[$i]}"
-              if [[ -z "${{ env.SUSFS_FOLDER_FIXED }}" ]]; then
-                cp NonGKI_Kernel_Patches/${FIXED_LIST[$i]}.patch ./
-              else
-                cp NonGKI_Kernel_Patches/"${{ env.SUSFS_FOLDER_FIXED }}"/${FIXED_LIST[$i]}.patch ./
-              fi
+              echo "[+] 正在缝合本地补丁 -> ${FIXED_LIST[$i]}"
+              # 👇 核心改变：直接从你仓库根目录的 my_patches 文件夹里拿补丁！
+              cp $GITHUB_WORKSPACE/my_patches/${FIXED_LIST[$i]}.patch ./ 
               patch -p1 < ${FIXED_LIST[$i]}.patch || true
-              echo "Patching successful!"
-              echo "<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>"
+              echo "[+] 缝合完毕！"
             done
+            echo "==================================="
           fi
 
       - name: Upload Build Patch Rejected Files
