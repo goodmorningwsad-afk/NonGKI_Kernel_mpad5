@@ -201,19 +201,24 @@ jobs:
               echo "✅ 成功缝合: $file (在第 $target_line 行插入)"
           }
 
-          # 1. 缝合 fs/exec.c (掌管 Root 的绝对核心)
+          # 1. 缝合 fs/exec.c (掌管 Root 的绝对核心 - 解决 Nabu 的 4.18 结构体逆向移植BUG！)
           EXEC_HOOK="#ifdef CONFIG_KSU
           {
               extern bool ksu_execveat_hook __read_mostly;
               extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
               extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
+              
+              /* 专治小米魔改：将 user_arg_ptr 结构体拆解成 KSU 认识的原始指针 */
+              void *ksu_argv = (void *)argv.ptr.native;
+              void *ksu_envp = (void *)envp.ptr.native;
+              
               if (unlikely(ksu_execveat_hook))
-                  ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
+                  ksu_handle_execveat(&fd, &filename, &ksu_argv, &ksu_envp, &flags);
               else
-                  ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
+                  ksu_handle_execveat_sucompat(&fd, &filename, &ksu_argv, &ksu_envp, &flags);
           }
           #endif"
-          patch_file "fs/exec.c" "current->flags &= ~PF_NPROC_EXCEEDED;" 0 "$EXEC_HOOK" "ksu_execveat_hook"
+          patch_file "fs/exec.c" "bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
 
           # 2. 缝合 fs/open.c (权限探测核心)
           OPEN_HOOK="#ifdef CONFIG_KSU
