@@ -9,12 +9,9 @@ runs:
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel/
-
-          # 🚨 抛弃 Github 限制，直连官方 GitLab 获取 4.14 专属 1.5.5 补丁！
+          rm -rf susfs_patches
           echo "==== 开始拉取 Simonpunk 官方 4.14 专属补丁 ===="
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b kernel-4.14 susfs_patches --depth=1
-          
-          # 把下载好的补丁移动到工作目录备用
           cp -r susfs_patches/kernel_patches/* ./
           echo "[+] 官方 1.5.5 (4.14分支) 补丁已就位！"
 
@@ -31,90 +28,76 @@ runs:
             tar -czf "rej_files_1.5.5.tar.gz" -C "$temp_dir" .
             rm -rf "$temp_dir"
             echo "[+] Packed Successfully."
-
             find . -type f \( -name "*.rej" -o -name "*.orig" \) -delete
-            echo "[+] Removed all .rej and .orig files."
-            echo "[+] =================================== "
           }
 
-          # Check SuSFS
           if grep -q "CONFIG_KSU_SUSFS" "fs/namespace.c"; then
-            echo ">>>>>>>>>>>>Check<<<<<<<<<<<<"
             echo ">SuSFS is already patched, skipping.<"
-            echo ">>>>>>>>>>>>>> <<<<<<<<<<<<<<"
             echo "SUSFS_SKIP=true" >> $GITHUB_ENV
           else
             echo "==== 严格执行官方 4.14 专属挂载流程 ===="
-            
-            # 1. 物理搬运核心文件
             cp susfs_patches/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
             cp susfs_patches/kernel_patches/50_add_susfs_in_kernel-4.14.patch ./
             cp susfs_patches/kernel_patches/fs/* ./fs/
             cp susfs_patches/kernel_patches/include/linux/* ./include/linux/
             
-            # 2. 给 KSU 引擎打孔 (🚨此处咱们跳过了，因为 SukiSU 自带支持，保留原样不执行即可)
-            # cd KernelSU
-            # patch -p1 < 10_enable_susfs_for_ksu.patch || true
-            # cd ..
-            
-            # 3. 给内核源码打孔
+            # 🚨 SukiSU 跳过 KernelSU 内部补丁动作
             echo "[-] 正在缝合 4.14 内核深层逻辑..."
             patch -p1 < 50_add_susfs_in_kernel-4.14.patch || true
 
-            # 👇👇👇 核心改造区：纯手工物理打补丁并销毁尸体 👇👇👇
             echo "==== 开始手工修复 SUSFS 1.5.5 冲突点 ===="
             
+            # 修复 task_mmu.c
             cat << 'EOF' > fix_mmu.patch
-            --- a/fs/proc/task_mmu.c
-            +++ b/fs/proc/task_mmu.c
-            @@ -19,6 +19,9 @@
-             #include <linux/shmem_fs.h>
-             #include <linux/uaccess.h>
-             #include <linux/mm_inline.h>
-            +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-            +#include <linux/susfs_def.h>
-            +#endif
-             #include <linux/ctype.h>
-             
-             #include <asm/elf.h>
-            EOF
+          --- a/fs/proc/task_mmu.c
+          +++ b/fs/proc/task_mmu.c
+          @@ -19,6 +19,9 @@
+           #include <linux/shmem_fs.h>
+           #include <linux/uaccess.h>
+           #include <linux/mm_inline.h>
+          +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+          +#include <linux/susfs_def.h>
+          +#endif
+           #include <linux/ctype.h>
+           
+           #include <asm/elf.h>
+          EOF
             patch -p1 < fix_mmu.patch || true
-            rm -f fs/proc/task_mmu.c.rej  # 🚨 物理销毁报错尸体，防止法医误报！
+            rm -f fs/proc/task_mmu.c.rej
             
+            # 修复 cmdline.c
             cat << 'EOF' > fix_cmdline.patch
-            --- a/fs/proc/cmdline.c
-            +++ b/fs/proc/cmdline.c
-            @@ -4,6 +4,9 @@
-             #include <linux/proc_fs.h>
-             #include <linux/seq_file.h>
-            +#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-            +extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
-            +#endif
-             #ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG
-             #include <asm/setup.h>
-             #endif
-            @@ -28,6 +31,12 @@
-             
-             static int cmdline_proc_show(struct seq_file *m, void *v)
-             {
-            +#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-            +	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
-            +		seq_putc(m, '\n');
-            +		return 0;
-            +	}
-            +#endif
-             #ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG
-             	seq_printf(m, "%s\n", proc_command_line);
-             #else
-            EOF
+          --- a/fs/proc/cmdline.c
+          +++ b/fs/proc/cmdline.c
+          @@ -4,6 +4,9 @@
+           #include <linux/proc_fs.h>
+           #include <linux/seq_file.h>
+          +#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+          +extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
+          +#endif
+           #ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG
+           #include <asm/setup.h>
+           #endif
+          @@ -28,6 +31,12 @@
+           
+           static int cmdline_proc_show(struct seq_file *m, void *v)
+           {
+          +#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+          +	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
+          +		seq_putc(m, '\n');
+          +		return 0;
+          +	}
+          +#endif
+           #ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG
+           	seq_printf(m, "%s\n", proc_command_line);
+           #else
+          EOF
             patch -p1 < fix_cmdline.patch || true
-            rm -f fs/proc/cmdline.c.rej   # 🚨 物理销毁报错尸体，防止法医误报！
+            rm -f fs/proc/cmdline.c.rej
             
             echo "==== SUSFS 核心冲突点手工缝合完毕！ ===="
-            # 👆👆👆 核心改造区结束 👇👇👇
           fi
 
-          # Patch .rej find
           if [[ "${{ env.BUILD_DEBUGGER }}" == "true" ]]; then
             echo "[+] Checking SuSFS v1.5.5 (4.14 branch) rej files..."
             mapfile -t REJ_FILES < <(find . -type f -name "*.rej")
@@ -124,40 +107,13 @@ runs:
                 for CAT_REJ in "${REJ_FILES[@]}"; do
                     echo "[-] Found .rej file: $CAT_REJ"
                     cat $CAT_REJ
-                    echo "[+] =================================== "
                 done
+                if [[ "${{ env.SKIP_PATCH }}" != "true" ]] || [ -z "${{ env.SUSFS_PATCH_FIXED }}" ]; then
+                    echo "[-] Found .rej files, Stopped! "
+                    PACK_FILES
+                    false
+                fi
             fi
-
-            if [[ "${{ env.SKIP_PATCH }}" == "true" ]] || [ -n "${{ env.SUSFS_PATCH_FIXED }}" ]; then
-                echo "[+] SuSFS Patch Version: v1.5.5 (4.14 branch). "
-                echo "[+] SKIP_PATCH enabled or found SuSFS Fixed Patch, skipping."
-                PACK_FILES
-            elif [[ "${{ env.SKIP_PATCH }}" != "true" ]] || [ -z "${{ env.SUSFS_PATCH_FIXED }}" ]; then
-                echo "[+] SuSFS Patch Version: v1.5.5 (4.14 branch). "
-                echo "[-] Found .rej files, Stopped! "
-                PACK_FILES
-                false
-            fi
-          fi
-
-      - name: SUSFS Patch Fixed
-        if: env.SUSFS_ENABLE == 'true' && env.SUSFS_SKIP != 'true'
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel/
-
-          if [[ -z "${{ env.SUSFS_PATCH_FIXED }}" ]]; then
-            echo "[-] 兄弟，你还没配置自定义修复补丁，直接放行让它报错吧！"
-          else
-            IFS=',' read -ra FIXED_LIST <<< "${{ env.SUSFS_PATCH_FIXED }}"
-            echo "==== 开始打入本地专属修复补丁 ===="
-            for i in "${!FIXED_LIST[@]}"; do
-              echo "[+] 正在缝合本地补丁 -> ${FIXED_LIST[$i]}"
-              cp $GITHUB_WORKSPACE/my_patches/${FIXED_LIST[$i]}.patch ./ 
-              patch -p1 < ${FIXED_LIST[$i]}.patch || true
-              echo "[+] 缝合完毕！"
-            done
-            echo "==================================="
           fi
 
       - name: Upload Build Patch Rejected Files
@@ -165,5 +121,4 @@ runs:
         uses: actions/upload-artifact@v4
         with:
           name: patch_rejected_files
-          path: |
-            device_kernel/rej_files_*
+          path: device_kernel/rej_files_*
