@@ -50,7 +50,6 @@ env:
 
   ROM_TEXT : "derpfest_a15"
 
-  # Other env - 锁定 Python 2 拯救老内核
   PYTHON_VERSION: "2" 
 
   PACK_METHOD: "Anykernel3" 
@@ -65,7 +64,6 @@ env:
 
   REKERNEL_ENABLE: "false" 
 
-  # 🚨 终极修正 1：改为 manual，彻底掐断庸医脚本瞎改 syscall 的念头！
   HOOK_METHOD: "manual" 
   HOOK_OLDER: "false" 
 
@@ -84,7 +82,7 @@ env:
   GENERATE_DTB: "false" 
   GENERATE_CHIP: "qcom" 
 
-  BUILD_DEBUGGER: "false" 
+  BUILD_DEBUGGER: "true" 
   SKIP_PATCH: "true" 
 
   BUILD_OTHER_CONFIG: "false" 
