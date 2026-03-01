@@ -116,23 +116,24 @@ jobs:
       - name: 📦 提取核心源码进行验证 (包含 hooks.c)
         run: |
           cd $GITHUB_WORKSPACE
-          echo "==== 正在提取 hooks.c 和 exec.c 进行验证 ===="
+          echo "==== 正在提取 hooks.c、exec.c 和 核心配置文件 ===="
           
-          # 创建一个临时文件夹用来存放要看的文件
+          # 1. 创建临时文件夹
           mkdir -p verify_files/security/selinux
           mkdir -p verify_files/fs
+          mkdir -p verify_files/config  # 👈 新建一个目录放图纸
           
-          # 提取免死金牌文件 hooks.c
+          # 2. 提取源码
           cp device_kernel/security/selinux/hooks.c verify_files/security/selinux/ || echo "❌ 未找到 hooks.c"
-          
-          # 顺手把开机传感器 exec.c 也提取出来再确认一眼
           cp device_kernel/fs/exec.c verify_files/fs/ || echo "❌ 未找到 exec.c"
-          # 将内核底盘配置文件提取到打包目录中 (注意替换你的目标打包文件夹，比如 Official_Patches 或 patched_source_files)
-          cp device_kernel/arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig Official_Patches/ || echo "❌ 未找到 exec.c"
-          # 打包成 zip
+          
+          # 3. 👇 🚨 正确提取底盘配置文件 👇
+          cp device_kernel/arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig verify_files/config/ || echo "❌ 未找到 defconfig 配置文件"
+          
+          # 4. 打包成 zip
           cd verify_files
           zip -r ../Kernel_Verify_Files.zip .
-
+          
       - name: 📤 上传源码验证包到云端
         uses: actions/upload-artifact@v4
         with:
