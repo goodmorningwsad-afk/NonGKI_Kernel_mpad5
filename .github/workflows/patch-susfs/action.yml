@@ -3,25 +3,20 @@ name: 'Patch SuSFS for Kernel.'
 runs:
   using: 'composite'
   steps:
-      - name: Get SuSFS
+      -- name: Get SuSFS
         if: env.SUSFS_ENABLE == 'true'
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel/
 
-          # Core
-          if [[ "${{ env.SUSFS_FIXED }}" == true ]]; then
-            if [ -z "${{ env.PATCHES_SOURCE }}" ] || [ -z "${{ env.PATCHES_BRANCH }}" ]; then
-              echo "Please input a vaild source and branch!"
-              false
-            elif [[ "${{ env.PATCHES_SOURCE }}" == *".git" ]]; then
-              echo "Please do not set a full URL in PATCH_SOURCE!"
-              false
-            else
-              git clone https://github.com/${{ env.PATCHES_SOURCE }}.git -b ${{ env.PATCHES_BRANCH }} NonGKI_Kernel_Patches --depth=1 # It's not necessary.
-            fi
-          fi
-
+          # 🚨 抛弃 Github 限制，直连官方 GitLab 获取 4.14 专属 1.5.5 补丁！
+          echo "==== 开始拉取 Simonpunk 官方 4.14 专属补丁 ===="
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b kernel-4.14 susfs_patches --depth=1
+          
+          # 把下载好的补丁移动到工作目录备用
+          cp -r susfs_patches/kernel_patches/* ./
+          echo "[+] 官方 1.5.5 (4.14分支) 补丁已就位！"
+          
       - name: Set KSU and SUSFS for DEFCONFIG
         if: env.SUSFS_ENABLE == 'true'
         shell: bash
