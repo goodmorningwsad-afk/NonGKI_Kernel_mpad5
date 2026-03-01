@@ -112,6 +112,9 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 🪝 Patch Kernel of SUSFS
+        uses: ./.github/workflows/patch-susfs
+
       - name: 📦 提取核心源码进行验证 (包含 hooks.c)
         run: |
           cd $GITHUB_WORKSPACE
