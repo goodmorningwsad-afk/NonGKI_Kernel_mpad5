@@ -165,33 +165,29 @@ jobs:
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
 
-      - name: 🛠️ 运行 SukiSU 官方底层打孔脚本 (纯净版)
+      - name: 🛠️ 运行 SukiSU 官方底层依赖补齐 (专供 KPM)
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 开始执行 SukiSU 官方自动化缝合脚本 ===="
+          echo "==== 开始执行 SukiSU 向后移植脚本 ===="
           
-          echo "[-] 正在从 /tmp/Patches 提取官方脚本..."
           cp -r /tmp/Patches/* ./ || true
           
+          # 🚨 必须保留！给 4.14 老内核补齐 path_umount 等功能
           if [ -f "backport_patches.sh" ]; then
+              echo "[-] 正在执行 backport_patches.sh..."
               bash backport_patches.sh
           fi
           
+          # 🚨 必须保留！补齐 4.14 缺失的 SELinux 结构体
           if [ -f "backport_selinux_patches.sh" ]; then
+              echo "[-] 正在执行 backport_selinux_patches.sh..."
               bash backport_selinux_patches.sh
           fi
           
-          if [ -f "syscall_hook_patches.sh" ]; then
-              echo "[-] 正在执行 syscall_hook_patches.sh..."
-              bash syscall_hook_patches.sh
-              
-              # 👇 🚨 致命修正：同步脚本与 SukiSU 源码的变量名脱节！ 👇
-              echo "[-] 正在修复 read_write.c 中的变量名脱节问题..."
-              sed -i 's/ksu_vfs_read_hook/ksu_init_rc_hook/g' fs/read_write.c
-              # 👆 🚨 修正完毕 👆
-          fi
+          # ❌ 绝命毒师：彻底删掉 syscall_hook_patches.sh 和之前咱们写的 sed 替换！
+          # 因为 KPM 会在二进制层面搞定所有拦截，源码再打孔就会导致“双重挂载”卡死 Root！
           
-          echo "==== 官方脚本执行完毕！ ===="
+          echo "==== 依赖补齐执行完毕，源码纯净，等待 KPM 接管！ ===="
           
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
