@@ -430,33 +430,42 @@ jobs:
           
           echo "✅ 模块挂载核心注射器 (sys_read) 缝合完毕！"
 
-          echo "==== 查抄 execve 拦截探头 ===="
-           grep -rnA 5 -B 5 "ksu_handle_execve" fs/exec.c 
-
-           echo "==== 查抄 devpts 终端探头（哑巴刺客） ===="
-           grep -rnA 5 -B 5 "ksu_handle_devpts" fs/devpts/inode.c 
-
-           echo "==== 13. 缝合 security/selinux/hooks.c (system_server 物理免死金牌) ===="
+          echo "==== 13. 缝合 security/selinux/hooks.c (system_server 物理免死金牌) ===="
           
-          SYSTEM_SERVER_HOOK="
+          SYSTEM_SERVER_INODE_HOOK="
           #ifdef CONFIG_KSU
           {
-              /* 🚨 物理放行 system_server，彻底摧毁 Android 15 的 SELinux 阻击 🚨 */
+              /* 🚨 system_server_bypass_inode 🚨 */
               if (unlikely(!strncmp(current->comm, \"system_server\", 13))) {
                   return 0;
               }
           }
           #endif"
           
-          # 📍 第一针：完美避开正则符号，精准锚定 selinux_inode_permission 的核心逻辑开头
-          patch_file "security/selinux/hooks.c" "from_access = mask" 0 "$SYSTEM_SERVER_HOOK" "system_server_bypass_inode"
+          SYSTEM_SERVER_FILE_HOOK="
+          #ifdef CONFIG_KSU
+          {
+              /* 🚨 system_server_bypass_file 🚨 */
+              if (unlikely(!strncmp(current->comm, \"system_server\", 13))) {
+                  return 0;
+              }
+          }
+          #endif"
           
-          # 📍 第二针：完美避开正则符号，精准锚定 selinux_file_permission 的耗时重校验处
-          patch_file "security/selinux/hooks.c" "return selinux_revalidate_file_permission" 0 "$SYSTEM_SERVER_HOOK" "system_server_bypass_file"
+          # 📍 第一针：带上 inode 专属身份证
+          patch_file "security/selinux/hooks.c" "from_access = mask" 0 "$SYSTEM_SERVER_INODE_HOOK" "system_server_bypass_inode"
+          
+          # 📍 第二针：带上 file 专属身份证
+          patch_file "security/selinux/hooks.c" "return selinux_revalidate_file_permission" 0 "$SYSTEM_SERVER_FILE_HOOK" "system_server_bypass_file"
           
           echo "✅ system_server 上帝模式 (SELinux 豁免) 缝合完毕！"
 
-           
+          echo "==== 查抄 execve 拦截探头 ===="
+           grep -rnA 5 -B 5 "ksu_handle_execve" fs/exec.c 
+
+           echo "==== 查抄 devpts 终端探头（哑巴刺客） ===="
+           grep -rnA 5 -B 5 "ksu_handle_devpts" fs/devpts/inode.c 
+
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
           cd $GITHUB_WORKSPACE
