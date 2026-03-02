@@ -131,6 +131,24 @@ runs:
         #endif"
         patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
 
+        echo "==== [手工缝合] 修复唯一的 .rej 冲突 (fs/proc/cmdline.c) ===="
+
+        CMDLINE_HOOK_1="
+        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+        extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
+        #endif"
+        # 挂载在函数声明之前
+        patch_file "fs/proc/cmdline.c" "static int cmdline_proc_show" 0 "$CMDLINE_HOOK_1" "extern int susfs_spoof_cmdline_or_bootconfig"
+        
+        CMDLINE_HOOK_2="
+        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+        	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
+        		seq_putc(m, '\n');
+        		return 0;
+        	}
+        #endif"
+        # 挂载在 seq_printf 打印启动参数之前
+        patch_file "fs/proc/cmdline.c" "seq_printf(m" 0 "$CMDLINE_HOOK_2" "susfs_spoof_cmdline_or_bootconfig(m)"
 
         echo "==== [原生底盘区] (系统级通信与底层救砖，保持绝对原生) ===="
         
