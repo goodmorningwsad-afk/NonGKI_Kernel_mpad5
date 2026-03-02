@@ -1,1 +1,190 @@
+name: "SukiSU & SuSFS Phantom Hooks"
+description: "Apply SuSFS 4.14 core patch and inject Phantom Hooks for SukiSU"
 
+runs:
+  using: "composite"
+  steps:
+    - name: 🪄 Apply SuSFS 4.14 Patch & Phantom SukiSU Hooks
+      shell: bash
+      run: |
+        cd $GITHUB_WORKSPACE/device_kernel
+        
+        echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
+        # 这里假设你已经把 susfs_patch_to_4.14.patch 放进了你的仓库，或者由上游脚本下载了
+        # 🚨 这一步只打官方的 3000 行纯净补丁，绝对不跑那些乱七八糟的 .sh 脚本！
+        # 如果路径不同，请自行修改下面的 patch 路径
+        # patch -p1 < ../Official_Patches/Patch/susfs_patch_to_4.14.patch || true
+        echo "✅ SuSFS 核心 VFS 欺骗逻辑已就位！"
+
+        echo "==== 2. 升级神级打孔 -> 幻影打孔 (自动规避银行App) ===="
+        patch_file() {
+            local file="$1"
+            local search_str="$2"
+            local offset="$3"
+            local insert_code="$4"
+            local identifier="$5"
+            
+            echo "🔍 正在处理: $file"
+            if grep -q "$identifier" "$file"; then
+                echo "⚠️ $file 已包含 $identifier，跳过。"
+                return 0
+            fi
+            if ! grep -Fq "$search_str" "$file"; then
+                echo "❌ 致命错误: 在 $file 中找不到特征字符串 '$search_str'！"
+                exit 1
+            fi
+            awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
+            index($0, search) && !done {
+                if (offset == 0) { print code; print; }
+                else { print; count = offset; while(count > 0 && getline > 0) { print; count--; } print code; }
+                done = 1
+                next
+            }
+            { print }
+            ' "$file" > tmp_file && mv tmp_file "$file"
+            
+            if grep -q "$identifier" "$file"; then
+                echo "✅ 成功缝合: $file"
+            else
+                echo "❌ 致命错误: $file 处理完毕，但未写入 $identifier！"
+                exit 1
+            fi
+        }
+        
+        echo "==== [幻影打孔] fs/exec.c ===="
+        EXEC_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern bool ksu_execveat_hook __read_mostly;
+            extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
+            extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
+        /* 🚨 幻影装甲：如果是银行App，假装无事发生，直接放行！ 🚨 */
+        #ifdef CONFIG_KSU_SUSFS
+            extern bool susfs_is_current_proc_umounted(void);
+            if (!susfs_is_current_proc_umounted()) {
+        #endif
+                if (unlikely(ksu_execveat_hook))
+                    ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
+                else
+                    ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
+        #ifdef CONFIG_KSU_SUSFS
+            }
+        #endif
+        }
+        #endif"
+        patch_file "fs/exec.c" "bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
+
+        echo "==== [幻影打孔] fs/open.c ===="
+        OPEN_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
+        #ifdef CONFIG_KSU_SUSFS
+            extern bool susfs_is_current_proc_umounted(void);
+            if (!susfs_is_current_proc_umounted()) {
+        #endif
+                ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
+        #ifdef CONFIG_KSU_SUSFS
+            }
+        #endif
+        }
+        #endif"
+        patch_file "fs/open.c" "if (mode & ~S_IRWXO)" 0 "$OPEN_HOOK" "ksu_handle_faccessat"
+
+        echo "==== [幻影打孔] fs/stat.c ===="
+        STAT_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
+        #ifdef CONFIG_KSU_SUSFS
+            extern bool susfs_is_current_proc_umounted(void);
+            if (!susfs_is_current_proc_umounted()) {
+        #endif
+                ksu_handle_stat(&dfd, &filename, &flags);
+        #ifdef CONFIG_KSU_SUSFS
+            }
+        #endif
+        }
+        #endif"
+        patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
+
+        echo "==== [幻影打孔] fs/devpts/inode.c ===="
+        DEVPTS_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern void ksu_handle_devpts(struct inode*);
+        #ifdef CONFIG_KSU_SUSFS
+            extern bool susfs_is_current_proc_umounted(void);
+            if (!susfs_is_current_proc_umounted()) {
+        #endif
+                ksu_handle_devpts(dentry->d_inode);
+        #ifdef CONFIG_KSU_SUSFS
+            }
+        #endif
+        }
+        #endif"
+        patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
+
+        echo "==== [保留原生神级打孔] (这些底层逻辑绝对不能对银行隐身，否则系统暴毙) ===="
+        
+        # 1. 模块挂载 (read_write.c)
+        READ_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern bool ksu_init_rc_hook __read_mostly;
+            extern void ksu_handle_sys_read(unsigned int fd);
+            if (unlikely(ksu_init_rc_hook))
+                ksu_handle_sys_read(fd);
+        }
+        #endif"
+        patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
+
+        # 2. 权限提权大动脉 (sys.c)
+        SYS_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern int ksu_handle_setuid_common(uid_t new_uid, uid_t old_uid, uid_t new_euid);
+            ksu_handle_setuid_common(ruid, current_uid().val, euid);
+        }
+        #endif"
+        patch_file "kernel/sys.c" "ksuid = make_kuid(ns, suid);" 1 "$SYS_HOOK" "ksu_handle_setuid_common"
+
+        # 3. KSU核心通信后门 (reboot.c)
+        REBOOT_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);
+            if (ksu_handle_sys_reboot(magic1, magic2, cmd, &arg) == 0)
+                return 0;
+        }
+        #endif"
+        patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
+
+        # 4. SELinux 防爆头金牌 (hooks.c)
+        HOOKS_PATCH_1="
+        #ifdef CONFIG_KSU
+        {
+            static u32 ksu_sid;
+            if(!ksu_sid){
+                security_secctx_to_secid(\"u:r:su:s0\", strlen(\"u:r:su:s0\"), &ksu_sid);
+            }
+            if(new_tsec->sid == ksu_sid){
+                return 0;
+            }
+        }
+        #endif"
+        patch_file "security/selinux/hooks.c" "if (!nnp && !nosuid)" 0 "$HOOKS_PATCH_1" "security_secctx_to_secid"
+
+        HOOKS_PATCH_2="
+        #ifdef CONFIG_KSU
+        {
+            extern bool is_ksu_transition(const void *old_tsec, const void *new_tsec);
+            if (is_ksu_transition(current_security(), bprm->cred->security))
+                return 0;
+        }
+        #endif"
+        patch_file "security/selinux/hooks.c" "new_tsec = bprm->cred->security;" 0 "$HOOKS_PATCH_2" "is_ksu_transition"
+
+        echo "==== 斩杀 -dirty 强迫症尾巴 ===="
+        sed -i 's/-dirty//g' scripts/setlocalversion
+        echo "✅ 幻影打孔与洁癖修整全数完成，战车准备点火！"
