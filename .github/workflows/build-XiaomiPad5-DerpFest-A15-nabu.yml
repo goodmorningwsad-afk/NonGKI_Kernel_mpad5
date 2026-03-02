@@ -368,9 +368,10 @@ jobs:
               ksu_handle_setresuid(ruid, euid, suid);
           }
           #endif"
-          patch_file "kernel/sys.c" "if ((ruid != (uid_t) -1) && !uid_valid(kruid))" 0 "$SYS_HOOK" "ksu_handle_setresuid"
+          # 🚨 终极换弹：使用全文件唯一特征码 ksuid = make_kuid... 绝对不会误伤！
+          patch_file "kernel/sys.c" "ksuid = make_kuid(ns, suid);" 1 "$SYS_HOOK" "ksu_handle_setresuid"
           
-          echo "✅  (sys.c) 缝合完毕！"
+          echo "✅ 核心提权与注入雷达 (sys.c) 缝合完毕！"
 
           echo "==== 10. 缝合 security/selinux/hooks.c (bprm_committing_creds 终极域转换) ===="
           HOOKS_PATCH_3="
