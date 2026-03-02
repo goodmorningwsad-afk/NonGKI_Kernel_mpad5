@@ -388,21 +388,6 @@ jobs:
           
           echo "✅ SELinux 终极域转换 (is_ksu_transition) 缝合完毕！"
 
-          echo "==== 9.5 缝合 kernel/sys.c (Root 授权与 prctl 拦截核心命脉) ===="
-          PRCTL_HOOK="
-          #ifdef CONFIG_KSU
-          {
-              extern int ksu_handle_prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5);
-              int ksu_prctl_ret = ksu_handle_prctl(option, arg2, arg3, arg4, arg5);
-              if (ksu_prctl_ret != -ENOSYS)
-                  return ksu_prctl_ret;
-          }
-          #endif"
-          
-          # 🚨使用绝对单行的 security_task_prctl 作为特征码，偏移量设为 0（精准插在它正上方）
-          patch_file "kernel/sys.c" "error = security_task_prctl(option, arg2, arg3, arg4, arg5);" 0 "$PRCTL_HOOK" "ksu_handle_prctl"
-          
-          echo "✅ Root 授权基站 (prctl) 缝合完毕！"
            
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
