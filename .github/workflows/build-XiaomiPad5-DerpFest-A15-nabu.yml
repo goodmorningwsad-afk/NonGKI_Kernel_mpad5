@@ -238,6 +238,26 @@ jobs:
           name: Official_Patches
           path: Official_Patches.zip
 
+      - name: 📤 提取 SuSFS 冲突原件 ( .rej 查抄)
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 正在满世界抓捕 .rej 冲突文件 ===="
+          mkdir -p Rej_Files
+          
+          # 从内核源码目录把所有打不进去的 .rej 尸体全搜出来，复制到专案组文件夹
+          find device_kernel -name "*.rej" -exec cp {} Rej_Files/ \; || true
+          
+          cd Rej_Files
+          # 如果没有冲突，压缩包可能为空，加上 || true 防报错
+          zip -r ../Rej_Files.zip . || true
+
+      - name: 📦 上传冲突审查包 (.rej)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuSFS_Rej_Files
+          path: Rej_Files.zip
+          if-no-files-found: ignore
+
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
 
