@@ -184,6 +184,9 @@ jobs:
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
+
+      - name: 🪝 呼叫 SuSFS 幻影打孔外挂
+        uses: ./.github/actions/patch-susfs-new
           
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
