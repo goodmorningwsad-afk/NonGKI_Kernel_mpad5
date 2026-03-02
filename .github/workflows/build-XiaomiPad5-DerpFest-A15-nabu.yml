@@ -414,6 +414,22 @@ jobs:
           
           echo "✅ KSU 核心通信后门 (reboot.c) 缝合完毕！"
 
+          echo "==== 12. 缝合 fs/read_write.c (模块挂载与 Zygisk 的终极注射器) ===="
+          READ_HOOK="
+          #ifdef CONFIG_KSU
+          {
+              extern bool ksu_init_rc_hook __read_mostly;
+              extern void ksu_handle_sys_read(unsigned int fd);
+              if (unlikely(ksu_init_rc_hook))
+                  ksu_handle_sys_read(fd);
+          }
+          #endif"
+          
+          # 🚨 致命修正：在 4.14 内核的 SYSCALL_DEFINE3(read...) 入口处，拿到 fd 变量后立刻注射！
+          patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
+          
+          echo "✅ 模块挂载核心注射器 (sys_read) 缝合完毕！"
+
           echo "==== 查抄 execve 拦截探头 ===="
            grep -rnA 5 -B 5 "ksu_handle_execve" fs/exec.c || true
 
