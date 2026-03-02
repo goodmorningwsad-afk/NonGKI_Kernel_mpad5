@@ -188,15 +188,16 @@ jobs:
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
           
-      - name: 📤 提取并打包已打孔的源码 (用于人工审查)
+      - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
         run: |
           cd $GITHUB_WORKSPACE
-          echo "==== 正在收集打孔后的核心文件 ===="
+          echo "==== 正在收集打孔后的核心文件，准备验尸 ===="
           mkdir -p patched_source_files/fs/devpts
           mkdir -p patched_source_files/drivers/input
-          mkdir -p patched_source_files/security/selinux  # 👈 新增：创建目标文件夹
+          mkdir -p patched_source_files/security/selinux
+          mkdir -p patched_source_files/fs/proc
           
-          # 复制打过孔的文件
+          # 1. 提取咱们自己手打的神级孔
           cp device_kernel/fs/exec.c patched_source_files/fs/ || true
           cp device_kernel/fs/open.c patched_source_files/fs/ || true
           cp device_kernel/fs/read_write.c patched_source_files/fs/ || true
@@ -204,11 +205,18 @@ jobs:
           cp device_kernel/fs/namespace.c patched_source_files/fs/ || true
           cp device_kernel/fs/devpts/inode.c patched_source_files/fs/devpts/ || true
           cp device_kernel/drivers/input/input.c patched_source_files/drivers/input/ || true
-          cp device_kernel/security/selinux/hooks.c patched_source_files/security/selinux/ || true # 👈 新增：把 hooks.c 拿出来
+          cp device_kernel/security/selinux/hooks.c patched_source_files/security/selinux/ || true
+          cp device_kernel/fs/proc/cmdline.c patched_source_files/fs/proc/ || true
+          
+          # 2. 🚨 重点提取 SuSFS 的核心大动脉，验明真身！
+          cp device_kernel/fs/susfs.c patched_source_files/fs/ || true
+          cp device_kernel/fs/dcache.c patched_source_files/fs/ || true
+          cp device_kernel/fs/readdir.c patched_source_files/fs/ || true
+          cp device_kernel/fs/namei.c patched_source_files/fs/ || true
           
           cd patched_source_files
           zip -r ../Patched_Source_Files.zip .
-
+          
       - name: 📦 上传打孔后源码验证包
         uses: actions/upload-artifact@v4
         with:
