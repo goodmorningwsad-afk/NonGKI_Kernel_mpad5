@@ -412,6 +412,12 @@ jobs:
           
           echo "✅ KSU 核心通信后门 (reboot.c) 缝合完毕！"
 
+          echo "查抄 execve 拦截探头:"
+           grep -rn "ksu_handle_execve" fs/exec.c 
+
+          echo "查抄 devpts 终端探头:"
+          grep -rn "ksu_handle_devpts" fs/devpts/inode.c 
+
            
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
