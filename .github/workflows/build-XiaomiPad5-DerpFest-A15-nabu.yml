@@ -359,6 +359,18 @@ jobs:
           patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH_2" "KSU_SELINUX_BYPASS_UNIVERSAL_2"
           
           echo "✅ SELinux hooks.c 双重免死金牌追加完成！"
+
+          echo "==== 9. 缝合 kernel/sys.c (Root 提权与 Zygisk 注入的核心命脉) ===="
+          SYS_HOOK="
+          #ifdef CONFIG_KSU
+          {
+              extern int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid);
+              ksu_handle_setresuid(ruid, euid, suid);
+          }
+          #endif"
+          patch_file "kernel/sys.c" "if ((ruid != (uid_t) -1) && !uid_valid(kruid))" 0 "$SYS_HOOK" "ksu_handle_setresuid"
+          
+          echo "✅  (sys.c) 缝合完毕！"
            
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
