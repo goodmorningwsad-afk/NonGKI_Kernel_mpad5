@@ -380,7 +380,7 @@ jobs:
               /* 🚨 案发现场临时伪造身份证 🚨 */
               extern bool is_ksu_transition(const void *old_tsec, const void *new_tsec);
               if (is_ksu_transition(current_security(), bprm->cred->security))
-                  return;
+                  return 0;  /* 👈 致命修正：补上 0，符合 int 返回值语法！ */
           }
           #endif"
           patch_file "security/selinux/hooks.c" "new_tsec = bprm->cred->security;" 0 "$HOOKS_PATCH_3" "is_ksu_transition"
