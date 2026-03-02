@@ -397,6 +397,21 @@ jobs:
           
           echo "✅ SELinux 终极域转换 (is_ksu_transition) 缝合完毕！"
 
+          echo "==== 11. 缝合 kernel/reboot.c (KSU 核心通信后门) ===="
+          REBOOT_HOOK="
+          #ifdef CONFIG_KSU
+          {
+              extern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);
+              if (ksu_handle_sys_reboot(magic1, magic2, cmd, &arg) == 0)
+                  return 0;
+          }
+          #endif"
+          
+          # 🚨 精准插在内核原本的权限校验之前，拦截所有魔法暗号！
+          patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
+          
+          echo "✅ KSU 核心通信后门 (reboot.c) 缝合完毕！"
+
            
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
