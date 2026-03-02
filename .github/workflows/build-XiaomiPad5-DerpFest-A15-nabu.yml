@@ -110,15 +110,6 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-      - name: 🔍 法医级提取：定位 SELinux 命门补丁
-        run: |
-          cd $GITHUB_WORKSPACE
-          echo "==== 1. 暴力搜捕 apply_kernelsu_rules 的官方打孔坐标 ===="
-          grep -rnA 5 -B 5 "apply_kernelsu_rules" ./ || true
-          
-          echo "==== 2. 查抄官方 SELinux 补丁原件 ===="
-          find . -type f \( -name "*selinux*.sh" -o -name "*selinux*.patch" \) -exec echo ">>> 文件: {}" \; -exec cat {} \; || true
-
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
@@ -165,17 +156,17 @@ jobs:
           name: Kernel_Verify_Files
           path: Kernel_Verify_Files.zip
 
-      # 🚨 终极修正 2：彻底铲除 patch-no-kprobe 步骤，绝不留患！
+      # 🚨 终极修正 2：彻底铲除 patch-no-kprobe 步骤！
 
       - name: 🩹 Fix SukiSU Source Bugs & Extra Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 开始清理与修复 SukiSU 原厂 Bug ===="
           
-          # 1. 毫米级精准修复 builtin 分支里的原厂笔误
+          # 1. 修复 builtin 分支里的原厂笔误
           sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
           sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
-          # 🚨 致命修正：只替换 300 行以后的 cred！绝不误伤上半部分合法的 cred 变量！
+          # 只替换 300 行以后的 cred！绝不误伤上半部分合法的 cred 变量！
           sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
           
           # 2. 修复 supercalls.c 的宏定义套娃与链接报错
@@ -186,7 +177,7 @@ jobs:
           # 3. 屏蔽内核中烦人的无用函数警告
           echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
           echo "ccflags-y += -Wno-error" >> fs/Makefile
-          # 👇 物理接通被阉割的用户命名空间，拯救模块挂载 👇
+          #  接通被阉割的用户命名空间，拯救模块挂载 
           sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           
           # 4. 防止 LTO 爆内存，并强制唤醒挂载引擎
@@ -435,6 +426,14 @@ jobs:
 
            echo "==== 查抄 devpts 终端探头（哑巴刺客） ===="
            grep -rnA 5 -B 5 "ksu_handle_devpts" fs/devpts/inode.c 
+
+           echo "==== 斩杀 -dirty 强迫症尾巴 ===="
+          # 🚨 物理阉割 setlocalversion 脚本，让它永远吐不出 dirty 这个词
+          sed -i 's/-dirty//g' scripts/setlocalversion
+          
+          # 备用保险（有些老内核的 Makefile 里还会检查 .scmversion）
+          echo "" > .scmversion
+          echo "✅ 纯净内核版本号伪装完毕！"
 
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
