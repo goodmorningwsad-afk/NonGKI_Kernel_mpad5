@@ -104,6 +104,9 @@ jobs:
       - name: ⏰ Checkout repository
         uses: actions/checkout@v4
 
+      - name: ⌛️ Compilation environment preparation
+        uses: ./.github/workflows/build-env
+
       - name: 🚀 强行拉满虚拟内存 (拯救 LTO 爆内存)
         run: |
           echo "==== 正在分配 16GB Swap 虚拟内存 ===="
@@ -118,9 +121,6 @@ jobs:
           # 5. 打印当前内存状态，让你亲眼看到运存飙升
           free -h
           echo "✅ 16GB 虚拟内存加载完毕，LTO 巨兽来吧！"
-
-      - name: ⌛️ Compilation environment preparation
-        uses: ./.github/workflows/build-env
 
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
