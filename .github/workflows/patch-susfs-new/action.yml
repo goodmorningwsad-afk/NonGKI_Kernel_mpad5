@@ -8,7 +8,7 @@ runs:
       shell: bash
       run: |
         cd $GITHUB_WORKSPACE/device_kernel
-
+        
         echo "==== 0. 唤醒 SuSFS 内核编译大动脉开关 ===="
         DEFCONFIG_FILE="arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig"
         
@@ -26,6 +26,18 @@ runs:
         CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
         EOF
         echo "✅ SuSFS 物理开关全数合闸！"
+
+        echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
+        # 🚨 启动全域索敌雷达，在 /tmp 和整个工作区寻找补丁文件
+        PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.14.patch" 2>/dev/null | head -n 1)
+        
+        if [ -z "$PATCH_FILE" ]; then
+            echo "❌ 致命错误：在 /tmp 和整个仓库里都没找到 susfs_patch_to_4.14.patch！"
+            exit 1
+        fi
+        
+        echo "🔍 锁定物理补丁原件: $PATCH_FILE"
+        patch -p1 -f < "$PATCH_FILE" || echo "⚠️ 部分补丁存在冲突，已自动生成 .rej 文件并强制继续！"
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
@@ -61,7 +73,25 @@ runs:
                 exit 1
             fi
         }
+
+        echo "==== [手工缝合] 修复唯一的 .rej 冲突 (fs/proc/cmdline.c) ===="
+        CMDLINE_HOOK_1="
+        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+        extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
+        #endif"
+        # 挂载在函数声明之前
+        patch_file "fs/proc/cmdline.c" "static int cmdline_proc_show" 0 "$CMDLINE_HOOK_1" "extern int susfs_spoof_cmdline_or_bootconfig"
         
+        CMDLINE_HOOK_2="
+        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+        	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
+        		seq_putc(m, 10); /* 🚨 物理魔法：10 就是 ASCII 的换行符，完美避开所有 Shell 转义地狱！ */
+        		return 0;
+        	}
+        #endif"
+        # 挂载在 seq_printf 打印启动参数之前
+        patch_file "fs/proc/cmdline.c" "seq_printf(m" 0 "$CMDLINE_HOOK_2" "susfs_spoof_cmdline_or_bootconfig(m)"
+
         echo "==== [幻影打孔区] (自动规避银行App) ===="
         
         echo "==== [幻影打孔] fs/exec.c ===="
@@ -85,25 +115,6 @@ runs:
         }
         #endif"
         patch_file "fs/exec.c" "bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
-
-        echo "==== [手工缝合] 修复唯一的 .rej 冲突 (fs/proc/cmdline.c) ===="
-        
-        CMDLINE_HOOK_1="
-        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-        extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
-        #endif"
-        # 挂载在函数声明之前
-        patch_file "fs/proc/cmdline.c" "static int cmdline_proc_show" 0 "$CMDLINE_HOOK_1" "extern int susfs_spoof_cmdline_or_bootconfig"
-        
-        CMDLINE_HOOK_2="
-        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-        	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
-        		seq_putc(m, 10); /* 🚨 物理魔法：10 就是 ASCII 的换行符，完美避开所有 Shell 转义地狱！ */
-        		return 0;
-        	}
-        #endif"
-        # 挂载在 seq_printf 打印启动参数之前
-        patch_file "fs/proc/cmdline.c" "seq_printf(m" 0 "$CMDLINE_HOOK_2" "susfs_spoof_cmdline_or_bootconfig(m)"文件并强制继续！"
 
         echo "==== [幻影打孔] fs/open.c ===="
         OPEN_HOOK="
@@ -155,25 +166,6 @@ runs:
         }
         #endif"
         patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
-
-        echo "==== [手工缝合] 修复唯一的 .rej 冲突 (fs/proc/cmdline.c) ===="
-
-        CMDLINE_HOOK_1="
-        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-        extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
-        #endif"
-        # 挂载在函数声明之前
-        patch_file "fs/proc/cmdline.c" "static int cmdline_proc_show" 0 "$CMDLINE_HOOK_1" "extern int susfs_spoof_cmdline_or_bootconfig"
-        
-        CMDLINE_HOOK_2="
-        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-        	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
-        		seq_putc(m, '\n');
-        		return 0;
-        	}
-        #endif"
-        # 挂载在 seq_printf 打印启动参数之前
-        patch_file "fs/proc/cmdline.c" "seq_printf(m" 0 "$CMDLINE_HOOK_2" "susfs_spoof_cmdline_or_bootconfig(m)"
 
         echo "==== [原生底盘区] (系统级通信与底层救砖，保持绝对原生) ===="
         
