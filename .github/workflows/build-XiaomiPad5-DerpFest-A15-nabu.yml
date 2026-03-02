@@ -110,6 +110,15 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 🔍 法医级提取：定位 SELinux 命门补丁
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 1. 暴力搜捕 apply_kernelsu_rules 的官方打孔坐标 ===="
+          grep -rnA 5 -B 5 "apply_kernelsu_rules" ./ || true
+          
+          echo "==== 2. 查抄官方 SELinux 补丁原件 ===="
+          find . -type f \( -name "*selinux*.sh" -o -name "*selinux*.patch" \) -exec echo ">>> 文件: {}" \; -exec cat {} \; || true
+
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
