@@ -240,7 +240,7 @@ jobs:
               fi
           }
           
-          # 1. 缝合 fs/exec.c (精准拦截在 bprm->argc 赋值前，完美避开多重 goto)
+          echo "==== 1. 缝合 fs/exec.c (精准拦截，修复假Root与Zygisk瘫痪) ===="
           EXEC_HOOK="
           #ifdef CONFIG_KSU
           {
@@ -253,7 +253,9 @@ jobs:
                   ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
           }
           #endif"
-          patch_file "fs/exec.c" "bprm->argc = count(argv, MAX_ARG_STRINGS);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
+          
+          # 🚨 终极换位：必须在内核尝试打开文件 (do_open_execat) 之前强行截胡！
+          patch_file "fs/exec.c" "bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
 
           # 2. 缝合 fs/open.c (拦截在 faccessat 中)
           OPEN_HOOK="
