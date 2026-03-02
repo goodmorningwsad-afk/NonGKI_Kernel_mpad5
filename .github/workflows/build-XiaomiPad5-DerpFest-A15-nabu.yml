@@ -421,20 +421,12 @@ jobs:
           
           echo "✅ 模块挂载核心注射器 (sys_read) 缝合完毕！"
 
-          echo "==== 查抄 execve 拦截探头 ===="
-           grep -rnA 5 -B 5 "ksu_handle_execve" fs/exec.c 
-
-           echo "==== 查抄 devpts 终端探头（哑巴刺客） ===="
-           grep -rnA 5 -B 5 "ksu_handle_devpts" fs/devpts/inode.c 
-
-           echo "==== 斩杀 -dirty 强迫症尾巴 ===="
-          # 🚨 物理阉割 setlocalversion 脚本，让它永远吐不出 dirty 这个词
+          echo "==== 斩杀 -dirty 强迫症尾巴 ===="
+          # 🚨 仅精准阉割 setlocalversion 脚本中的 dirty 字符串，绝对不碰 Git 哈希！
           sed -i 's/-dirty//g' scripts/setlocalversion
           
-          # 备用保险（有些老内核的 Makefile 里还会检查 .scmversion）
-          echo "" > .scmversion
-          echo "✅ 纯净内核版本号伪装完毕！"
-
+          echo "✅ 纯净内核版本号 (保留 Hash) 伪装完毕！"
+          
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
           cd $GITHUB_WORKSPACE
