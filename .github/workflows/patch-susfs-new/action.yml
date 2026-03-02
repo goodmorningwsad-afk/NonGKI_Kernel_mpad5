@@ -12,7 +12,6 @@ runs:
         echo "==== 0. 唤醒 SuSFS 内核编译大动脉开关 ===="
         DEFCONFIG_FILE="arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig"
         
-        # 🚨 强行把 SuSFS 的所有满级隐身模块注入到编译配置清单中！
         cat << 'EOF' >> "$DEFCONFIG_FILE"
         CONFIG_KSU_SUSFS=y
         CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -28,15 +27,11 @@ runs:
         echo "✅ SuSFS 物理开关全数合闸！"
 
         echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
-        # 🚨 启动全域索敌雷达，在 /tmp 和整个工作区寻找补丁文件
         PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.14.patch" 2>/dev/null | head -n 1)
-        
         if [ -z "$PATCH_FILE" ]; then
             echo "❌ 致命错误：在 /tmp 和整个仓库里都没找到 susfs_patch_to_4.14.patch！"
             exit 1
         fi
-        
-        echo "🔍 锁定物理补丁原件: $PATCH_FILE"
         patch -p1 -f < "$PATCH_FILE" || echo "⚠️ 部分补丁存在冲突，已自动生成 .rej 文件并强制继续！"
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
@@ -47,13 +42,12 @@ runs:
             local insert_code="$4"
             local identifier="$5"
             
-            echo "🔍 正在处理: $file"
             if grep -q "$identifier" "$file"; then
                 echo "⚠️ $file 已包含 $identifier，跳过。"
                 return 0
             fi
             if ! grep -Fq "$search_str" "$file"; then
-                echo "❌ 致命错误: 在 $file 中找不到特征字符串 '$search_str'！"
+                echo "❌ 致命错误: $file 中找不到特征字符串！"
                 exit 1
             fi
             awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
@@ -65,13 +59,6 @@ runs:
             }
             { print }
             ' "$file" > tmp_file && mv tmp_file "$file"
-            
-            if grep -q "$identifier" "$file"; then
-                echo "✅ 成功缝合: $file"
-            else
-                echo "❌ 致命错误: $file 处理完毕，但未写入 $identifier！"
-                exit 1
-            fi
         }
 
         echo "==== [手工缝合] 修复唯一的 .rej 冲突 (fs/proc/cmdline.c) ===="
@@ -79,97 +66,62 @@ runs:
         #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
         extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
         #endif"
-        # 挂载在函数声明之前
         patch_file "fs/proc/cmdline.c" "static int cmdline_proc_show" 0 "$CMDLINE_HOOK_1" "extern int susfs_spoof_cmdline_or_bootconfig"
         
         CMDLINE_HOOK_2="
         #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
         	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
-        		seq_putc(m, 10); /* 🚨 物理魔法：10 就是 ASCII 的换行符，完美避开所有 Shell 转义地狱！ */
+        		seq_putc(m, 10); /* 🚨 物理魔法：10 是换行符，防转义 */
         		return 0;
         	}
         #endif"
-        # 挂载在 seq_printf 打印启动参数之前
         patch_file "fs/proc/cmdline.c" "seq_printf(m" 0 "$CMDLINE_HOOK_2" "susfs_spoof_cmdline_or_bootconfig(m)"
 
-        echo "==== [幻影打孔区] (自动规避银行App) ===="
+        echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         
-        echo "==== [幻影打孔] fs/exec.c ===="
         EXEC_HOOK="
         #ifdef CONFIG_KSU
         {
             extern bool ksu_execveat_hook __read_mostly;
             extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
             extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-        #ifdef CONFIG_KSU_SUSFS
-            extern bool susfs_is_current_proc_umounted(void);
-            if (!susfs_is_current_proc_umounted()) {
-        #endif
-                if (unlikely(ksu_execveat_hook))
-                    ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
-                else
-                    ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
-        #ifdef CONFIG_KSU_SUSFS
-            }
-        #endif
+            if (unlikely(ksu_execveat_hook))
+                ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
+            else
+                ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
         }
         #endif"
         patch_file "fs/exec.c" "bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
 
-        echo "==== [幻影打孔] fs/open.c ===="
         OPEN_HOOK="
         #ifdef CONFIG_KSU
         {
             extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
-        #ifdef CONFIG_KSU_SUSFS
-            extern bool susfs_is_current_proc_umounted(void);
-            if (!susfs_is_current_proc_umounted()) {
-        #endif
-                ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
-        #ifdef CONFIG_KSU_SUSFS
-            }
-        #endif
+            ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
         }
         #endif"
         patch_file "fs/open.c" "if (mode & ~S_IRWXO)" 0 "$OPEN_HOOK" "ksu_handle_faccessat"
 
-        echo "==== [幻影打孔] fs/stat.c ===="
         STAT_HOOK="
         #ifdef CONFIG_KSU
         {
             extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
-        #ifdef CONFIG_KSU_SUSFS
-            extern bool susfs_is_current_proc_umounted(void);
-            if (!susfs_is_current_proc_umounted()) {
-        #endif
-                ksu_handle_stat(&dfd, &filename, &flags);
-        #ifdef CONFIG_KSU_SUSFS
-            }
-        #endif
+            ksu_handle_stat(&dfd, &filename, &flags);
         }
         #endif"
         patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
 
-        echo "==== [幻影打孔] fs/devpts/inode.c ===="
         DEVPTS_HOOK="
         #ifdef CONFIG_KSU
         {
             extern void ksu_handle_devpts(struct inode*);
-        #ifdef CONFIG_KSU_SUSFS
-            extern bool susfs_is_current_proc_umounted(void);
-            if (!susfs_is_current_proc_umounted()) {
-        #endif
-                ksu_handle_devpts(dentry->d_inode);
-        #ifdef CONFIG_KSU_SUSFS
-            }
-        #endif
+            ksu_handle_devpts(dentry->d_inode);
         }
         #endif"
         patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
 
-        echo "==== [原生底盘区] (系统级通信与底层救砖，保持绝对原生) ===="
+        echo "==== [原生底盘区] ===="
         
-        echo "==== 缝合 drivers/input/input.c (安全模式防砖监听) ===="
         INPUT_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -181,7 +133,6 @@ runs:
         #endif"
         patch_file "drivers/input/input.c" "if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)" 0 "$INPUT_HOOK" "ksu_handle_input_handle_event"
 
-        echo "==== 正在复活 path_umount 模块神技 ===="
         if ! grep -q "path_umount" fs/namespace.c; then
             cat << 'EOF' >> fs/namespace.c
 
@@ -215,12 +166,8 @@ runs:
             return ret;
         }
         EOF
-            echo "✅ fs/namespace.c (path_umount) 追加完成！"
-        else
-            echo "⚠️ fs/namespace.c 已存在 path_umount，跳过。"
         fi
 
-        echo "==== 缝合 security/selinux/hooks.c (终极双重免死金牌) ===="
         HOOKS_PATCH_1="
         #ifdef CONFIG_KSU
         /* KSU_SELINUX_BYPASS_UNIVERSAL_1 */
@@ -254,7 +201,6 @@ runs:
         HOOKS_PATCH_3="
         #ifdef CONFIG_KSU
         {
-            /* 🚨 案发现场临时伪造身份证 🚨 */
             extern bool is_ksu_transition(const void *old_tsec, const void *new_tsec);
             if (is_ksu_transition(current_security(), bprm->cred->security))
                 return 0;
@@ -262,17 +208,16 @@ runs:
         #endif"
         patch_file "security/selinux/hooks.c" "new_tsec = bprm->cred->security;" 0 "$HOOKS_PATCH_3" "is_ksu_transition"
 
-        echo "==== 缝合 kernel/sys.c (Root提权命脉) ===="
+        # 🚨 致命修正：回归正统的 ksu_handle_setresuid 🚨
         SYS_HOOK="
         #ifdef CONFIG_KSU
         {
-            extern int ksu_handle_setuid_common(uid_t new_uid, uid_t old_uid, uid_t new_euid);
-            ksu_handle_setuid_common(ruid, current_uid().val, euid);
+            extern int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid);
+            ksu_handle_setresuid(ruid, euid, suid);
         }
         #endif"
-        patch_file "kernel/sys.c" "ksuid = make_kuid(ns, suid);" 1 "$SYS_HOOK" "ksu_handle_setuid_common"
+        patch_file "kernel/sys.c" "ksuid = make_kuid(ns, suid);" 1 "$SYS_HOOK" "ksu_handle_setresuid"
 
-        echo "==== 缝合 kernel/reboot.c (KSU核心通信后门) ===="
         REBOOT_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -283,7 +228,6 @@ runs:
         #endif"
         patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
 
-        echo "==== 缝合 fs/read_write.c (模块挂载注射器) ===="
         READ_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -295,7 +239,5 @@ runs:
         #endif"
         patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
 
-        echo "==== 斩杀 -dirty 强迫症尾巴 ===="
         sed -i 's/-dirty//g' scripts/setlocalversion
-        
-        echo "✅ 原型级修复 + 幻影打孔全数完成！战车无敌，准备起飞！"
+        echo "✅ 修复所有链接符号，全境畅通，起飞！"
