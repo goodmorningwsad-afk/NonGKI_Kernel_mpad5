@@ -10,9 +10,12 @@ runs:
         cd $GITHUB_WORKSPACE/device_kernel
         
         echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
-        # 🚨 如果你的路径不同，请自行修改下面的 patch 路径
-        # patch -p1 < ../Official_Patches/Patch/susfs_patch_to_4.14.patch || true
-        echo "✅ SuSFS 核心 VFS 欺骗逻辑已就位！"
+        # 🚨 使用 -f 强制模式，遇到冲突自动生成 .rej 并继续
+        patch -p1 -f < ../Official_Patches/Patch/susfs_patch_to_4.14.patch || echo "⚠️ 部分补丁存在冲突，已自动生成 .rej 文件并强制继续！"
+        
+        echo "==== 🔍 法医级勘验：查抄所有失败的 .rej 冲突原件 ===="
+        find . -name "*.rej" -print || true
+        echo "✅ SuSFS 核心 VFS 欺骗逻辑注入完毕（含部分冲突标记）！"
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
