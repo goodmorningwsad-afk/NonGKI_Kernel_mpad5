@@ -399,8 +399,8 @@ jobs:
           }
           #endif"
           
-          # 定位 sys.c 中的 SYSCALL_DEFINE5(prctl... 函数开头进行打孔
-          patch_file "kernel/sys.c" "SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3, unsigned long, arg4, unsigned long, arg5)" 2 "$PRCTL_HOOK" "ksu_handle_prctl"
+          # 🚨使用绝对单行的 security_task_prctl 作为特征码，偏移量设为 0（精准插在它正上方）
+          patch_file "kernel/sys.c" "error = security_task_prctl(option, arg2, arg3, arg4, arg5);" 0 "$PRCTL_HOOK" "ksu_handle_prctl"
           
           echo "✅ Root 授权基站 (prctl) 缝合完毕！"
            
