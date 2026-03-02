@@ -8,6 +8,24 @@ runs:
       shell: bash
       run: |
         cd $GITHUB_WORKSPACE/device_kernel
+
+        echo "==== 0. 唤醒 SuSFS 内核编译大动脉开关 ===="
+        DEFCONFIG_FILE="arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig"
+        
+        # 🚨 强行把 SuSFS 的所有满级隐身模块注入到编译配置清单中！
+        cat << 'EOF' >> "$DEFCONFIG_FILE"
+        CONFIG_KSU_SUSFS=y
+        CONFIG_KSU_SUSFS_SUS_PATH=y
+        CONFIG_KSU_SUSFS_SUS_MOUNT=y
+        CONFIG_KSU_SUSFS_SUS_KSTAT=y
+        CONFIG_KSU_SUSFS_SUS_MAP=y
+        CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+        CONFIG_KSU_SUSFS_ENABLE_LOG=y
+        CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+        CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+        CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+        EOF
+        echo "✅ SuSFS 物理开关全数合闸！"
         
         echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
         # 🚨 直接去 build-ready 下载的老巢 /tmp 临时目录里拿图纸！
