@@ -26,25 +26,6 @@ runs:
         CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
         EOF
         echo "✅ SuSFS 物理开关全数合闸！"
-        
-        echo "==== [手工缝合] 修复唯一的 .rej 冲突 (fs/proc/cmdline.c) ===="
-        
-        CMDLINE_HOOK_1="
-        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-        extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
-        #endif"
-        # 挂载在函数声明之前
-        patch_file "fs/proc/cmdline.c" "static int cmdline_proc_show" 0 "$CMDLINE_HOOK_1" "extern int susfs_spoof_cmdline_or_bootconfig"
-        
-        CMDLINE_HOOK_2="
-        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-        	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
-        		seq_putc(m, 10); /* 🚨 物理魔法：10 就是 ASCII 的换行符，完美避开所有 Shell 转义地狱！ */
-        		return 0;
-        	}
-        #endif"
-        # 挂载在 seq_printf 打印启动参数之前
-        patch_file "fs/proc/cmdline.c" "seq_printf(m" 0 "$CMDLINE_HOOK_2" "susfs_spoof_cmdline_or_bootconfig(m)"文件并强制继续！"
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
@@ -104,6 +85,25 @@ runs:
         }
         #endif"
         patch_file "fs/exec.c" "bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
+
+        echo "==== [手工缝合] 修复唯一的 .rej 冲突 (fs/proc/cmdline.c) ===="
+        
+        CMDLINE_HOOK_1="
+        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+        extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
+        #endif"
+        # 挂载在函数声明之前
+        patch_file "fs/proc/cmdline.c" "static int cmdline_proc_show" 0 "$CMDLINE_HOOK_1" "extern int susfs_spoof_cmdline_or_bootconfig"
+        
+        CMDLINE_HOOK_2="
+        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+        	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
+        		seq_putc(m, 10); /* 🚨 物理魔法：10 就是 ASCII 的换行符，完美避开所有 Shell 转义地狱！ */
+        		return 0;
+        	}
+        #endif"
+        # 挂载在 seq_printf 打印启动参数之前
+        patch_file "fs/proc/cmdline.c" "seq_printf(m" 0 "$CMDLINE_HOOK_2" "susfs_spoof_cmdline_or_bootconfig(m)"文件并强制继续！"
 
         echo "==== [幻影打孔] fs/open.c ===="
         OPEN_HOOK="
