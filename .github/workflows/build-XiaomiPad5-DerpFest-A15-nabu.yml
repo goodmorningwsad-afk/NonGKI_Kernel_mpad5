@@ -1,4 +1,4 @@
-name: Build Xiaomi Pad 5 (nabu) (DerpFest A15)
+name: Build Xiaomi Pad 5 (nabu) (DerpFest A15) 
 
 on:
   workflow_call:
