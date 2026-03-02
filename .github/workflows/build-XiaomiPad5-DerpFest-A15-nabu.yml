@@ -431,10 +431,30 @@ jobs:
           echo "✅ 模块挂载核心注射器 (sys_read) 缝合完毕！"
 
           echo "==== 查抄 execve 拦截探头 ===="
-           grep -rnA 5 -B 5 "ksu_handle_execve" fs/exec.c || true
+           grep -rnA 5 -B 5 "ksu_handle_execve" fs/exec.c 
 
            echo "==== 查抄 devpts 终端探头（哑巴刺客） ===="
-           grep -rnA 5 -B 5 "ksu_handle_devpts" fs/devpts/inode.c || true
+           grep -rnA 5 -B 5 "ksu_handle_devpts" fs/devpts/inode.c 
+
+           echo "==== 13. 缝合 security/selinux/hooks.c (system_server 物理免死金牌) ===="
+          
+          SYSTEM_SERVER_HOOK="
+          #ifdef CONFIG_KSU
+          {
+              /* 🚨 物理放行 system_server，彻底摧毁 Android 15 的 SELinux 阻击 🚨 */
+              if (unlikely(!strncmp(current->comm, \"system_server\", 13))) {
+                  return 0;
+              }
+          }
+          #endif"
+          
+          # 📍 第一针：打在 inode 权限审查入口 (偏移量设为 2，正好插在大括号和变量声明之后)
+          patch_file "security/selinux/hooks.c" "static int selinux_inode_permission(struct inode *inode, int mask)" 2 "$SYSTEM_SERVER_HOOK" "system_server_bypass_inode"
+          
+          # 📍 第二针：打在 file 权限审查入口
+          patch_file "security/selinux/hooks.c" "static int selinux_file_permission(struct file *file, int mask)" 2 "$SYSTEM_SERVER_HOOK" "system_server_bypass_file"
+          
+          echo "✅ system_server 上帝模式 (SELinux 豁免) 缝合完毕！"
 
            
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
