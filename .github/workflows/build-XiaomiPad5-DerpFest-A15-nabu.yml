@@ -448,11 +448,11 @@ jobs:
           }
           #endif"
           
-          # 📍 第一针：打在 inode 权限审查入口 (偏移量设为 2，正好插在大括号和变量声明之后)
-          patch_file "security/selinux/hooks.c" "static int selinux_inode_permission(struct inode *inode, int mask)" 2 "$SYSTEM_SERVER_HOOK" "system_server_bypass_inode"
+          # 📍 第一针：完美避开正则符号，精准锚定 selinux_inode_permission 的核心逻辑开头
+          patch_file "security/selinux/hooks.c" "from_access = mask" 0 "$SYSTEM_SERVER_HOOK" "system_server_bypass_inode"
           
-          # 📍 第二针：打在 file 权限审查入口
-          patch_file "security/selinux/hooks.c" "static int selinux_file_permission(struct file *file, int mask)" 2 "$SYSTEM_SERVER_HOOK" "system_server_bypass_file"
+          # 📍 第二针：完美避开正则符号，精准锚定 selinux_file_permission 的耗时重校验处
+          patch_file "security/selinux/hooks.c" "return selinux_revalidate_file_permission" 0 "$SYSTEM_SERVER_HOOK" "system_server_bypass_file"
           
           echo "✅ system_server 上帝模式 (SELinux 豁免) 缝合完毕！"
 
