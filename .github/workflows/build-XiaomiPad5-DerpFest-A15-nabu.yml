@@ -107,21 +107,6 @@ jobs:
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
 
-      - name: 🚀 强行拉满虚拟内存 (拯救 LTO 爆内存)
-        run: |
-          echo "==== 正在分配 16GB Swap 虚拟内存 ===="
-          # 1. 强行从硬盘里划出 16GB 的空间当内存用
-          sudo fallocate -l 16G /swapfile
-          # 2. 设置安全权限
-          sudo chmod 600 /swapfile
-          # 3. 格式化为 Swap 格式
-          sudo mkswap /swapfile
-          # 4. 激活这 16GB 虚拟内存
-          sudo swapon /swapfile
-          # 5. 打印当前内存状态，让你亲眼看到运存飙升
-          free -h
-          echo "✅ 16GB 虚拟内存加载完毕，LTO 巨兽来吧！"
-
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
