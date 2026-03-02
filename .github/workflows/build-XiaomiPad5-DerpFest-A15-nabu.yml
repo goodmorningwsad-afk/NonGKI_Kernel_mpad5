@@ -371,6 +371,20 @@ jobs:
           patch_file "kernel/sys.c" "if ((ruid != (uid_t) -1) && !uid_valid(kruid))" 0 "$SYS_HOOK" "ksu_handle_setresuid"
           
           echo "✅  (sys.c) 缝合完毕！"
+
+          echo "==== 10. 缝合 security/selinux/hooks.c (bprm_committing_creds 终极域转换) ===="
+          HOOKS_PATCH_3="
+          #ifdef CONFIG_KSU
+          {
+              /* 🚨 案发现场临时伪造身份证 🚨 */
+              extern bool is_ksu_transition(const void *old_tsec, const void *new_tsec);
+              if (is_ksu_transition(current_security(), bprm->cred->security))
+                  return;
+          }
+          #endif"
+          patch_file "security/selinux/hooks.c" "new_tsec = bprm->cred->security;" 0 "$HOOKS_PATCH_3" "is_ksu_transition"
+          
+          echo "✅ SELinux 终极域转换 (is_ksu_transition) 缝合完毕！"
            
       - name: 📤 提取并打包已打孔的源码 (用于人工审查)
         run: |
