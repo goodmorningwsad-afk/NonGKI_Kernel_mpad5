@@ -364,12 +364,13 @@ jobs:
           SYS_HOOK="
           #ifdef CONFIG_KSU
           {
-              extern int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid);
-              ksu_handle_setresuid(ruid, euid, suid);
+              /* 🚨 终极置换：呼叫老内核专属的替身使者 🚨 */
+              extern int ksu_handle_setuid_common(uid_t new_uid, uid_t old_uid, uid_t new_euid);
+              ksu_handle_setuid_common(ruid, current_uid().val, euid);
           }
           #endif"
-          # 🚨 终极换弹：使用全文件唯一特征码 ksuid = make_kuid... 绝对不会误伤！
-          patch_file "kernel/sys.c" "ksuid = make_kuid(ns, suid);" 1 "$SYS_HOOK" "ksu_handle_setresuid"
+          # 依然使用我们上回合锁定的全文件唯一特征码
+          patch_file "kernel/sys.c" "ksuid = make_kuid(ns, suid);" 1 "$SYS_HOOK" "ksu_handle_setuid_common"
           
           echo "✅ 核心提权与注入雷达 (sys.c) 缝合完毕！"
 
