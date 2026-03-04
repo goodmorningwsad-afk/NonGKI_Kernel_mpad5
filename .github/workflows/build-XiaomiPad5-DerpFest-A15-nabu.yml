@@ -113,24 +113,6 @@ jobs:
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
-      - name: 📦 提取 SukiSU 底层源码寻找真名
-        run: |
-          cd $GITHUB_WORKSPACE
-          echo "==== 正在查抄 SukiSU 底层核心寻找隐藏函数 ===="
-          mkdir -p SukiSU_Source
-          
-          # 直接把整个 kernelsu 驱动文件夹端出来
-          cp -r device_kernel/drivers/kernelsu/* SukiSU_Source/ || echo "❌ 未找到 SukiSU 源码"
-          
-          cd SukiSU_Source
-          zip -r ../SukiSU_Source.zip .
-          
-      - name: 📤 上传 SukiSU 源码
-        uses: actions/upload-artifact@v4
-        with:
-          name: SukiSU_Source
-          path: SukiSU_Source.zip
-
       - name: 📦 提取核心源码进行验证 (包含 hooks.c)
         run: |
           cd $GITHUB_WORKSPACE
@@ -292,6 +274,24 @@ jobs:
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
+
+      - name: 📦 提取 SukiSU 底层源码寻找真名
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 正在查抄 SukiSU 底层核心寻找隐藏函数 ===="
+          mkdir -p SukiSU_Source
+          
+          # 直接把整个 kernelsu 驱动文件夹端出来
+          cp -r device_kernel/drivers/kernelsu/* SukiSU_Source/ || echo "❌ 未找到 SukiSU 源码"
+          
+          cd SukiSU_Source
+          zip -r ../SukiSU_Source.zip .
+          
+      - name: 📤 上传 SukiSU 源码
+        uses: actions/upload-artifact@v4
+        with:
+          name: SukiSU_Source
+          path: SukiSU_Source.zip
 
       - name: 🔒 Patch Kernel of Baseband Guard
         uses: ./.github/workflows/patch-baseband-guard
