@@ -169,7 +169,7 @@ jobs:
           # 只替换 300 行以后的 cred！绝不误伤上半部分合法的 cred 变量！
           sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
           
-          # 2. 彻底铲除被淘汰的旧版 API，防止 IOCTL 撞车导致 App 列表显示为 0
+          # 2. 铲除被淘汰的旧版 API，防止 IOCTL 导致 App 列表显示为 0
           sed -i '/KSU_IOCTL(GET_ALLOW_LIST/,+1d' drivers/kernelsu/supercalls.c
           sed -i '/KSU_IOCTL(GET_DENY_LIST/,+1d' drivers/kernelsu/supercalls.c
           # 修复新版 API 的双重套娃
