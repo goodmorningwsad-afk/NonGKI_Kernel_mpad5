@@ -176,15 +176,15 @@ jobs:
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
 
-      - name: Backtrack & Clean Dirty KSU Hooks (法医级回溯净化)
+      - name: Force Short-Circuit Dirty Hooks (法医级单行物理破锁)
         run: |
-          echo "[+] 开始执行底层源码净化：清除 read_write.c 中的旧版 init.rc 锁..."
-          perl -0777 -pi -e 's/#ifdef CONFIG_KSU\s*\{\s*extern bool ksu_init_rc_hook.*?\n\s*\}\n#endif/#ifdef CONFIG_KSU\n{\n    extern void ksu_handle_sys_read(unsigned int fd);\n    ksu_handle_sys_read(fd);\n}\n#endif/gs' fs/read_write.c
-
-          echo "[+] 开始执行底层源码净化：清除 exec.c 中的旧版 sucompat 锁..."
-          perl -0777 -pi -e 's/#ifdef CONFIG_KSU\s*\{\s*extern bool ksu_execveat_hook.*?\n\s*\}\n#endif/#ifdef CONFIG_KSU\n{\n    extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\n    ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);\n}\n#endif/gs' fs/exec.c
-
-          echo "[+] 净化完成！旧时代枷锁已彻底物理粉碎！"
+         echo "[+] 正在强行短接 read_write.c 开机触发锁..."
+         sed -i 's/if (unlikely(ksu_init_rc_hook))/if (1)/g' fs/read_write.c
+        
+         echo "[+] 正在强行短接 exec.c 守护进程注入锁..."
+         sed -i 's/if (unlikely(ksu_execveat_hook))/if (1)/g' fs/exec.c
+        
+         echo "[+] 破锁完成！底层通道已强行通电！"
           
       - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
         run: |
