@@ -169,10 +169,9 @@ jobs:
           # 只替换 300 行以后的 cred！绝不误伤上半部分合法的 cred 变量！
           sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
           
-          # 2. 修复 supercalls.c 的宏定义套娃与链接报错
-          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
-          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
-          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
+          # 2. 修复 supercalls.c 旧版 API 残留导致的未声明报错 (暴力接驳 NEW_API)
+          sed -i 's/KSU_IOCTL(GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i 's/KSU_IOCTL(GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
           
           # 3. 屏蔽内核中烦人的无用函数警告
           echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
