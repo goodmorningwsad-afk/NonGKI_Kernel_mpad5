@@ -1,18 +1,44 @@
-name: 'Patch ReKernel for Kernel.'
+name: 'Hardcore Patch ReKernel'
+description: 'Manually inject ReKernel with strict forensic validation'
 
 runs:
   using: 'composite'
   steps:
-      - name: Patch ReKernel
-        if: env.REKERNEL_ENABLE == 'true'
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel/
-          cp /tmp/Patches/Rekernel/rekernel_patches.sh ./
-          bash rekernel_patches.sh
-
-          mkdir -p drivers/rekernel
-          cp /tmp/Patches/Rekernel/rekernel_extra.patch ./
-          patch -p1 < rekernel_extra.patch || true
-
-          echo "Patched Re:Kernel for your kernel successfully."
+    - name: 🧰 注入 Re:Kernel 
+      if: env.REKERNEL_ENABLE == 'true'
+      shell: bash
+      run: |
+        cd $GITHUB_WORKSPACE/device_kernel/
+        
+        echo "==== 1. 建立通信基站 (rekernel.h) ===="
+        mkdir -p drivers/rekernel
+        cp /tmp/Patches/Rekernel/rekernel_extra.patch ./
+        patch -p1 < rekernel_extra.patch || { echo "❌ 建立基站失败！"; exit 1; }
+        
+        echo "==== 2. 召唤手术刀并执行强制注射 ===="
+        cp /tmp/Patches/Rekernel/rekernel_patches.sh ./
+        chmod +x rekernel_patches.sh
+        # 运行脚本（撕掉 || true 伪装，暴露真实错误）
+        bash rekernel_patches.sh
+        
+        echo "==== 3. 打孔校验  ===="
+        
+        grep -q "REKERNEL" drivers/android/binder.c || {
+          echo "❌ 致命错误：drivers/android/binder.c 注入失败！源码结构不匹配！";
+          exit 1;
+        }
+        echo "✅ binder.c 注入成功！"
+        
+        grep -q "REKERNEL" drivers/android/binder_alloc.c || {
+          echo "❌ 致命错误：drivers/android/binder_alloc.c 注入失败！结构不匹配！";
+          exit 1;
+        }
+        echo "✅ binder_alloc.c 神经元注入成功！"
+        
+        grep -q "REKERNEL" kernel/signal.c || {
+          echo "❌ 致命错误：kernel/signal.c 注入失败！源码结构不匹配！";
+          exit 1;
+        }
+        echo "✅ signal.c 神经元注入成功！"
+        
+        echo "🎉 Re:Kernel 全量核心黑魔法已完美焊死在系统底层！"
