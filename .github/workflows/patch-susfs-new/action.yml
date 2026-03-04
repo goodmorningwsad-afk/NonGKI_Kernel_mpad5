@@ -241,3 +241,10 @@ runs:
 
         sed -i 's/-dirty//g' scripts/setlocalversion
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
+        echo "==== [法医级修复] 强行补全 apk_sign.c 缺失的 Manager 签名 ===="
+        sed -i '/{ EXPECTED_SIZE_SHIRKNEKO, EXPECTED_HASH_SHIRKNEKO }, \/\/ SukiSU/a \
+        { EXPECTED_SIZE_NEKO, EXPECTED_HASH_NEKO }, \/\/ Neko\n\
+        { EXPECTED_SIZE_OFFICIAL, EXPECTED_HASH_OFFICIAL }, \/\/ Official\n\
+        { EXPECTED_SIZE_RSUNTK, EXPECTED_HASH_RSUNTK }, \/\/ rsuntk\n\
+        { EXPECTED_SIZE_5EC1CFF, EXPECTED_HASH_5EC1CFF }, \/\/ 5ec1cff\n\
+        { EXPECTED_SIZE_KOWX712, EXPECTED_HASH_KOWX712 }, \/\/ KOWX712' fs/apk_sign.c
