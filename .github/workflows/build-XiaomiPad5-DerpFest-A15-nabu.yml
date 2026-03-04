@@ -270,6 +270,24 @@ jobs:
           path: Rej_Files.zip
           if-no-files-found: ignore
 
+      - name: 📤 窃取 ReKernel 原始补丁及脚本
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 正在突袭 /tmp/ 目录，提取 ReKernel 原始作案工具 ===="
+          mkdir -p Extracted_ReKernel
+          
+          # 直接把整个 Rekernel 文件夹端出来
+          cp -r /tmp/Patches/Rekernel/* Extracted_ReKernel/ || echo "❌ 未找到 /tmp/Patches/Rekernel"
+          
+          cd Extracted_ReKernel
+          zip -r ../ReKernel_Original_Files.zip .
+
+      - name: 📦 上传 ReKernel 原始补丁至云端
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReKernel_Original_Files
+          path: ReKernel_Original_Files.zip
+
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
 
