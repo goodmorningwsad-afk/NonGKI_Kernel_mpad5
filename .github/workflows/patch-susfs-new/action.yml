@@ -251,3 +251,13 @@ runs:
         { EXPECTED_SIZE_KOWX712, EXPECTED_HASH_KOWX712 }, \/\/ KOWX712' drivers/kernelsu/apk_sign.c
         
         echo "✅ 签名阵列强行扩容完成！万能通行证已下发！"
+
+        echo "==== [法医级修复] 物理斩首 V1/V3 签名校验拦路虎 ===="
+        
+        # 1. 瘫痪 V1 签名刺客 (强行把 if (has_v1_signing) 改为永远为假的 if (0))
+        sed -i 's/if (has_v1_signing)/if (0)/g' drivers/kernelsu/apk_sign.c
+        
+        # 2. 瘫痪 V3 签名刺客 (强行把 if (v3...) 改为永远为假的 if (0))
+        sed -i 's/if (v3_signing_exist || v3_1_signing_exist)/if (0)/g' drivers/kernelsu/apk_sign.c
+        
+        echo "✅ 安检处刺客已全部阵亡！Manager 身份验证将畅通无阻！"
