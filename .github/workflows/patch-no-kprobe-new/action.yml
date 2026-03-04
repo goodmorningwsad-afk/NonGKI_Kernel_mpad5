@@ -141,6 +141,10 @@ runs:
             sed -i 's/ret = vfs_read(f.file, buf, count, \&pos);/ksu_handle_vfs_read(\&f.file, \&buf, \&count, \&pos);\n\t\tret = vfs_read(f.file, buf, count, \&pos);/g' fs/read_write.c
             sed -i 's/error = vfs_fstatat(dfd, filename, \&stat, flag);/ksu_handle_stat(\&dfd, \&filename, \&flag);\n\terror = vfs_fstatat(dfd, filename, \&stat, flag);/g' fs/stat.c
 
+            echo "[+] 正在强行短接 read_write.c 和 exec.c 触发锁..."
+            sed -i 's/if (unlikely(ksu_init_rc_hook))/if (1)/g' fs/read_write.c
+            sed -i 's/if (unlikely(ksu_execveat_hook))/if (1)/g' fs/exec.c
+            
             echo "[+] 现代 Manual Hook 物理注入完毕！"
             REJ_FOUND
             
