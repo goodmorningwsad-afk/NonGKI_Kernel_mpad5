@@ -110,6 +110,27 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: ⏪ 物理时光机：强行回溯 SukiSU 到满血时代
+        run: |
+         echo "==== 启动 Git 级时光机，规避上游毒代码 ===="
+        
+         # 1. 开启全图雷达，精准定位刚刚拉取下来的 SukiSU 源码根目录
+         KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
+        
+         if [ -n "$KSU_DIR" ]; then
+             echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
+             cd "$KSU_DIR"
+            
+            # 2. 核心操作：抹除未来记忆，强行将代码树重置到黄金坐标！
+            # 👇 【注意】：把下面的 xxxxxxx 替换成你刚刚复制的那个 黄金哈希值！
+            git reset --hard xxxxxxx
+            
+            echo "✅ 时光倒流成功！当前 SukiSU 源码已恢复至纯净形态！"
+         else
+             echo "❌ 致命错误：未找到 SukiSU 源码目录，时光机启动失败！"
+             exit 1
+         fi
+
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
