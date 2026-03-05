@@ -93,7 +93,7 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 正在执行法医级清创：精准狙击，绝对防乱杀 ===="
           
-          # [原有核心修复：全部绿灯通过，绝对保留]
+          # [原有修复：已验证成功，逐字保留]
           sed -i 's/struct user_namespace \*s_user_ns;/struct user_namespace \*s_user_ns;\n\tint error = 0;/g' fs/namei.c
           sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
           sed -i '1i struct cs_target { const char *name; char *cpus; };' kernel/cgroup/cpuset.c
@@ -117,12 +117,10 @@ jobs:
           sed -i '/EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/d' lib/lz4/lz4_decompress.c
           
           # ==========================================
-          # 👇 [本次精准修正：打扫战场] 👇
           
           echo "==== 7. 修复网络底层协议的 static 声明冲突 (追加 IPv6 修正) ===="
           perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s*static\s*#endif/#ifndef CONFIG_MPTCP\n#endif/g' net/ipv4/tcp_ipv4.c
           perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s*static\s*#endif/#ifndef CONFIG_MPTCP\n#endif/g' net/ipv6/tcp_ipv6.c
-          # [新增] 剔除 IPv6 头部多余的 static 声明，与底部非 static 完美对齐！
           sed -i 's/static const struct inet_connection_sock_af_ops ipv6_mapped;/const struct inet_connection_sock_af_ops ipv6_mapped;/g' net/ipv6/tcp_ipv6.c
           sed -i 's/static const struct inet_connection_sock_af_ops ipv6_specific;/const struct inet_connection_sock_af_ops ipv6_specific;/g' net/ipv6/tcp_ipv6.c
           
@@ -130,10 +128,10 @@ jobs:
           sed -i 's/#define ZSTD_FALLTHROUGH fallthrough/#define ZSTD_FALLTHROUGH __attribute__((__fallthrough__))/g' lib/zstd/common/compiler.h
           
           echo "==== 9. 修复小米屏幕指纹 (FOD) 驱动的缺失变量 (已剔除重复项) ===="
-          # [修正] 去掉了 old_point_id 和 fod_point_released，再也不会报 duplicate 错误了！
           perl -pi -e 's/(int aod_status;)/$1\n\tbool fod_finger_skip;\n\tint fod_down_time;\n\tbool point_id_changed;\n\tint fod_status;\n\tbool finger_in_fod;\n\tint fod_x;\n\tint fod_y;/g' drivers/input/touchscreen/focaltech_touch/focaltech_core.h
           
-          sed -i '1i int fts_fod_reg_write(struct i2c_client *client, u8 reg, u8 value);' drivers/input/touchscreen/focaltech_touch/focaltech_core.c
+          # 🚨 [本次唯一改动]：把函数声明插在 include 语句的正下方，完美解决 u8 无法识别的问题！
+          sed -i '/#include "focaltech_core.h"/a int fts_fod_reg_write(struct i2c_client *client, u8 reg, u8 value);' drivers/input/touchscreen/focaltech_touch/focaltech_core.c
           
           # ==========================================
           
