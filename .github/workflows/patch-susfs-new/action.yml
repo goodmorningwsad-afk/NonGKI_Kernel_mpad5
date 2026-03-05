@@ -24,9 +24,8 @@ runs:
         CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
         CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
         EOF
-        
         echo "✅ SuSFS 物理开关全数合闸！"
-        
+
         echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
         PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.14.patch" 2>/dev/null | head -n 1)
         if [ -z "$PATCH_FILE" ]; then
@@ -34,7 +33,7 @@ runs:
             exit 1
         fi
         patch -p1 -f < "$PATCH_FILE" || echo "⚠️ 部分补丁存在冲突，已自动生成 .rej 文件并强制继续！"
-        
+
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
             local file="$1"
@@ -47,12 +46,10 @@ runs:
                 echo "⚠️ $file 已包含 $identifier，跳过。"
                 return 0
             fi
-            
             if ! grep -Fq "$search_str" "$file"; then
                 echo "❌ 致命错误: $file 中找不到特征字符串！"
                 exit 1
             fi
-            
             awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
             index($0, search) && !done {
                 if (offset == 0) { print code; print; }
@@ -63,7 +60,7 @@ runs:
             { print }
             ' "$file" > tmp_file && mv tmp_file "$file"
         }
-        
+
         echo "==== [手工缝合] 修复唯一的 .rej 冲突 (fs/proc/cmdline.c) ===="
         CMDLINE_HOOK_1="
         #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
@@ -79,7 +76,7 @@ runs:
         	}
         #endif"
         patch_file "fs/proc/cmdline.c" "seq_printf(m" 0 "$CMDLINE_HOOK_2" "susfs_spoof_cmdline_or_bootconfig(m)"
-        
+
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         
         EXEC_HOOK="
@@ -95,7 +92,7 @@ runs:
         }
         #endif"
         patch_file "fs/exec.c" "bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
-        
+
         OPEN_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -104,7 +101,7 @@ runs:
         }
         #endif"
         patch_file "fs/open.c" "if (mode & ~S_IRWXO)" 0 "$OPEN_HOOK" "ksu_handle_faccessat"
-        
+
         STAT_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -113,7 +110,7 @@ runs:
         }
         #endif"
         patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
-        
+
         DEVPTS_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -122,7 +119,7 @@ runs:
         }
         #endif"
         patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
-        
+
         echo "==== [原生底盘区] ===="
         
         INPUT_HOOK="
@@ -135,10 +132,10 @@ runs:
         }
         #endif"
         patch_file "drivers/input/input.c" "if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)" 0 "$INPUT_HOOK" "ksu_handle_input_handle_event"
-        
+
         if ! grep -q "path_umount" fs/namespace.c; then
             cat << 'EOF' >> fs/namespace.c
-        
+
         static int can_umount(const struct path *path, int flags)
         {
             struct mount *mnt = real_mount(path->mnt);
@@ -156,7 +153,7 @@ runs:
                 return -EPERM;
             return 0;
         }
-        
+
         int path_umount(struct path *path, int flags)
         {
             struct mount *mnt = real_mount(path->mnt);
@@ -170,7 +167,7 @@ runs:
         }
         EOF
         fi
-        
+
         HOOKS_PATCH_1="
         #ifdef CONFIG_KSU
         /* KSU_SELINUX_BYPASS_UNIVERSAL_1 */
@@ -210,7 +207,7 @@ runs:
         }
         #endif"
         patch_file "security/selinux/hooks.c" "new_tsec = bprm->cred->security;" 0 "$HOOKS_PATCH_3" "is_ksu_transition"
-        
+
         # 🚨 致命修正：回归正统的 ksu_handle_setresuid 🚨
         SYS_HOOK="
         #ifdef CONFIG_KSU
@@ -220,7 +217,7 @@ runs:
         }
         #endif"
         patch_file "kernel/sys.c" "ksuid = make_kuid(ns, suid);" 1 "$SYS_HOOK" "ksu_handle_setresuid"
-        
+
         REBOOT_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -230,7 +227,7 @@ runs:
         }
         #endif"
         patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
-        
+
         READ_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -241,6 +238,6 @@ runs:
         }
         #endif"
         patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
-        
+
         sed -i 's/-dirty//g' scripts/setlocalversion
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
