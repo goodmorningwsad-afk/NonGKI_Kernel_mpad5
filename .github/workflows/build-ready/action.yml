@@ -30,7 +30,29 @@ runs:
           echo "KERNEL_VERSION=$KERNEL_VERSION" >> $GITHUB_ENV
           echo "FIRST_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $1}')" >> $GITHUB_ENV
           echo "SECOND_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $2}')" >> $GITHUB_ENV
-      
+
+      - name: 🕵️ 云端法医雷达：全盘扫描脏提交案底
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "==== 📡 雷达 A：标题扫描仪 (全网搜捕 susfs / ksu) ===="
+          # 扫描所有提交标题里带有这些敏感词的案底
+          git log --oneline --grep="susfs\|kernelsu\|ksu" -i || echo "未扫描到匹配标题"
+          echo ""
+          
+          echo "==== 🔬 雷达 B：底层显微镜 (搜捕源码里的 CONFIG_KSU) ===="
+          # 扫描所有在代码里偷偷增加或删除了 CONFIG_KSU 的案底
+          git log --oneline -S "CONFIG_KSU" -i || echo "未扫描到隐蔽代码"
+          echo ""
+          
+          echo "==== 🔪 雷达 C：案发现场监控 (死盯 exec.c 和 stat.c) ===="
+          # 找出所有动过这两个核心大动脉文件的历史记录
+          git log --oneline -- fs/exec.c fs/stat.c || echo "未扫描到文件修改记录"
+          echo ""
+          
+          echo "==== ✅ 扫描完毕！请在上方日志中查看嫌疑提交的哈希值！ ===="
+        
       - name: 🕵️ 校验内核环境 (输出 exec.c 和 stat.c 真实内容)
         shell: bash   # <====== 就是少了这一句救命的代码！
         run: |
