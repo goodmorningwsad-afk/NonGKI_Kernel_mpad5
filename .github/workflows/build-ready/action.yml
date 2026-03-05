@@ -40,18 +40,22 @@ runs:
               echo "----------------------------------------"
               echo "🔍 正在审判: $TITLE ($commit)"
               
-              # 核心排雷逻辑：绝对不能回滚带有 "Revert" 的提交！
               if [[ "$TITLE" == Revert* ]] || [[ "$TITLE" == revert* ]]; then
                   echo "⏭️ 判定为原作者自身的清理操作，安全跳过！"
                   continue
               fi
               
               echo "🔪 尝试安全剥离此提交..."
-              # 尝试调用 Git 底层引擎进行 C 语法级的安全回滚
+              # 尝试安全回滚
               git revert --no-edit $commit || {
-                  echo "⚠️ 发生时空冲突！"
-                  echo "🛡️ 触发防爆盾：自动放弃当前剥离，恢复现场并跳过..."
-                  git revert --abort
+                  echo "⚠️ 发生时空冲突或踩中子模块地雷！"
+                  echo "🛡️ 触发超合金防爆盾 V2：强制吸收爆炸伤害并重置现场..."
+                  
+                  # 🚨 极其关键的 || true：允许 abort 报错，绝不牵连流水线暴毙！
+                  git revert --abort || true
+                  
+                  # 🚨 物理级清场：不管留下什么脏东西，直接强制刷掉，保证下一次回滚干净！
+                  git reset --hard HEAD
               }
           done
           
