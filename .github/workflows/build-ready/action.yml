@@ -12,7 +12,6 @@ runs:
           rm -rf device_kernel
           
           echo "==== 📥 真正拉取源码：深度 150 以获取历史案底 ===="
-          # 🚨 这一句绝对不能删！这是整个内核宇宙的基石！
           git clone --recursive "${{ env.KERNEL_SOURCE }}" -b "${{ env.KERNEL_BRANCH }}" device_kernel --depth=150
           
           # 获取内核版本号的环境变量注入
@@ -26,40 +25,61 @@ runs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
-          echo "==== 1. 物理铲除子模块占位 ===="
+          echo "==== 1. 物理铲除老旧的 KernelSU 肿瘤 ===="
           rm -rf KernelSU kernelsu
           sed -i '/KernelSU/d' .gitmodules || true
           sed -i '/kernelsu/d' drivers/Makefile || true
+          sed -i '/kernelsu/d' drivers/Kconfig || true
           
-          echo "==== 2. 激光烧毁大动脉里的 CONFIG_KSU ===="
-          # 极其精准：从 #ifdef CONFIG_KSU 一直删到下一个 #endif，语法完美保持闭合！
-          sed -i '/#ifdef CONFIG_KSU/,/#endif/d' fs/exec.c fs/stat.c fs/open.c fs/read_write.c fs/namespace.c drivers/input/input.c security/selinux/hooks.c || true
-          sed -i '/#ifdef CONFIG_KSU_SUSFS/,/#endif/d' fs/exec.c fs/stat.c fs/open.c fs/read_write.c fs/namespace.c || true
+          echo "==== 2. 物理铲除老旧的 SuSFS 肿瘤 ===="
+          rm -f fs/susfs.c fs/sus_su.c
+          rm -f include/linux/susfs.h include/linux/susfs_def.h include/linux/sus_su.h
           
-          echo "✅ 无论是哪个年代的脏钩子，现已全部物理蒸发！内核回归绝对纯净！"
+          echo "==== 3. 激光烧毁大动脉里的 CONFIG_KSU 宏定义 ===="
+          # 极其精准：从 #ifdef CONFIG_KSU 一直删到下一个 #endif
+          for file in fs/exec.c fs/stat.c fs/open.c fs/read_write.c fs/namespace.c drivers/input/input.c security/selinux/hooks.c; do
+              if [ -f "$file" ]; then
+                  sed -i '/#ifdef CONFIG_KSU/,/#endif/d' "$file" || true
+                  sed -i '/#ifdef CONFIG_KSU_SUSFS/,/#endif/d' "$file" || true
+              fi
+          done
           
-          # Get Kernel Version
-          KERNEL_VERSION=$(head -n 3 Makefile | grep -E 'VERSION|PATCHLEVEL' | awk '{print $3}' | paste -sd '.')
-          echo "KERNEL_VERSION=$KERNEL_VERSION" >> $GITHUB_ENV
-          echo "FIRST_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $1}')" >> $GITHUB_ENV
-          echo "SECOND_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $2}')" >> $GITHUB_ENV
-        
-      - name: 🕵️ 校验内核环境 (输出 exec.c 和 stat.c 真实内容)
-        shell: bash   # <====== 就是少了这一句救命的代码！
+          echo "✅ 基础清理执行完毕，准备移交核磁共振仪进行深层复查！"
+
+      - name: 🕵️ 法医级全盘扫描：确认内核大动脉已绝对纯净
+        shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
+          echo "==== 🔬 启动全盘核磁共振，搜索任何 KSU/SuSFS 残留 ===="
           
-          echo "======================================================"
-          echo " 正在检查 fs/exec.c 里的 CONFIG_KSU 存留情况："
-          echo "======================================================"
-          grep -n -C 5 "CONFIG_KSU" fs/exec.c || echo " ✅ 报告：fs/exec.c 里没有找到 CONFIG_KSU，非常纯净！"
+          DIRTY=0
           
-          echo ""
-          echo "======================================================"
-          echo " 正在检查 fs/stat.c 里的 CONFIG_KSU 存留情况："
-          echo "======================================================"
-          grep -n -C 5 "CONFIG_KSU" fs/stat.c || echo " ✅ 报告：fs/stat.c 里没有找到 CONFIG_KSU，非常纯净！"
-          echo "======================================================"
+          echo "------------------------------------------------"
+          echo "👉 1. 正在深度扫描 fs/ (文件系统) 目录..."
+          grep -rnE 'CONFIG_KSU|ksu_handle|susfs' fs/ && DIRTY=1 || echo "✅ fs/ 目录极其纯净！"
+          
+          echo "------------------------------------------------"
+          echo "👉 2. 正在深度扫描 security/ (安全拦截) 目录..."
+          grep -rnE 'CONFIG_KSU|ksu_handle|susfs' security/ && DIRTY=1 || echo "✅ security/ 目录极其纯净！"
+          
+          echo "------------------------------------------------"
+          echo "👉 3. 正在深度扫描 include/ (头文件) 目录..."
+          grep -rnE 'CONFIG_KSU|ksu_handle|susfs' include/linux/ && DIRTY=1 || echo "✅ include/ 目录极其纯净！"
+          
+          echo "------------------------------------------------"
+          echo "👉 4. 正在深度扫描 drivers/ (驱动) 目录..."
+          grep -rnE 'CONFIG_KSU|ksu_handle|susfs' drivers/input/ && DIRTY=1 || echo "✅ drivers/ 目录极其纯净！"
+          
+          echo "------------------------------------------------"
+          
+          if [ $DIRTY -eq 1 ]; then
+              echo "❌ 致命警告！核磁共振发现残留病灶！"
+              echo "🩸 请立刻查看上方日志，上面已经打印出了残留代码的【具体文件路径】和【具体行号】！"
+              echo "🛑 触发自动熔断，停止后续编译，请查明原因！"
+              exit 1
+          else
+              echo "🎉 完美通关！内核大动脉已经达到 10000% 无菌纯净状态！允许注入 SukiSU！"
+          fi
 
       - name: 📤 提取纯净内核源文件用于精准定位
         uses: actions/upload-artifact@v4
@@ -86,8 +106,6 @@ runs:
       - name: Get Packing Tools
         shell: bash
         run: |
-          # Set ${{ env.PACK_METHOD }}
-
           if [[ "${{ env.PACK_METHOD }}" == "Anykernel3" ]]; then
             cd $GITHUB_WORKSPACE/device_kernel
             if [[ -d "Anykernel3" ]]; then
@@ -140,20 +158,11 @@ runs:
             fi
           fi
 
-      #- name: Cleaned KernelSU and Hook
-      #  shell: bash
-       # run: |
-       #   cd $GITHUB_WORKSPACE/device_kernel
-
-       #   cp /tmp/Bin/clean_hook.sh ./
-       #   bash clean_hook.sh
-
       - name: Set KernelSU
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
 
-          # Function
           KERNELSU_AUTO(){
             if [[ "${{ env.KERNELSU_AUTO_FORK }}" == "magic" ]]; then
                 KERNELSU_AUTHOR="backslashxx"
@@ -210,27 +219,22 @@ runs:
             if [[ "${{ env.KERNELSU_AUTO_FORK }}" == "next" ]]; then
                 KERNELSU_FOLDER="KernelSU-Next"
                 echo "KERNELSU_NAME=$KERNELSU_FOLDER" >> $GITHUB_ENV
-
             else
                 KERNELSU_FOLDER="KernelSU"
                 echo "KERNELSU_NAME=$KERNELSU_FOLDER" >> $GITHUB_ENV
-
             fi
 
             if [[ "${{ env.KERNELSU_METHOD }}" == "shell" ]]; then
                 curl -sSL "https://raw.githubusercontent.com/${KERNELSU_AUTHOR}/${KERNELSU_NAME}/refs/heads/${KERNELSU_ORIGIN_BRANCH}/kernel/setup.sh" | bash -s "$KERNELSU_BRANCH"
-
             elif [[ "${{ env.KERNELSU_METHOD }}" == "manual" ]]; then
                 git clone "https://github.com/$KERNELSU_AUTHOR/$KERNELSU_NAME.git" -b "$KERNELSU_BRANCH" "$KERNELSU_FOLDER"
                 ln -sf "../$KERNELSU_FOLDER/kernel" "drivers/kernelsu"
                 grep -q "kernelsu" "$GITHUB_WORKSPACE/device_kernel/drivers/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> $GITHUB_WORKSPACE/device_kernel/drivers/Makefile
                 grep -q "source \"drivers/kernelsu/Kconfig\"" "$GITHUB_WORKSPACE/device_kernel/drivers/Kconfig" || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "${GITHUB_WORKSPACE}/device_kernel/drivers/Kconfig"
                 echo "KernelSU Settings done."
-
             elif [[ "${{ env.KERNELSU_METHOD }}" == "only" ]]; then
                 git clone "https://github.com/$KERNELSU_AUTHOR/$KERNELSU_NAME.git" -b "$KERNELSU_BRANCH" "$KERNELSU_FOLDER"
                 ln -sf "../$KERNELSU_FOLDER/kernel" "drivers/kernelsu"
-
             fi
           }
 
@@ -238,38 +242,30 @@ runs:
             if [[ "${{ env.KERNELSU_SOURCE }}" == *Next* ]]; then
                 KERNELSU_FOLDER="KernelSU-Next"
                 echo "KERNELSU_NAME=$KERNELSU_FOLDER" >> $GITHUB_ENV
-
             else
                 KERNELSU_FOLDER="KernelSU"
                 echo "KERNELSU_NAME=$KERNELSU_FOLDER" >> $GITHUB_ENV
-
             fi
 
             if [[ "${{ env.KERNELSU_METHOD }}" == "shell" ]]; then
                 curl -sSL "${{ env.KERNELSU_SOURCE }}" | bash -s "${{ env.KERNELSU_BRANCH }}"
-
             elif [[ "${{ env.KERNELSU_METHOD }}" == "manual" ]]; then
                 git clone "${{ env.KERNELSU_SOURCE }}" -b "${{ env.KERNELSU_BRANCH }}" "$KERNELSU_FOLDER"
                 ln -sf "../$KERNELSU_FOLDER/kernel" "drivers/kernelsu"
                 grep -q "kernelsu" "$GITHUB_WORKSPACE/device_kernel/drivers/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> $GITHUB_WORKSPACE/device_kernel/drivers/Makefile
                 grep -q "source \"drivers/kernelsu/Kconfig\"" "$GITHUB_WORKSPACE/device_kernel/drivers/Kconfig" || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "${GITHUB_WORKSPACE}/device_kernel/drivers/Kconfig"
                 echo "KernelSU Settings done."
-
             elif [[ "${{ env.KERNELSU_METHOD }}" == "only" ]]; then
                 git clone "${{ env.KERNELSU_SOURCE }}" -b "${{ env.KERNELSU_BRANCH }}" "$KERNELSU_FOLDER"
                 ln -sf "../$KERNELSU_FOLDER/kernel" "drivers/kernelsu"
-
             fi
           }
-
 
           # Core
           if [[ ${{ env.KERNELSU_AUTO_GET }} == "true" ]]; then
             KERNELSU_AUTO
-
           else
             KERNELSU_MANUAL
-
           fi
           echo "KERNELSU_METHOD=${{ env.KERNELSU_METHOD }}" >> $GITHUB_ENV
 
@@ -280,14 +276,11 @@ runs:
           cd $GITHUB_WORKSPACE/device_kernel
 
           ENABLE_KPM_CONFIGS(){
-
             echo "CONFIG_KALLSYMS=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
             echo "CONFIG_KALLSYMS_ALL=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-
           }
 
           GET_KPM_TOOLS(){
-
             echo "[+] Detected set_memory."
             echo "CONFIG_KPM=y" >> ./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
             ${{ env.CURLX }} "${{ env.KPM_PATCH_SOURCE }}" patch
@@ -299,11 +292,9 @@ runs:
                 echo "[-] Get KPM Tools failed !"
                 false
             fi
-
           }
 
           GET_KPATCH_NEXT_TOOLS(){
-
             REPO="KernelSU-Next/KPatch-Next"
             ${{ env.CURLX }} "https://github.com/$REPO/releases/latest/download/kpimg-linux" kpimg-linux
             ${{ env.CURLX }} "https://github.com/$REPO/releases/latest/download/kptools-linux" kptools-linux
@@ -315,7 +306,6 @@ runs:
                 echo "[-] Get KPatch-Next Tools failed !"
                 false
             fi
-
           }
 
           if [[ "${{ env.KERNELSU_SOURCE }}" == *SukiSU* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "sukisu" ]]  || [[ "${{ env.KERNELSU_SOURCE }}" == *ReSukiSU* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "resukisu" ]] && [[ "${{ env.KPM_INLINE }}" == "true" ]]; then
@@ -324,27 +314,21 @@ runs:
 
             if [ -f "include/linux/set_memory.h" ]; then
                 GET_KPM_TOOLS
-
             else
                 cp /tmp/Patches/Patch/set_memory_to_49_and_low.patch ./
                 patch -p1 < set_memory_to_49_and_low.patch || true
                 echo "[+] Patch set_memory successfully !"
                 echo "[-] If have patch error (.rej), manual fixed it."
                 GET_KPM_TOOLS
-
             fi
-
           elif [[ "${{ env.KERNELSU_SOURCE }}" != *SukiSU* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" != "sukisu" ]] || [[ "${{ env.KERNELSU_SOURCE }}" != *ReSukiSU* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" != "resukisu" ]] && [[ "${{ env.KPM_INLINE }}" == "true" ]]; then
             echo "[-] Your KernelSU Fork could not support KPM Inline!"
             false
-
           elif [[ "${{ env.KPM_KPATCH_NEXT }}" == "true" ]]; then
             GET_KPATCH_NEXT_TOOLS
-
           else
             ENABLE_KPM_CONFIGS
             echo "[+] Necessary configuration items have been enabled for the KPM feature."
-
           fi
 
       - name: Set KSU and SUSFS for DEFCONFIG
@@ -360,7 +344,6 @@ runs:
           # Fork
           if [[ "${{ env.KERNELSU_SOURCE }}" == *rsuntk* ]] || [[ "${{ env.KERNELSU_SOURCE }}" == *SukiSU* ]] || [[ "${{ env.KERNELSU_SOURCE }}" == *next* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "sukisu" ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "rsuntk" ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "next" ]] || [[ "${{ env.KERNELSU_SOURCE }}" == *ReSukiSU* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "resukisu" ]]; then
             if [[ ${{ env.SUSFS_ENABLE }} != "true" ]]; then
-
                 echo "CONFIG_KSU_TRACEPOINT_HOOK=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
             fi
           fi
