@@ -91,43 +91,36 @@ jobs:
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 正在执行法医级清创：修复 Proton Clang 与原厂底层烂代码的物理碰撞 ===="
+          echo "==== 正在执行法医级清创：精准狙击，绝对防乱杀 ===="
           
-          # [原有修复：已验证成功]
-          # 1. 修复 fs/namei.c (遗留无头代码)
+          # [原有修复：已验证成功，逐字保留]
           sed -i 's/struct user_namespace \*s_user_ns;/struct user_namespace \*s_user_ns;\n\tint error = 0;/g' fs/namei.c
-          # 2. 修复 arch/arm64/kernel/module-plts.c (汇编头文件)
           sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
-          # 3. 修复 kernel/cgroup/cpuset.c (残缺结构体)
           sed -i '1i struct cs_target { const char *name; char *cpus; };' kernel/cgroup/cpuset.c
           
-          # [本次新增修复：专治 yuragi 分支原厂大坑]
+          # [本次新增修复：狙击级精准替换，消除“乱杀”隐患]
           
-          # 4. 修复 kernel/cpu.c (Kconfig 空宏导致 expected value 报错)
-          # 极客解法：强制走默认的 #else 分支，100% 安全且绕过语法报错
-          sed -i 's/#if CONFIG_LITTLE_CPU_MASK/#if 0/g' kernel/cpu.c
-          sed -i 's/#if CONFIG_BIG_CPU_MASK/#if 0/g' kernel/cpu.c
-          sed -i 's/#if CONFIG_PRIME_CPU_MASK/#if 0/g' kernel/cpu.c
+          # 4. 修复 kernel/cpu.c (带行首锚点 ^，只改 Kconfig 宏检查)
+          sed -i 's/^#if CONFIG_LITTLE_CPU_MASK/#if 0/g' kernel/cpu.c
+          sed -i 's/^#if CONFIG_BIG_CPU_MASK/#if 0/g' kernel/cpu.c
+          sed -i 's/^#if CONFIG_PRIME_CPU_MASK/#if 0/g' kernel/cpu.c
           
-          # 5. 修复 kernel/sched/tune.c (原厂作者宏定义包裹错误，调用了未声明的 wrapper)
-          # 极客解法：把后缀 _wrapper 全部剔除，直接调用原始函数，完美契合逻辑
-          sed -i 's/sched_boost_override_write_wrapper/sched_boost_override_write/g' kernel/sched/tune.c
-          sed -i 's/sched_colocate_write_wrapper/sched_colocate_write/g' kernel/sched/tune.c
-          sed -i 's/boost_write_wrapper/boost_write/g' kernel/sched/tune.c
-          sed -i 's/prefer_idle_write_wrapper/prefer_idle_write/g' kernel/sched/tune.c
+          # 5. 修复 kernel/sched/tune.c (带结构体前缀锚点，绝不误伤函数定义)
+          sed -i 's/\.write_u64 = sched_boost_override_write_wrapper/.write_u64 = sched_boost_override_write/g' kernel/sched/tune.c
+          sed -i 's/\.write_u64 = sched_colocate_write_wrapper/.write_u64 = sched_colocate_write/g' kernel/sched/tune.c
+          sed -i 's/\.write_s64 = boost_write_wrapper/.write_s64 = boost_write/g' kernel/sched/tune.c
+          sed -i 's/\.write_u64 = prefer_idle_write_wrapper/.write_u64 = prefer_idle_write/g' kernel/sched/tune.c
           
-          # 6. 修复 fs/namespace.c (极度凶险：原厂作者手滑截断了 do_loopback 函数的尾部)
-          # 极客解法：用 perl 正则吃掉末尾残缺的垃圾括号，完美补齐 out2 和 out 的收尾逻辑！
+          # 6. 修复 fs/namespace.c (多行严格上下文匹配，只修复断肢)
           perl -0777 -pi -e 's/(umount_tree\(mnt, UMOUNT_SYNC\);\s*unlock_mount_hash\(\);\s*\})\s*\}(\s*\})?/$1\n out2:\n\tunlock_mount(mp);\n out:\n\tpath_put(\&old_path);\n\treturn err;\n}/g' fs/namespace.c
           
           echo "==== 屏蔽烦人的警告，强行禁止编译器多管闲事 ===="
-          # 给四大核心模块打镇静剂，遇到未使用的老弱病残代码直接给警告放行，不准中断编译！
           echo "ccflags-y += -Wno-unused-function -Wno-error" >> mm/Makefile
           echo "ccflags-y += -Wno-unused-function -Wno-error" >> fs/Makefile
           echo "ccflags-y += -Wno-unused-function -Wno-error" >> kernel/Makefile
           echo "ccflags-y += -Wno-unused-function -Wno-error" >> kernel/sched/Makefile
           
-          echo "✅ 所有原厂残缺大动脉已物理缝合，镇静剂已全线注射，准备满血点火！"
+          echo "✅ 所有原厂残缺大动脉已精准缝合，镇静剂已全线注射，准备满血点火！"
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
