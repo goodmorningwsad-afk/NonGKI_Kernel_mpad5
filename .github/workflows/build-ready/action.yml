@@ -21,46 +21,22 @@ runs:
           echo "FIRST_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $1}')" >> $GITHUB_ENV
           echo "SECOND_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $2}')" >> $GITHUB_ENV
 
-      - name: ⏪ 全自动 Git 级除颤仪：智能回溯所有污染提交
+      - name: 🚀 终极激光物理清场：强行蒸发原厂脏钩子
         shell: bash
         run: |
-          # 🚨 此时 device_kernel 必定存在，进入源码目录！
           cd $GITHUB_WORKSPACE/device_kernel
           
-          echo "==== 🚀 启动全自动智能回溯引擎 ===="
-          git config --global user.email "action@github.com"
-          git config --global user.name "GitHub Action"
+          echo "==== 1. 物理铲除子模块占位 ===="
+          rm -rf KernelSU kernelsu
+          sed -i '/KernelSU/d' .gitmodules || true
+          sed -i '/kernelsu/d' drivers/Makefile || true
           
-          # 获取所有包含敏感词的 commit 哈希值（按时间从新到老排序）
-          ALL_SUSPECTS=$(git --no-pager log --format="%H" --grep="susfs\|kernelsu" -i)
+          echo "==== 2. 激光烧毁大动脉里的 CONFIG_KSU ===="
+          # 极其精准：从 #ifdef CONFIG_KSU 一直删到下一个 #endif，语法完美保持闭合！
+          sed -i '/#ifdef CONFIG_KSU/,/#endif/d' fs/exec.c fs/stat.c fs/open.c fs/read_write.c fs/namespace.c drivers/input/input.c security/selinux/hooks.c || true
+          sed -i '/#ifdef CONFIG_KSU_SUSFS/,/#endif/d' fs/exec.c fs/stat.c fs/open.c fs/read_write.c fs/namespace.c || true
           
-          for commit in $ALL_SUSPECTS; do
-              TITLE=$(git --no-pager log --format="%s" -n 1 $commit)
-              
-              echo "----------------------------------------"
-              echo "🔍 正在审判: $TITLE ($commit)"
-              
-              if [[ "$TITLE" == Revert* ]] || [[ "$TITLE" == revert* ]]; then
-                  echo "⏭️ 判定为原作者自身的清理操作，安全跳过！"
-                  continue
-              fi
-              
-              echo "🔪 尝试安全剥离此提交..."
-              # 尝试安全回滚
-              git revert --no-edit $commit || {
-                  echo "⚠️ 发生时空冲突或踩中子模块地雷！"
-                  echo "🛡️ 触发超合金防爆盾 V2：强制吸收爆炸伤害并重置现场..."
-                  
-                  # 🚨 极其关键的 || true：允许 abort 报错，绝不牵连流水线暴毙！
-                  git revert --abort || true
-                  
-                  # 🚨 物理级清场：不管留下什么脏东西，直接强制刷掉，保证下一次回滚干净！
-                  git reset --hard HEAD
-              }
-          done
-          
-          echo "----------------------------------------"
-          echo "✅ 智能回溯全部执行完毕！底层语法完美保全！"
+          echo "✅ 无论是哪个年代的脏钩子，现已全部物理蒸发！内核回归绝对纯净！"
           
           # Get Kernel Version
           KERNEL_VERSION=$(head -n 3 Makefile | grep -E 'VERSION|PATCHLEVEL' | awk '{print $3}' | paste -sd '.')
