@@ -144,28 +144,29 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 开始清理与修复 SukiSU 原厂 Bug ===="
-        
+          
           # 1. 修复 builtin 分支里的原厂笔误
           sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
           sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
           # 只替换 300 行以后的 cred！绝不误伤上半部分合法的 cred 变量！
           sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
-        
+          
           # 2. 修复 supercalls.c 的宏定义套娃与链接报错
           sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
           sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
           sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
-        
+          
           # 3. 屏蔽内核中烦人的无用函数警告
           echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
           echo "ccflags-y += -Wno-error" >> fs/Makefile
           #  接通被阉割的用户命名空间，拯救模块挂载 
           sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
-        
+          
           # 4. 防止 LTO 爆内存，并强制唤醒挂载引擎
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
+
           # >>>>>> ：修复探测 su 掉包漏洞 <<<<<<
           echo "==== 正在切断 su->sh 的无差别篡改大动脉 ===="
           sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c
