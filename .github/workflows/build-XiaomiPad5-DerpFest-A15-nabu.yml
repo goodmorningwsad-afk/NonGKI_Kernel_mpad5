@@ -123,7 +123,7 @@ jobs:
             
             # 2. 核心操作：抹除未来记忆，强行将代码树重置到黄金坐标！
             # 👇 【注意】：把下面的 xxxxxxx 替换成你刚刚复制的那个 黄金哈希值！
-            git reset --hard xxxxxxx
+            git reset --hard 2aba6b8c55524d7b0f1f87ee1e982ce6d36d1bb7
             
             echo "✅ 时光倒流成功！当前 SukiSU 源码已恢复至纯净形态！"
          else
