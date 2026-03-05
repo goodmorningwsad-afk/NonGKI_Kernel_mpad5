@@ -117,14 +117,40 @@ jobs:
         uses: ./.github/workflows/build-ready
 
       # 🚨 [神级切入点] 在 NonGKI 执行官方 SuSFS 补丁前，强行介入物理清场！
-      - name: 🪄 暴力清理 1.5.3 遗留文件并唤醒 2.0.0 大动脉
+      - name: 🪄 唤醒 SuSFS 2.0.0 大动脉 (纯净注入)
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 0. 物理斩首老版 SuSFS 1.5.3 ===="
-          rm -f fs/susfs.c
-          rm -f include/linux/susfs.h
-          rm -f include/linux/susfs_def.h
+          
+          echo "==== 1. 唤醒 SuSFS 2.0.0 核心开关 ===="
+          DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG_NAME"
+          if [ ! -f "$DEFCONFIG_FILE" ]; then
+              echo "⚠️ 找不到 $DEFCONFIG_FILE，尝试备用路径 picasso_defconfig"
+              DEFCONFIG_FILE="arch/arm64/configs/vendor/xiaomi/picasso_defconfig"
+          fi
+          
+          cat << 'EOF' >> "$DEFCONFIG_FILE"
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_SUS_MAP=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_USER_NS=y
+          CONFIG_KSU_MANUAL_HOOK=y
+          EOF
+          
+          sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' "$DEFCONFIG_FILE"
+          
+          echo "==== [防漂移装甲] 修正 SukiSU 验证逻辑 ===="
+          sed -i '/ksu_load_allow_list();/a \	track_throne(false);' drivers/kernelsu/ksud.c
+          sed -i 's/if (has_v1_signing)/if (0)/g' drivers/kernelsu/apk_sign.c
+          sed -i 's/if (v3_signing_exist || v3_1_signing_exist)/if (0)/g' drivers/kernelsu/apk_sign.c
           
           echo "==== 1. 唤醒 SuSFS 2.0.0 核心开关 ===="
           DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG_NAME"
@@ -157,7 +183,7 @@ jobs:
           sed -i 's/if (v3_signing_exist || v3_1_signing_exist)/if (0)/g' drivers/kernelsu/apk_sign.c
 
       - name: 🪝 Patch Kernel of SUSFS
-        uses: ./.github/workflows/patch-susfs
+        uses: ./.github/workflows/patch-susfs-new
 
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
