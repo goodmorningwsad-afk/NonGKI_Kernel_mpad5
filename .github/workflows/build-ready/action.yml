@@ -7,6 +7,8 @@ runs:
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE
+          echo "==== 🚀 物理清场：炸掉被提前占用的 device_kernel 目录 ===="
+          rm -rf device_kernel
           git clone --recursive "${{ env.KERNEL_SOURCE }}" -b "${{ env.KERNEL_BRANCH }}" device_kernel --depth=1
 
       - name: Get Kernel
