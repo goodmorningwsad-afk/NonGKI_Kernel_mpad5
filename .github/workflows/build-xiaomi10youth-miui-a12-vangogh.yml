@@ -93,7 +93,7 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 正在执行法医级清创：精准狙击，绝对防乱杀 ===="
           
-          # [原有修复：已验证成功，逐字保留]
+          # [原有核心修复：全部绿灯通过，绝对保留]
           sed -i 's/struct user_namespace \*s_user_ns;/struct user_namespace \*s_user_ns;\n\tint error = 0;/g' fs/namei.c
           sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
           sed -i '1i struct cs_target { const char *name; char *cpus; };' kernel/cgroup/cpuset.c
@@ -117,22 +117,22 @@ jobs:
           sed -i '/EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/d' lib/lz4/lz4_decompress.c
           
           # ==========================================
-          # 👇 [本次新增修复：解决跨版本代码缝合后遗症] 👇
+          # 👇 [本次精准修正：打扫战场] 👇
           
-          echo "==== 7. 修复网络底层协议的 static 声明冲突 (多行模式) ===="
-          # 动用 perl 跨行正则，将跨行的 static 彻底蒸发
+          echo "==== 7. 修复网络底层协议的 static 声明冲突 (追加 IPv6 修正) ===="
           perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s*static\s*#endif/#ifndef CONFIG_MPTCP\n#endif/g' net/ipv4/tcp_ipv4.c
           perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s*static\s*#endif/#ifndef CONFIG_MPTCP\n#endif/g' net/ipv6/tcp_ipv6.c
+          # [新增] 剔除 IPv6 头部多余的 static 声明，与底部非 static 完美对齐！
+          sed -i 's/static const struct inet_connection_sock_af_ops ipv6_mapped;/const struct inet_connection_sock_af_ops ipv6_mapped;/g' net/ipv6/tcp_ipv6.c
+          sed -i 's/static const struct inet_connection_sock_af_ops ipv6_specific;/const struct inet_connection_sock_af_ops ipv6_specific;/g' net/ipv6/tcp_ipv6.c
           
           echo "==== 8. 修复 ZSTD 压缩库的 fallthrough 宏定义 ===="
-          # 现代编译器的 fallthrough 在老代码里水土不服，强行替换为兼容属性
           sed -i 's/#define ZSTD_FALLTHROUGH fallthrough/#define ZSTD_FALLTHROUGH __attribute__((__fallthrough__))/g' lib/zstd/common/compiler.h
           
-          echo "==== 9. 修复小米屏幕指纹 (FOD) 驱动的缺失变量 ===="
-          # 物理注入原作者漏掉的 FOD 相关变量到头文件的结构体中！
-          perl -pi -e 's/(int aod_status;)/$1\n\tbool fod_finger_skip;\n\tint fod_down_time;\n\tbool point_id_changed;\n\tint fod_status;\n\tbool finger_in_fod;\n\tint fod_x;\n\tint fod_y;\n\tint old_point_id;\n\tbool fod_point_released;/g' drivers/input/touchscreen/focaltech_touch/focaltech_core.h
+          echo "==== 9. 修复小米屏幕指纹 (FOD) 驱动的缺失变量 (已剔除重复项) ===="
+          # [修正] 去掉了 old_point_id 和 fod_point_released，再也不会报 duplicate 错误了！
+          perl -pi -e 's/(int aod_status;)/$1\n\tbool fod_finger_skip;\n\tint fod_down_time;\n\tbool point_id_changed;\n\tint fod_status;\n\tbool finger_in_fod;\n\tint fod_x;\n\tint fod_y;/g' drivers/input/touchscreen/focaltech_touch/focaltech_core.h
           
-          # 补充缺失的写寄存器函数声明，防止隐式声明报错
           sed -i '1i int fts_fod_reg_write(struct i2c_client *client, u8 reg, u8 value);' drivers/input/touchscreen/focaltech_touch/focaltech_core.c
           
           # ==========================================
@@ -143,10 +143,9 @@ jobs:
           echo "ccflags-y += -Wno-unused-function -Wno-error" >> kernel/Makefile
           echo "ccflags-y += -Wno-unused-function -Wno-error" >> kernel/sched/Makefile
           echo "ccflags-y += -Wno-unused-variable -Wno-error" >> drivers/clk/Makefile
-          # 给触控驱动单独再加一剂猛药！
           echo "ccflags-y += -Wno-unused-variable -Wno-unused-function -Wno-error" >> drivers/input/touchscreen/focaltech_touch/Makefile
           
-          echo "✅ 所有缝合怪代码已被强制对齐，准备满血点火！"
+          echo "✅ 所有缝合怪代码已被强制对齐，黎明前的黑暗已被撕裂，冲锋！"
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
