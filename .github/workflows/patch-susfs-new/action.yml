@@ -240,4 +240,16 @@ runs:
         patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
 
         sed -i 's/-dirty//g' scripts/setlocalversion
+        echo "==== [法医级修复] 清理 SukiSU 原作者 2 天前的残次提交 ===="
+        
+        # 1. 修复作者“宏定义套娃”的弱智笔误 (解决 KSU_IOCTL_KSU_IOCTL_... 报错)
+        sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
+        sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
+        
+        # 2. 彻底斩杀作者“管杀不管埋”的旧版废弃接口 
+        sed -i '/KSU_IOCTL(GET_ALLOW_LIST,/d' drivers/kernelsu/supercalls.c
+        sed -i '/KSU_IOCTL(GET_DENY_LIST,/d' drivers/kernelsu/supercalls.c
+        
+        # 3. 修复其他遗留的未定义函数
+        sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
