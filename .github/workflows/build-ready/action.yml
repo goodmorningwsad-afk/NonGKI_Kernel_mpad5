@@ -3,9 +3,28 @@ name: 'Preparation for the official start of the compilation steps.'
 runs:
   using: 'composite'
   steps:
+      - name: Get Kernel (拉取内核源码)
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE
+          
+          echo "==== 🚀 物理清场：炸掉被子模块提前占用的空壳 ===="
+          rm -rf device_kernel
+          
+          echo "==== 📥 真正拉取源码：深度 150 以获取历史案底 ===="
+          # 🚨 这一句绝对不能删！这是整个内核宇宙的基石！
+          git clone --recursive "${{ env.KERNEL_SOURCE }}" -b "${{ env.KERNEL_BRANCH }}" device_kernel --depth=150
+          
+          # 获取内核版本号的环境变量注入
+          KERNEL_VERSION=$(head -n 3 device_kernel/Makefile | grep -E 'VERSION|PATCHLEVEL' | awk '{print $3}' | paste -sd '.')
+          echo "KERNEL_VERSION=$KERNEL_VERSION" >> $GITHUB_ENV
+          echo "FIRST_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $1}')" >> $GITHUB_ENV
+          echo "SECOND_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $2}')" >> $GITHUB_ENV
+
       - name: ⏪ 全自动 Git 级除颤仪：智能回溯所有污染提交
         shell: bash
         run: |
+          # 🚨 此时 device_kernel 必定存在，进入源码目录！
           cd $GITHUB_WORKSPACE/device_kernel
           
           echo "==== 🚀 启动全自动智能回溯引擎 ===="
@@ -13,7 +32,6 @@ runs:
           git config --global user.name "GitHub Action"
           
           # 获取所有包含敏感词的 commit 哈希值（按时间从新到老排序）
-          # 🚨 加了 --no-pager 强行关闭分页器，绝对防止在云端卡死！
           ALL_SUSPECTS=$(git --no-pager log --format="%H" --grep="susfs\|kernelsu\|ksu" -i)
           
           for commit in $ALL_SUSPECTS; do
@@ -22,8 +40,7 @@ runs:
               echo "----------------------------------------"
               echo "🔍 正在审判: $TITLE ($commit)"
               
-              # 🚨 核心排雷逻辑：绝对不能回滚带有 "Revert" 的提交！
-              # 因为回滚一个“回滚操作”，等于把毒代码重新加回去！
+              # 核心排雷逻辑：绝对不能回滚带有 "Revert" 的提交！
               if [[ "$TITLE" == Revert* ]] || [[ "$TITLE" == revert* ]]; then
                   echo "⏭️ 判定为原作者自身的清理操作，安全跳过！"
                   continue
@@ -32,7 +49,7 @@ runs:
               echo "🔪 尝试安全剥离此提交..."
               # 尝试调用 Git 底层引擎进行 C 语法级的安全回滚
               git revert --no-edit $commit || {
-                  echo "⚠️ 发生时空冲突 (代码已被后续补丁覆盖或早已被原作者清理)！"
+                  echo "⚠️ 发生时空冲突！"
                   echo "🛡️ 触发防爆盾：自动放弃当前剥离，恢复现场并跳过..."
                   git revert --abort
               }
