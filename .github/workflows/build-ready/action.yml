@@ -9,12 +9,32 @@ runs:
           cd $GITHUB_WORKSPACE
           git clone --recursive "${{ env.KERNEL_SOURCE }}" -b "${{ env.KERNEL_BRANCH }}" device_kernel --depth=1
 
+      - name: Get Kernel
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE
+          # 🚨 极其关键：将 depth 改为 100，获取足够的历史记录用于反向剥离
+          git clone --recursive "${{ env.KERNEL_SOURCE }}" -b "${{ env.KERNEL_BRANCH }}" device_kernel --depth=100
+          
+          cd device_kernel
+          
+          echo "==== 🚀 执行物理开颅：剥离原厂自带的 KSU-next 和 susfs ===="
+          # 配置 GitHub Actions 的临时 Git 身份（必须配才能 revert）
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          
+          # 🚨 精准斩首：按时间线倒序剥离（先剥离最新的 susfs，再剥离 KSU-next）
+          git revert --no-edit dcde219
+          git revert --no-edit ddb1984
+          
+          echo "✅ 历史病灶已被彻底连根拔起，底层钩子完美清除！"
+
           # Get Kernel Version
-          KERNEL_VERSION=$(head -n 3 $GITHUB_WORKSPACE/device_kernel/Makefile | grep -E 'VERSION|PATCHLEVEL' | awk '{print $3}' | paste -sd '.')
-          echo "KERNEL_VERSION=$(head -n 3 device_kernel/Makefile | grep -E 'VERSION|PATCHLEVEL' | awk '{print $3}' | paste -sd '.')" >> $GITHUB_ENV
+          KERNEL_VERSION=$(head -n 3 Makefile | grep -E 'VERSION|PATCHLEVEL' | awk '{print $3}' | paste -sd '.')
+          echo "KERNEL_VERSION=$KERNEL_VERSION" >> $GITHUB_ENV
           echo "FIRST_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $1}')" >> $GITHUB_ENV
           echo "SECOND_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $2}')" >> $GITHUB_ENV
-
+      
       - name: 🕵️ 校验内核环境 (输出 exec.c 和 stat.c 真实内容)
         shell: bash   # <====== 就是少了这一句救命的代码！
         run: |
