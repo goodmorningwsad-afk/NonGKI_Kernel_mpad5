@@ -111,26 +111,26 @@ jobs:
         uses: ./.github/workflows/build-ready
 
       - name: ⏪ 物理时光机：精准回溯 3 号提交
-      shell: bash
-      run: |
-        echo "==== 启动 Git 级时光机，直接回退 ===="
-        
-        # 精准定位 SukiSU 源码根目录
-        KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
-        
-        if [ -n "$KSU_DIR" ]; then
-            echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
-            cd "$KSU_DIR"
-            
-            # 🚨 核心指令：直接硬重置到 3 月 2 日的最后一个正常提交 (c1fd51c)
-            # 这行命令会瞬间抹除 3 号当天的所有提交记录和毒代码，干干净净！
-            git reset --hard c1fd51c
-            
-            echo "✅ 源码已成功回溯至 3 月 2 日纯净版！"
-        else
-            echo "❌ 致命错误：未找到 SukiSU 源码目录，时光机启动失败！"
-            exit 1
-        fi
+        shell: bash
+        run: |
+          echo "==== 启动 Git 级时光机，直接回退 ===="
+          
+          # 精准定位 SukiSU 源码根目录
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
+          
+          if [ -n "$KSU_DIR" ]; then
+              echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
+              cd "$KSU_DIR"
+              
+              # 🚨 核心指令：直接硬重置到 3 月 2 日的最后一个正常提交 (c1fd51c)
+              # 这行命令会瞬间抹除 3 号当天的所有提交记录和毒代码，干干净净！
+              git reset --hard c1fd51c
+              
+              echo "✅ 源码已成功回溯至 3 月 2 日纯净版！"
+          else
+              echo "❌ 致命错误：未找到 SukiSU 源码目录，时光机启动失败！"
+              exit 1
+          fi
 
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
@@ -178,8 +178,6 @@ jobs:
           name: Kernel_Verify_Files
           path: Kernel_Verify_Files.zip
 
-      # 🚨 终极修正 2：彻底铲除 patch-no-kprobe 步骤！
-
       - name: 🩹 Fix SukiSU Source Bugs & Extra Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
@@ -210,7 +208,7 @@ jobs:
           # >>>>>> ：修复探测 su 掉包漏洞 <<<<<<
           echo "==== 正在切断 su->sh 的无差别篡改大动脉 ===="
           sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c
-
+     
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
           
