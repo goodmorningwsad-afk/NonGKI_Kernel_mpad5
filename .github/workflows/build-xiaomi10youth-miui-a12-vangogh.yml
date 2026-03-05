@@ -107,10 +107,10 @@ jobs:
           sed -i 's/\.write_s64 = boost_write_wrapper/.write_s64 = boost_write/g' kernel/sched/tune.c
           sed -i 's/\.write_u64 = prefer_idle_write_wrapper/.write_u64 = prefer_idle_write/g' kernel/sched/tune.c
           
-          # 👇 [本次修正 1：放弃危险正则！绝对精准替换报错的 5 行代码，完美保留 namespace.c 的下半身！]
-          sed -i '/umount_tree(mnt, UMOUNT_SYNC);/,+4 c\t\tumount_tree(mnt, UMOUNT_SYNC);\n\t\tunlock_mount_hash();\n\t}\n out2:\n\tunlock_mount(mp);\n out:\n\tpath_put(\&old_path);\n\treturn err;\n}' fs/namespace.c
+          # 👇 [本次终极修正：锁定唯一的完整锚点 graft_tree，将之后所有残肢物理截断并替换为满血收尾！]
+          perl -0777 -pi -e 's/err = graft_tree\(mnt, parent, mp\);.*$/err = graft_tree(mnt, parent, mp);\n\tif (err) {\n\t\tlock_mount_hash();\n\t\tumount_tree(mnt, UMOUNT_SYNC);\n\t\tunlock_mount_hash();\n\t}\n out2:\n\tunlock_mount(mp);\n out:\n\tpath_put(\&old_path);\n\treturn err;\n}/s' fs/namespace.c
           
-          # [以下网络、压缩库、触控宏 原封不动保留]
+          # [以下网络、压缩库、触控宏、SDHCI、MODVERSIONS 均严格原封不动保留]
           sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_partial);/d' lib/lz4/lz4_decompress.c
           sed -i '/EXPORT_SYMBOL(LZ4_setStreamDecode);/d' lib/lz4/lz4_decompress.c
           sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_continue);/d' lib/lz4/lz4_decompress.c
@@ -128,11 +128,9 @@ jobs:
           perl -pi -e 's/(int aod_status;)/$1\n\tbool fod_finger_skip;\n\tint fod_down_time;\n\tbool point_id_changed;\n\tint fod_status;\n\tbool finger_in_fod;\n\tint fod_x;\n\tint fod_y;/g' drivers/input/touchscreen/focaltech_touch/focaltech_core.h
           sed -i 's/mmc_card_doing_bkops(card)/0/g' drivers/mmc/core/core.c
           
-          # 👇 [本次修正 2：修复残缺调用，将其物理替换为 0，满足链接器]
           sed -i 's/fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_ON, true);/0;/g' drivers/input/touchscreen/focaltech_touch/focaltech_core.c
           sed -i 's/reclaim_pages([^)]*)/0/g' mm/madvise.c
           
-          # 👇 [本次修正 3：抹除 sdhci.c 作者的乱码注释，让函数正常导出，满足其他驱动的调用]
           sed -i 's|//\* void sdhci_set_uhs|void sdhci_set_uhs|g' drivers/mmc/host/sdhci.c
           sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);|g' drivers/mmc/host/sdhci.c
           
