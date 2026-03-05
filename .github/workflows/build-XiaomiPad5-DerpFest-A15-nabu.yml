@@ -144,9 +144,6 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 开始清理与修复 SukiSU 原厂 Bug ===="
-          
-          cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 开始清理与修复 SukiSU 原厂 Bug ===="
         
           # 1. 修复 builtin 分支里的原厂笔误
           sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
