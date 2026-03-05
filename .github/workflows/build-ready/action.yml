@@ -32,7 +32,7 @@ runs:
           git config --global user.name "GitHub Action"
           
           # 获取所有包含敏感词的 commit 哈希值（按时间从新到老排序）
-          ALL_SUSPECTS=$(git --no-pager log --format="%H" --grep="susfs\|kernelsu\|ksu" -i)
+          ALL_SUSPECTS=$(git --no-pager log --format="%H" --grep="susfs\|kernelsu" -i)
           
           for commit in $ALL_SUSPECTS; do
               TITLE=$(git --no-pager log --format="%s" -n 1 $commit)
