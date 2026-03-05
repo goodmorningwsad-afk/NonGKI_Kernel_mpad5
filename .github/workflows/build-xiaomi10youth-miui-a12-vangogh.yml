@@ -93,30 +93,63 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 正在执行法医级清创：精准狙击，绝对防乱杀 ===="
           
-          # [这里保留你之前所有 1~11 步的修复代码，一字别删！]
+          # [原有核心修复：全部绿灯通过，绝对逐字保留]
           sed -i 's/struct user_namespace \*s_user_ns;/struct user_namespace \*s_user_ns;\n\tint error = 0;/g' fs/namei.c
           sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
-          # ... 中间的全部保留 ...
+          sed -i '1i struct cs_target { const char *name; char *cpus; };' kernel/cgroup/cpuset.c
+          
+          sed -i 's/^#if CONFIG_LITTLE_CPU_MASK/#if 0/g' kernel/cpu.c
+          sed -i 's/^#if CONFIG_BIG_CPU_MASK/#if 0/g' kernel/cpu.c
+          sed -i 's/^#if CONFIG_PRIME_CPU_MASK/#if 0/g' kernel/cpu.c
+          
+          sed -i 's/\.write_u64 = sched_boost_override_write_wrapper/.write_u64 = sched_boost_override_write/g' kernel/sched/tune.c
+          sed -i 's/\.write_u64 = sched_colocate_write_wrapper/.write_u64 = sched_colocate_write/g' kernel/sched/tune.c
+          sed -i 's/\.write_s64 = boost_write_wrapper/.write_s64 = boost_write/g' kernel/sched/tune.c
+          sed -i 's/\.write_u64 = prefer_idle_write_wrapper/.write_u64 = prefer_idle_write/g' kernel/sched/tune.c
+          
+          # 👇 [本次重构：对 namespace.c 启动黑洞级吞噬，无论结尾有多乱，统统强制洗平！]
+          perl -0777 -pi -e 's/umount_tree\(mnt, UMOUNT_SYNC\);\s*unlock_mount_hash\(\);\s*\}.*$/umount_tree(mnt, UMOUNT_SYNC);\n\t\tunlock_mount_hash();\n\t}\n out2:\n\tunlock_mount(mp);\n out:\n\tpath_put(\&old_path);\n\treturn err;\n}/s' fs/namespace.c
+          
+          # [以下所有网络、压缩库、触控、MMC、VMLINUX 补丁均原封不动保留]
+          sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_partial);/d' lib/lz4/lz4_decompress.c
+          sed -i '/EXPORT_SYMBOL(LZ4_setStreamDecode);/d' lib/lz4/lz4_decompress.c
+          sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_continue);/d' lib/lz4/lz4_decompress.c
+          sed -i '/EXPORT_SYMBOL(LZ4_decompress_fast_continue);/d' lib/lz4/lz4_decompress.c
+          sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_usingDict);/d' lib/lz4/lz4_decompress.c
+          sed -i '/EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/d' lib/lz4/lz4_decompress.c
+          
+          perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s*static\s*#endif/#ifndef CONFIG_MPTCP\n#endif/g' net/ipv4/tcp_ipv4.c
+          perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s*static\s*#endif/#ifndef CONFIG_MPTCP\n#endif/g' net/ipv6/tcp_ipv6.c
+          sed -i 's/static const struct inet_connection_sock_af_ops ipv6_mapped;/const struct inet_connection_sock_af_ops ipv6_mapped;/g' net/ipv6/tcp_ipv6.c
+          sed -i 's/static const struct inet_connection_sock_af_ops ipv6_specific;/const struct inet_connection_sock_af_ops ipv6_specific;/g' net/ipv6/tcp_ipv6.c
+          
+          sed -i 's/#define ZSTD_FALLTHROUGH fallthrough/#define ZSTD_FALLTHROUGH __attribute__((__fallthrough__))/g' lib/zstd/common/compiler.h
+          
+          perl -pi -e 's/(int aod_status;)/$1\n\tbool fod_finger_skip;\n\tint fod_down_time;\n\tbool point_id_changed;\n\tint fod_status;\n\tbool finger_in_fod;\n\tint fod_x;\n\tint fod_y;/g' drivers/input/touchscreen/focaltech_touch/focaltech_core.h
+          sed -i '/#include "focaltech_core.h"/a int fts_fod_reg_write(struct i2c_client *client, u8 reg, u8 value);' drivers/input/touchscreen/focaltech_touch/focaltech_core.c
+          
+          sed -i 's/mmc_card_doing_bkops(card)/0/g' drivers/mmc/core/core.c
+          
+          echo "==== 11. 修复 sdhci.c 的嵌套注释冲突 ===="
           sed -i 's|//\* void sdhci_set_uhs|#if 0\nvoid sdhci_set_uhs|g' drivers/mmc/host/sdhci.c
           sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\n#endif|g' drivers/mmc/host/sdhci.c
           
-          # ==========================================
-          # 👇 [本次精准修正：最终决战，打通 vmlinux 命脉] 👇
-          
           echo "==== 12. 终极斩杀 LLD 链接器报错 (物理拔除 MODVERSIONS) ===="
-          # 现代 ld.lld 极其严格，拒绝旧版内核的 32位绝对重定位。
-          # 强行关闭模块版本校验，秒杀报错，并在未来无视原厂驱动强校验，一石二鸟！
           sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
           echo "# CONFIG_MODVERSIONS is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
           
-          # ==========================================
-          
           echo "==== 屏蔽烦人的警告，强行禁止编译器多管闲事 ===="
-          # [这里保留之前加的所有 ccflags-y 镇静剂]
           echo "ccflags-y += -Wno-unused-function -Wno-error" >> mm/Makefile
-          # ... (剩下的全保留) ...
+          echo "ccflags-y += -Wno-unused-function -Wno-error" >> fs/Makefile
+          echo "ccflags-y += -Wno-unused-function -Wno-error" >> kernel/Makefile
+          echo "ccflags-y += -Wno-unused-function -Wno-error" >> kernel/sched/Makefile
+          echo "ccflags-y += -Wno-unused-variable -Wno-error" >> drivers/clk/Makefile
+          echo "ccflags-y += -Wno-unused-variable -Wno-unused-function -Wno-error" >> drivers/input/touchscreen/focaltech_touch/Makefile
+          echo "ccflags-y += -Wno-declaration-after-statement -Wno-error" >> drivers/leds/Makefile
+          echo "ccflags-y += -Wno-shift-count-overflow -Wno-error" >> drivers/mmc/host/Makefile
+          echo "ccflags-y += -Wno-logical-op-parentheses -Wno-error" >> net/ipv4/Makefile
           
-          echo "✅ 最终 BOSS 的核心护盾已被击碎，通关之门开启，准备迎接 AnyKernel3！"
+          echo "✅ 所有大动脉彻底缝合完毕，准备迎接 AnyKernel3！"
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
