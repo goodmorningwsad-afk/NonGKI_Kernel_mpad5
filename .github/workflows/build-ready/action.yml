@@ -29,28 +29,33 @@ runs:
           sed -i '/kernelsu/d' drivers/Makefile || true
           sed -i '/kernelsu/d' drivers/Kconfig || true
           
-          echo "==== 2. 物理铲除老旧的 SuSFS 肿瘤 ===="
+          echo "==== 2. 物理铲除老旧的 SuSFS 肿瘤与编译索引 ===="
           rm -f fs/susfs.c fs/sus_su.c
           rm -f include/linux/susfs.h include/linux/susfs_def.h include/linux/sus_su.h
+          # 切断 Makefile 里企图编译 susfs 的大动脉
+          sed -i '/susfs/d' fs/Makefile || true
           
-          echo "==== 3. 激光烧毁大动脉和头文件里的宏定义 (范围扩大) ===="
-          # 🚨 新增 include/linux/sched.h 和 mount.h，实施全图打击！
-          for file in fs/exec.c fs/stat.c fs/open.c fs/read_write.c fs/namespace.c drivers/input/input.c security/selinux/hooks.c include/linux/sched.h include/linux/mount.h; do
+          echo "==== 3. 💣 启动全自动追踪激光：地毯式蒸发宏定义 ===="
+          # 🚨 核心奥义：利用 grep 找出全盘所有带毒的文件，绝不放过任何一个死角！
+          TOXIC_FILES=$(grep -rlE 'CONFIG_KSU|susfs' fs/ include/ security/ drivers/ || true)
+          
+          for file in $TOXIC_FILES; do
               if [ -f "$file" ]; then
-                  # 打击标准的 #ifdef 语法
+                  echo "💥 正在净化深层感染文件: $file"
+                  # 斩首标准 #ifdef 语法
                   sed -i '/#ifdef CONFIG_KSU/,/#endif/d' "$file" || true
-                  sed -i '/#ifdef CONFIG_KSU_SUSFS/,/#endif/d' "$file" || true
-                  # 打击变种的 #if defined(...) 语法
-                  sed -i '/#if defined(CONFIG_KSU_SUSFS/,/#endif/d' "$file" || true
+                  # 斩首作者魔改的 #if defined(...) 语法
+                  sed -i '/#if defined(CONFIG_KSU/,/#endif/d' "$file" || true
                   
-                  # 物理抹除极其顽固的单独变量残留 (防漏网)
+                  # 物理抹除极其顽固的游离头文件和单独变量 (防漏网)
+                  sed -i '/#include <linux\/susfs/d' "$file" || true
                   sed -i '/susfs_task_state/d' "$file" || true
                   sed -i '/susfs_last_fake_mnt_id/d' "$file" || true
                   sed -i '/susfs_orig_mnt_id/d' "$file" || true
               fi
           done
           
-          echo "✅ 基础清理执行完毕，准备移交核磁共振仪进行深层复查！"
+          echo "✅ 全盘地毯式清理执行完毕，准备移交核磁共振仪！"
           
       - name: 🕵️ 法医级全盘扫描：确认内核大动脉已绝对纯净
         shell: bash
