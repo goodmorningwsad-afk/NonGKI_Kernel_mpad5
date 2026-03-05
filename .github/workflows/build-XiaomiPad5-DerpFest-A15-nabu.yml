@@ -272,8 +272,8 @@ jobs:
           name: ReKernel_Original_Files
           path: ReKernel_Original_Files.zip
 
-      - name: 🧰 Patch Kernel of Re:Kernel
-        uses: ./.github/workflows/patch-rekernel
+      #- name: 🧰 Patch Kernel of Re:Kernel
+      #  uses: ./.github/workflows/patch-rekernel
 
       - name: 📦 提取 SukiSU 底层源码寻找真名
         run: |
