@@ -88,10 +88,11 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-      - name: 🛑 纯净度检验挂起
-        run: |
-          echo "========================================================"
-          echo "🛡️ 当前为【绝对净化测试模式】！"
-          echo "🛡️ SukiSU 与 SuSFS 注入动作已被全部物理隔离！"
-          echo "🛡️ 请前往上方的 Build Environment 日志中查看核磁共振结果！"
-          echo "========================================================"
+      - name: 🚀 Build Process
+        uses: ./.github/workflows/build-process
+
+      - name: 🔩 Pack Process
+        uses: ./.github/workflows/pack-process
+
+      - name: ✏️ Upload Artifacts
+        uses: ./.github/workflows/upload-files
