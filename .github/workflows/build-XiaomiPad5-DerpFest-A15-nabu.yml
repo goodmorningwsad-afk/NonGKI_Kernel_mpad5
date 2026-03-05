@@ -121,15 +121,28 @@ jobs:
              echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
              cd "$KSU_DIR"
             
-            # 2. 核心操作：抹除未来记忆，强行将代码树重置到黄金坐标！
-            # 👇 【注意】：把下面的 xxxxxxx 替换成你刚刚复制的那个 黄金哈希值！
-            git reset --hard 2aba6b8c55524d7b0f1f87ee1e982ce6d36d1bb7 ea1614c8aadbbf4b925349e08f9fbb7279f9eeab f6037b73d80aeeba24e4d673658fa23eb45728e0
-            
-            echo "✅ 时光倒流成功！当前 SukiSU 源码已恢复至纯净形态！"
-         else
-             echo "❌ 致命错误：未找到 SukiSU 源码目录，时光机启动失败！"
-             exit 1
-         fi
+            echo "拉取完整历史..."
+          git fetch --depth=100 || echo "已经是完整克隆，继续..."
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          
+          # 📜 策略说明：
+          # 1. 严格按照 Git 提交的时间倒序（由新到旧）进行剥离！
+          
+          COMMITS_TO_REVERT=(
+            2aba6b8c55524d7b0f1f87ee1e982ce6d36d1bb7
+            ea1614c8aadbbf4b925349e08f9fbb7279f9eeab
+            f6037b73d80aeeba24e4d673658fa23eb45728e0
+          )
+          
+          for commit in "${COMMITS_TO_REVERT[@]}"; do
+            echo "🔄 正在精准回滚 Commit: $commit ..."
+            # 严格执行，出错即停
+            git revert --no-edit "$commit" || {
+              echo "❌ 回滚 $commit 失败！请检查源码状态。";
+              exit 1;
+            }
+          done
 
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
