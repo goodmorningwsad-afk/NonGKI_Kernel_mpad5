@@ -15,49 +15,6 @@ runs:
           echo "FIRST_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $1}')" >> $GITHUB_ENV
           echo "SECOND_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $2}')" >> $GITHUB_ENV
 
-          # ==========================================
-          # ==== 👇 终极顺序修正版：严格倒序，保留长哈希 👇 ====
-          # ==========================================
-          echo "==== 开始精准回滚 (清除前朝余孽) ===="
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "拉取完整历史..."
-          git fetch --depth=100 || echo "已经是完整克隆，继续..."
-          git config --global user.name "GitHub Action"
-          git config --global user.email "action@github.com"
-          
-          # 📜 策略说明：
-          # 1. 严格按照 Git 提交的时间倒序（由新到旧）进行剥离。
-          # 2. 必须保留 5cb6bd8d9d71 这个长哈希，防止引发 ambiguous (争议) 报错！
-          
-          COMMITS_TO_REVERT=(
-            "bced3a10f41050f36e96848553cff6d4e11445a0"
-            "08af382"      # (最新) disabled ksu and susfs
-            "1171f23"      # nabu: update config
-            "c44e1ab"      # drivers: Add KernelSU hooks
-            "3912338"      # devpts: KernelSU: Fix...
-            "5cb6bd8d9d71" # 🌟 必须保留的防争议长哈希！
-            "c5ad197"      # selinux: Allow init exec ksud
-            "4da2bb2"      # fs: Backport path_umount
-            "be70102"      # drivers: Set proper version
-            "73789c6"      # drivers: Import KernelSU Next
-            "bc69b25"      # fs: SUSFS v1.5.5 config
-            "fe2ed1a"      # (最旧) fs: 实现 SUSFS V1.5.5
-          )
-          
-          for commit in "${COMMITS_TO_REVERT[@]}"; do
-            echo "🔄 正在精准回滚 Commit: $commit ..."
-            # 严格执行，出错即停
-            git revert --no-edit "$commit" || {
-              echo "❌ 回滚 $commit 失败！请检查源码状态。";
-              exit 1;
-            }
-          done
-          
-          echo "✅ 11 次连贯回滚完美执行完毕！没有任何冲突和争议！"
-          echo "==== 🧹 源码已达到绝对纯净状态 ===="
-          # ==========================================
-
       - name: 🕵️ 校验内核环境 (输出 exec.c 和 stat.c 真实内容)
         shell: bash   # <====== 就是少了这一句救命的代码！
         run: |
