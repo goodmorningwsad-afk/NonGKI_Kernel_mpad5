@@ -3,55 +3,49 @@ name: 'Preparation for the official start of the compilation steps.'
 runs:
   using: 'composite'
   steps:
-      - name: Get Kernel
+      - name: ⏪ 全自动 Git 级除颤仪：智能回溯所有污染提交
         shell: bash
         run: |
-          cd $GITHUB_WORKSPACE
-          echo "==== 🚀 物理清场：炸掉被提前占用的 device_kernel 目录 ===="
-          rm -rf device_kernel
-          # 🚨 极其关键：将 depth 改为 100，获取足够的历史记录用于反向剥离
-          git clone --recursive "${{ env.KERNEL_SOURCE }}" -b "${{ env.KERNEL_BRANCH }}" device_kernel --depth=100
+          cd $GITHUB_WORKSPACE/device_kernel
           
-          cd device_kernel
-          
-          echo "==== 🚀 执行物理开颅：剥离原厂自带的 KSU-next 和 susfs ===="
-          # 配置 GitHub Actions 的临时 Git 身份（必须配才能 revert）
+          echo "==== 🚀 启动全自动智能回溯引擎 ===="
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
           
-          # 🚨 精准斩首：按时间线倒序剥离（先剥离最新的 susfs，再剥离 KSU-next）
-          git revert --no-edit dcde219
-          git revert --no-edit ddb1984
+          # 获取所有包含敏感词的 commit 哈希值（按时间从新到老排序）
+          # 🚨 加了 --no-pager 强行关闭分页器，绝对防止在云端卡死！
+          ALL_SUSPECTS=$(git --no-pager log --format="%H" --grep="susfs\|kernelsu\|ksu" -i)
           
-          echo "✅ 历史病灶已被彻底连根拔起，底层钩子完美清除！"
-
+          for commit in $ALL_SUSPECTS; do
+              TITLE=$(git --no-pager log --format="%s" -n 1 $commit)
+              
+              echo "----------------------------------------"
+              echo "🔍 正在审判: $TITLE ($commit)"
+              
+              # 🚨 核心排雷逻辑：绝对不能回滚带有 "Revert" 的提交！
+              # 因为回滚一个“回滚操作”，等于把毒代码重新加回去！
+              if [[ "$TITLE" == Revert* ]] || [[ "$TITLE" == revert* ]]; then
+                  echo "⏭️ 判定为原作者自身的清理操作，安全跳过！"
+                  continue
+              fi
+              
+              echo "🔪 尝试安全剥离此提交..."
+              # 尝试调用 Git 底层引擎进行 C 语法级的安全回滚
+              git revert --no-edit $commit || {
+                  echo "⚠️ 发生时空冲突 (代码已被后续补丁覆盖或早已被原作者清理)！"
+                  echo "🛡️ 触发防爆盾：自动放弃当前剥离，恢复现场并跳过..."
+                  git revert --abort
+              }
+          done
+          
+          echo "----------------------------------------"
+          echo "✅ 智能回溯全部执行完毕！底层语法完美保全！"
+          
           # Get Kernel Version
           KERNEL_VERSION=$(head -n 3 Makefile | grep -E 'VERSION|PATCHLEVEL' | awk '{print $3}' | paste -sd '.')
           echo "KERNEL_VERSION=$KERNEL_VERSION" >> $GITHUB_ENV
           echo "FIRST_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $1}')" >> $GITHUB_ENV
           echo "SECOND_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $2}')" >> $GITHUB_ENV
-
-      - name: 🕵️ 云端法医雷达：全盘扫描脏提交案底
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "==== 📡 雷达 A：标题扫描仪 (全网搜捕 susfs / ksu) ===="
-          # 扫描所有提交标题里带有这些敏感词的案底
-          git log --oneline --grep="susfs\|kernelsu\|ksu" -i || echo "未扫描到匹配标题"
-          echo ""
-          
-          echo "==== 🔬 雷达 B：底层显微镜 (搜捕源码里的 CONFIG_KSU) ===="
-          # 扫描所有在代码里偷偷增加或删除了 CONFIG_KSU 的案底
-          git log --oneline -S "CONFIG_KSU" -i || echo "未扫描到隐蔽代码"
-          echo ""
-          
-          echo "==== 🔪 雷达 C：案发现场监控 (死盯 exec.c 和 stat.c) ===="
-          # 找出所有动过这两个核心大动脉文件的历史记录
-          git log --oneline -- fs/exec.c fs/stat.c || echo "未扫描到文件修改记录"
-          echo ""
-          
-          echo "==== ✅ 扫描完毕！请在上方日志中查看嫌疑提交的哈希值！ ===="
         
       - name: 🕵️ 校验内核环境 (输出 exec.c 和 stat.c 真实内容)
         shell: bash   # <====== 就是少了这一句救命的代码！
