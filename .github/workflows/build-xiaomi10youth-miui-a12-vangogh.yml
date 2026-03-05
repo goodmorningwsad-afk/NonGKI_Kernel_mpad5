@@ -141,29 +141,6 @@ jobs:
               exit 1
           fi
 
-      - name: 🩹 物理开颅：修复 SukiSU 遗留的 C 语言语法错误
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 开始修复 SukiSU 原厂代码结构 Bug ===="
-          
-          # 1. 修复 app_profile.c 的指针调用笔误 (profile-> 改为 profile.)
-          sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
-          sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
-          # 精准替换后半段代码，防误伤
-          sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
-          
-          # 2. 修复 supercalls.c 的宏定义套娃与链接报错
-          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
-          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
-          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
-          
-          # 3. 修复 sucompat.c 致命的安全掉包漏洞
-          echo "==== 正在切断 su->sh 的无差别篡改大动脉 ===="
-          sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c
-          
-          echo "✅ SukiSU 核心病灶与语法报错已全部物理切除！"
-
       - name: 🪄 唤醒 SuSFS 2.0.0 大动脉 (纯净注入)
         shell: bash
         run: |
