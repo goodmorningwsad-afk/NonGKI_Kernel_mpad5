@@ -118,6 +118,18 @@ jobs:
           if [ -n "$KSU_DIR" ]; then
               echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
               cd "$KSU_DIR"
+             if [ -n "$KSU_DIR" ]; then
+              echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
+              cd "$KSU_DIR"
+              
+              echo "==== 🚨 突破子模块浅克隆限制，拉取时空记录 ===="
+              git fetch --depth=150 || git fetch --unshallow
+              
+              # 现在历史已补全，可以直接穿梭了
+              git reset --hard c1fd51c
+              
+              echo "✅ 源码已成功回溯！"
+          else
               git reset --hard c1fd51c
               echo "✅ 源码已成功回溯至 3 月 2 日纯净版！"
           else
