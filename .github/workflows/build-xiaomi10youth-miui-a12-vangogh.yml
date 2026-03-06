@@ -130,7 +130,7 @@ jobs:
               fi
               
               echo "❌ [致命错误] 补丁应用失败！未能在 $file 中找到特征码 ($mode: $marker)。"
-              exit 1 # 立即拉掉电闸，阻止 GitHub Actions 继续编译！
+              exit 1
           }
           
           # ===================================================
@@ -205,7 +205,10 @@ jobs:
           apply_patch "修补 module-plts.c" arch/arm64/kernel/module-plts.c has "#include <asm/insn.h>" patch_module_plts
           apply_patch "修补 cpuset.c" kernel/cgroup/cpuset.c has "struct cs_target" patch_cpuset
           apply_patch "修补 cpu.c" kernel/cpu.c has "FIXED_CPU_MASK" patch_cpu
-          apply_patch "修补 sched/tune.c" kernel/sched/tune.c no "sched_boost_override_write_wrapper" patch_sched_tune
+          
+          # 👇 [修复误杀BUG：将 mode 改为 has，特征码改为修改后的代码片段]
+          apply_patch "修补 sched/tune.c" kernel/sched/tune.c has ".write_u64 = sched_boost_override_write" patch_sched_tune
+          
           apply_patch "修补 namespace.c (VFS核心)" fs/namespace.c has "out2:" patch_namespace
           apply_patch "清理 lz4 幽灵导出" lib/lz4/lz4_decompress.c no "EXPORT_SYMBOL(LZ4_decompress_safe_partial);" patch_lz4
           apply_patch "修复 TCP 网络协议" net/ipv6/tcp_ipv6.c no "static const struct inet_connection_sock_af_ops ipv6_mapped;" patch_tcp
@@ -228,7 +231,7 @@ jobs:
           echo "ccflags-y += -Wno-shift-count-overflow -Wno-error" >> drivers/mmc/host/Makefile
           echo "ccflags-y += -Wno-logical-op-parentheses -Wno-error" >> net/ipv4/Makefile
           
-          echo "✅ 自检装，直接通关吧！"
+          echo "✅ 自甲加载完毕！"
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
