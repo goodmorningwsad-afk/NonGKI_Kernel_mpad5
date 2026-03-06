@@ -155,8 +155,8 @@ jobs:
               sed -i 's/\.write_u64 = prefer_idle_write_wrapper/.write_u64 = prefer_idle_write/g' kernel/sched/tune.c
           }
           patch_namespace() {
-              # 纳米级精准吃掉最后多余的 2 个右括号，绝不伤及后面的代码！
-              perl -0777 -pi -e 's/(err = graft_tree\(mnt, parent, mp\);\s*if\s*\(err\)\s*\{\s*lock_mount_hash\(\);\s*umount_tree\(mnt, UMOUNT_SYNC\);\s*unlock_mount_hash\(\);\s*\})\s*\}\s*\}/$1\n out2:\n\tunlock_mount(mp);\n out:\n\tpath_put(\&old_path);\n\treturn err;\n}/g' fs/namespace.c
+              # 👇 [本次终极修正：基于真实源码物理切片，直击文件末尾 (EOF) 进行全盘替换！]
+              perl -0777 -pi -e 's/err = graft_tree\(mnt, parent, mp\);\s*if\s*\(err\)\s*\{\s*lock_mount_hash\(\);[\s\}]*$/err = graft_tree(mnt, parent, mp);\n\tif (err) {\n\t\tlock_mount_hash();\n\t\tumount_tree(mnt, UMOUNT_SYNC);\n\t\tunlock_mount_hash();\n\t}\n out2:\n\tunlock_mount(mp);\n out:\n\tpath_put(\&old_path);\n\treturn err;\n}\n/g' fs/namespace.c
           }
           patch_lz4() {
               sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_partial);/d' lib/lz4/lz4_decompress.c
@@ -196,23 +196,15 @@ jobs:
           }
           
           # ===================================================
-          # 🎯 精准部署任务流水线 (全线特征码已校准)
+          # 🎯 精准部署任务流水线
           # ===================================================
           
           apply_patch "修补 namei.c" fs/namei.c has "int error = 0;" patch_namei
           apply_patch "修补 module-plts.c" arch/arm64/kernel/module-plts.c has "#include <asm/insn.h>" patch_module_plts
-          
-          # [校准]: 必须精准匹配我们注入的这一行，防止被原厂废弃代码骗过！
           apply_patch "修补 cpuset.c" kernel/cgroup/cpuset.c has "const char *name; char *cpus;" patch_cpuset
-          
           apply_patch "修补 cpu.c" kernel/cpu.c has "FIXED_CPU_MASK" patch_cpu
-          
-          # [校准]: 将模式改为 has，只要包含替换后的新指针赋值即判定成功！
           apply_patch "修补 sched/tune.c" kernel/sched/tune.c has ".write_u64 = sched_boost_override_write" patch_sched_tune
-          
-          # [校准]: 匹配最新的精确闭合标签 out2:
           apply_patch "修补 namespace.c (VFS核心)" fs/namespace.c has "out2:" patch_namespace
-          
           apply_patch "清理 lz4 幽灵导出" lib/lz4/lz4_decompress.c no "EXPORT_SYMBOL(LZ4_decompress_safe_partial);" patch_lz4
           apply_patch "修复 TCP 网络协议" net/ipv6/tcp_ipv6.c no "static const struct inet_connection_sock_af_ops ipv6_mapped;" patch_tcp
           apply_patch "修复 ZSTD 压缩库" lib/zstd/common/compiler.h has "__attribute__((__fallthrough__))" patch_zstd
@@ -228,7 +220,6 @@ jobs:
           echo "ccflags-y += -Wno-unused-function -Wno-unused-variable -Wno-error" >> fs/Makefile
           echo "ccflags-y += -Wno-unused-function -Wno-error" >> kernel/Makefile
           echo "ccflags-y += -Wno-unused-function -Wno-error" >> kernel/sched/Makefile
-          # [新增] 专门给 cpuset.c 所在的目录打一针，屏蔽辅助函数未使用的警告
           echo "ccflags-y += -Wno-unused-function -Wno-error" >> kernel/cgroup/Makefile
           echo "ccflags-y += -Wno-unused-variable -Wno-error" >> drivers/clk/Makefile
           echo "ccflags-y += -Wno-unused-variable -Wno-unused-function -Wno-error" >> drivers/input/touchscreen/focaltech_touch/Makefile
