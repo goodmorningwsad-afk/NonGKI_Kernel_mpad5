@@ -266,7 +266,28 @@ runs:
         #endif"
         patch_file "kernel/sched/tune.c" "static struct cftype files[] = {" 0 "$TUNE_HOOK" "STUNE_ASSIST_WRAPPER_FIX"
         sed -i 's/-dirty//g' scripts/setlocalversion
-       
+        # 4. 修复 focaltech_core.h 缺失 FOD 成员的官方漏网之鱼 Bug
+        # 🚨 锚点：雷达锁定 int aod_status; 并在其正上方注入缺失的变量，保持结构体完整！
+        FOCAL_HOOK_1="
+        /* FOCAL_STRUCT_FIX */
+        bool fod_finger_skip;
+        int fod_down_time;
+        bool point_id_changed;
+        int fod_status;
+        bool finger_in_fod;
+        int fod_x;
+        int fod_y;
+        bool fod_point_released;"
+        patch_file "drivers/input/touchscreen/focaltech_touch/focaltech_core.h" "int aod_status;" 0 "$FOCAL_HOOK_1" "FOCAL_STRUCT_FIX"
+
+        # 5. 修复 focaltech_core.c 隐式调用未定义函数的链接期暴毙 Bug
+        # 🚨 锚点：锁定头文件引入处，注入宏定义，把缺失的函数直接变成空气 (0)，防止 Linker 报错！
+        FOCAL_HOOK_2="
+        /* FOCAL_FUNC_FIX */
+        #ifndef fts_fod_reg_write
+        #define fts_fod_reg_write(client, reg, val) (0)
+        #endif"
+        patch_file "drivers/input/touchscreen/focaltech_touch/focaltech_core.c" "#include \"focaltech_core.h\"" 0 "$FOCAL_HOOK_2" "FOCAL_FUNC_FIX"
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
         
         sed -i 's/-dirty//g' scripts/setlocalversion
