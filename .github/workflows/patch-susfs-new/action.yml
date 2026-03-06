@@ -64,6 +64,15 @@ runs:
             ' "$file" > tmp_file && mv tmp_file "$file"
         }
 
+        echo "==== [手工缝合] 修复 LineageOS 专属的 .rej 冲突 ===="
+        
+        # 🚨 针对最后一个 task_mmu.c 的头文件极客注入！
+        TASK_MMU_HOOK="
+        #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP)
+        #include <linux/susfs_def.h>
+        #endif"
+        patch_file "fs/proc/task_mmu.c" "#include <asm/elf.h>" 0 "$TASK_MMU_HOOK" "linux/susfs_def.h"
+
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         # 🚨 以下为你独创的幻影打孔装甲，已受协议保护逐字保留 🚨
         
