@@ -1,10 +1,10 @@
 name: "SukiSU & SuSFS Phantom Hooks"
-description: "Apply SuSFS 4.14 core patch and inject Phantom Hooks for SukiSU"
+description: "Apply SuSFS 4.19 core patch and inject Phantom Hooks for SukiSU"
 
 runs:
   using: "composite"
   steps:
-    - name: 🪄 Apply SuSFS 4.14 Patch & Phantom SukiSU Hooks
+    - name: 🪄 Apply SuSFS 4.19 Patch & Phantom SukiSU Hooks
       shell: bash
       run: |
         cd $GITHUB_WORKSPACE/device_kernel
@@ -28,9 +28,10 @@ runs:
         echo "✅ SuSFS 物理开关全数合闸！"
 
         echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
-        PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.14.patch" 2>/dev/null | head -n 1)
+        # 🚨 史诗级修正：匹配 SM7250 的真实内核版本 4.19！
+        PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" 2>/dev/null | head -n 1)
         if [ -z "$PATCH_FILE" ]; then
-            echo "❌ 警告：找不到 susfs_patch_to_4.14.patch！"
+            echo "❌ 警告：找不到 susfs_patch_to_4.19.patch！"
         else
             patch -p1 -f < "$PATCH_FILE" || echo "⚠️ 部分补丁存在冲突，已自动生成 .rej 文件并强制继续！"
         fi
@@ -50,7 +51,7 @@ runs:
             if ! grep -Fq "$search_str" "$file"; then
                 echo "❌ 警告: $file 中找不到特征字符串 '$search_str'！"
                 echo "⏭️ 触发防熔断机制：强制跳过此文件，保留全尸供你下载排错！"
-                return 0  # 🚨 【核心修改】：去掉了原来的 exit 1（中止），现在它会强行跑完流水线！
+                return 0
             fi
             awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
             index($0, search) && !done {
@@ -63,24 +64,8 @@ runs:
             ' "$file" > tmp_file && mv tmp_file "$file"
         }
 
-        echo "==== [手工缝合] 修复唯一的 .rej 冲突 (fs/proc/cmdline.c) ===="
-        CMDLINE_HOOK_1="
-        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-        extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
-        #endif"
-        patch_file "fs/proc/cmdline.c" "static int cmdline_proc_show" 0 "$CMDLINE_HOOK_1" "extern int susfs_spoof_cmdline_or_bootconfig"
-        
-        CMDLINE_HOOK_2="
-        #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-        	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
-        		seq_putc(m, 10); /* 🚨 物理魔法：10 是换行符，防转义 */
-        		return 0;
-        	}
-        #endif"
-        # 🚨 【核心修改】：将锚点改为 seq_puts，完美契合 LineageOS 最新源码！
-        patch_file "fs/proc/cmdline.c" "seq_puts(m, saved_command_line);" 0 "$CMDLINE_HOOK_2" "susfs_spoof_cmdline_or_bootconfig(m)"
-
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
+        # 🚨 以下为你独创的幻影打孔装甲，已受协议保护逐字保留 🚨
         
         EXEC_HOOK="
         #ifdef CONFIG_KSU
