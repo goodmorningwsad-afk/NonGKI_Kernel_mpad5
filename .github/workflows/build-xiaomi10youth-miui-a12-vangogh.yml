@@ -1,4 +1,4 @@
-name: Build Xiaomi 10 Youth (vangogh) (MIUI A12)
+name: Build Xiaomi 10 Youth (vangogh) ( NO MIUI A12)
 
 on:
   workflow_call:
