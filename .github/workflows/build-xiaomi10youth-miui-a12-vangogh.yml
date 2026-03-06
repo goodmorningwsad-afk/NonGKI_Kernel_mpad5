@@ -160,7 +160,7 @@ jobs:
           }
           
           # ===================================================
-          # 🧰 所有修补逻辑函数化 (强行注入唯一防伪钢印)
+          # 🧰 所有修补逻辑函数化
           # ===================================================
           
           patch_module_plts() {
@@ -212,27 +212,10 @@ jobs:
               sed -i 's|//\* void sdhci_set_uhs_signaling|/* FIXED_SDHCI */ void sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c
               sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);|g' drivers/mmc/host/sdhci.c
           }
-          patch_modversions() {
-              # 仅关闭 KSU 宏，绝对不再碰 MODVERSIONS！保留 MIUI 原厂的模块校验机制！
-              sed -i 's/CONFIG_KSU=y/# CONFIG_KSU is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
-              sed -i 's/CONFIG_KSU_SUSFS=y/# CONFIG_KSU_SUSFS is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
-              echo "# CONFIG_KSU is not set /* FIXED_MODVERSIONS */" >> arch/arm64/configs/vendor/lito-perf_defconfig
-          }
-          patch_module_spoof() {
-              # 遇到任何 CRC 校验，强行 return 1 (成功)！
-              perl -0777 -pi -e 's/(static int check_version.*?\{)/$1\n\treturn 1; \/* FIXED_CRC *\//s' kernel/module.c
-              # 遇到任何 Vermagic 签名比对，强行 return 1 (成功)！
-              perl -0777 -pi -e 's/(static inline int same_magic.*?\{)/$1\n\treturn 1; \/* FIXED_VERMAGIC *\//s' kernel/module.c
-          }
-          
-          # 👇 [本次夺冠新增：切除引发报错的 DVB 盲肠模块]
           patch_dvb() {
-              # 取消 defconfig 中的模块配置
               sed -i 's/CONFIG_DVB_MPQ=m/# CONFIG_DVB_MPQ is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
               sed -i 's/CONFIG_DVB_MPQ_DEMUX=m/# CONFIG_DVB_MPQ_DEMUX is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
               echo "# CONFIG_DVB_MPQ is not set /* FIXED_DVB_CONFIG */" >> arch/arm64/configs/vendor/lito-perf_defconfig
-              
-              # 直接物理摧毁 DVB 目录下的所有 Makefile 编译链
               if [ -d "drivers/media/platform/msm/dvb" ]; then
                   find drivers/media/platform/msm/dvb -name "Makefile" -type f -exec sed -i 's/obj-$(CONFIG/DISABLED_obj-$(CONFIG/g' {} +
                   find drivers/media/platform/msm/dvb -name "Makefile" -type f -exec sed -i 's/obj-m/DISABLED_obj-m/g' {} +
@@ -240,6 +223,26 @@ jobs:
               fi
           }
           
+          # 👇 [修复核心1：强制保留 MODVERSIONS，但开启相对重定位修复 LLD 报错]
+          patch_modversions() {
+              # 开启相对重定位，这是让 LLVM 闭嘴的关键！
+              echo "CONFIG_MODULE_REL_CRCS=y" >> arch/arm64/configs/vendor/lito-perf_defconfig
+              
+              # 物理级防御：修改汇编代码，将所有的绝对重定位改成相对重定位 ( - . )
+              perl -pi -e 's/(\.long\s+__crc_" #sym ")(?!\s*-\s*\.)/$1 - ./g' include/asm-generic/export.h || true
+              perl -pi -e 's/(\.long\s+__crc_" #sym ")(?!\s*-\s*\.)/$1 - ./g' arch/arm64/include/asm/export.h || true
+              
+              echo "# FIXED_MODVERSIONS" >> arch/arm64/configs/vendor/lito-perf_defconfig
+          }
+
+          # 👇 [修复核心2：终极黑客欺骗术，让所有外挂驱动免检放行！解决黑屏、无触控！]
+          patch_module_spoof() {
+              # 遇到任何 CRC 校验，强行 return 1 (成功)！
+              perl -0777 -pi -e 's/(static int check_version.*?\{)/$1\n\treturn 1; \/* FIXED_CRC *\//s' kernel/module.c
+              # 遇到任何 Vermagic 签名比对，强行 return 1 (成功)！
+              perl -0777 -pi -e 's/(static inline int same_magic.*?\{)/$1\n\treturn 1; \/* FIXED_VERMAGIC *\//s' kernel/module.c
+          }
+
           # ===================================================
           # 🎯 精准部署任务流水线 (强制校验物理钢印)
           # ===================================================
@@ -255,10 +258,11 @@ jobs:
           apply_patch "修复 MMC 闪存驱动" drivers/mmc/core/core.c has "FIXED_MMC" patch_mmc
           apply_patch "修复 内存回收机制" mm/madvise.c has "FIXED_RECLAIM" patch_madvise
           apply_patch "修复 SDHCI 乱码注释" drivers/mmc/host/sdhci.c has "FIXED_SDHCI" patch_sdhci
-          apply_patch "物理关闭 MODVERSIONS 与 KSU 强效宏" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_MODVERSIONS" patch_modversions
-          
-          # 🚨 注入斩首指令
           apply_patch "切除无用的 DVB 数字电视驱动模块" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_DVB_CONFIG" patch_dvb
+          
+          # 🚨 注入欺骗与修复指令
+          apply_patch "物理修复 LLVM 链接器重定位 Bug" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_MODVERSIONS" patch_modversions
+          apply_patch "内核级驱动欺骗 (解决黑屏无触控)" kernel/module.c has "FIXED_VERMAGIC" patch_module_spoof
           
           echo "---------------------------------------------------"
           echo "💉 注入镇静剂，屏蔽无效的编译器警告"
@@ -272,9 +276,7 @@ jobs:
           echo "ccflags-y += -Wno-declaration-after-statement -Wno-error" >> drivers/leds/Makefile
           echo "ccflags-y += -Wno-shift-count-overflow -Wno-error" >> drivers/mmc/host/Makefile
           echo "ccflags-y += -Wno-logical-op-parentheses -Wno-error" >> net/ipv4/Makefile
-          apply_patch "物理关闭 KSU 强效宏" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_MODVERSIONS" patch_modversions
-          # 👇 加上这句
-          apply_patch "内核级驱动欺骗 (解决黑屏无触控)" kernel/module.c has "FIXED_VERMAGIC" patch_module_spoof
+          
           echo "✅ 所有雷区排空！主内核已成形，准备见证 Anykernel3 出包奇迹！"
           
       - name: 🚀 Build Process
