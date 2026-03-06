@@ -87,81 +87,191 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-      - name: 📦 Extract Pristine Source Code (Before Patching)
+      - name: ⏪ 物理时光机：精准回溯 3 号提交
         shell: bash
         run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 正在提取案发现场绝对纯净的原厂源码 ===="
-          # 将所有嫌疑文件打包成一个 zip
-          zip -r pristine_sources.zip \
-            fs/namespace.c \
-            fs/namei.c \
-            kernel/cgroup/cpuset.c \
-            kernel/cpu.c \
-            kernel/sched/tune.c \
-            arch/arm64/kernel/module-plts.c \
-            lib/lz4/lz4_decompress.c \
-            net/ipv4/tcp_ipv4.c \
-            net/ipv6/tcp_ipv6.c \
-            lib/zstd/common/compiler.h \
-            drivers/input/touchscreen/focaltech_touch/focaltech_core.h \
-            drivers/input/touchscreen/focaltech_touch/focaltech_core.c \
-            drivers/mmc/core/core.c \
-            mm/madvise.c \
-            drivers/mmc/host/sdhci.c
-            
-      - name: 📤 Upload Pristine Sources Artifact
+          echo "==== 启动 Git 级时光机，直接回退 ===="
+          
+          # 精准定位 SukiSU 源码根目录
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
+          
+          if [ -n "$KSU_DIR" ]; then
+              echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
+              cd "$KSU_DIR"
+              
+              # 🚨 核心指令：直接硬重置到 3 月 2 日的最后一个正常提交 (c1fd51c)
+              # 这行命令会瞬间抹除 3 号当天的所有提交记录和毒代码，干干净净！
+              git reset --hard c1fd51c
+              
+              echo "✅ 源码已成功回溯至 3 月 2 日纯净版！"
+          else
+              echo "❌ 致命错误：未找到 SukiSU 源码目录，时光机启动失败！"
+              exit 1
+          fi
+
+      - name: 📦 提取 SukiSU 底层源码寻找真名
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 正在查抄 SukiSU 底层核心寻找隐藏函数 ===="
+          mkdir -p SukiSU_Source
+          
+          # 直接把整个 kernelsu 驱动文件夹端出来
+          cp -r device_kernel/drivers/kernelsu/* SukiSU_Source/ || echo "❌ 未找到 SukiSU 源码"
+          
+          cd SukiSU_Source
+          zip -r ../SukiSU_Source.zip .
+          
+      - name: 📤 上传 SukiSU 源码
         uses: actions/upload-artifact@v4
         with:
-          name: pristine_kernel_sources
-          path: device_kernel/pristine_sources.zip
+          name: SukiSU_Source
+          path: SukiSU_Source.zip
 
-      - name: 🪛 Extra Kernel Options (Safe Mode)
-        shell: bash
+      - name: 📦 提取核心源码进行验证 (包含 hooks.c)
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 正在提取 hooks.c 和 exec.c 进行验证 ===="
+          
+          # 创建一个临时文件夹用来存放要看的文件
+          mkdir -p verify_files/security/selinux
+          mkdir -p verify_files/fs
+          
+          # 提取免死金牌文件 hooks.c
+          cp device_kernel/security/selinux/hooks.c verify_files/security/selinux/ || echo "❌ 未找到 hooks.c"
+          
+          # 顺手把开机传感器 exec.c 也提取出来再确认一眼
+          cp device_kernel/fs/exec.c verify_files/fs/ || echo "❌ 未找到 exec.c"
+          
+          # 打包成 zip
+          cd verify_files
+          zip -r ../Kernel_Verify_Files.zip .
+
+      - name: 📤 上传源码验证包到云端
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kernel_Verify_Files
+          path: Kernel_Verify_Files.zip
+
+      - name: 🩹 Fix SukiSU Source Bugs & Extra Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
+          echo "==== 开始清理与修复 SukiSU 原厂 Bug ===="
           
-          apply_patch() {
-              local name="$1"; local file="$2"; local mode="$3"; local marker="$4"; local func="$5"
-              echo "🔍 检查补丁: [$name] -> $file"
-              if [ "$mode" = "has" ] && grep -Fq "$marker" "$file"; then return 0; fi
-              if [ "$mode" = "no" ] && ! grep -Fq "$marker" "$file"; then return 0; fi
-              echo "🔨 正在执行外科手术..."
-              $func
-              if [ "$mode" = "has" ] && grep -Fq "$marker" "$file"; then echo "✅ [成功]"; return 0; fi
-              if [ "$mode" = "no" ] && ! grep -Fq "$marker" "$file"; then echo "✅ [成功]"; return 0; fi
-              echo "❌ [致命错误] $file"
-              exit 1
-          }
+          # 1. 修复 builtin 分支里的原厂笔误
+          sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
+          sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
+          # 只替换 300 行以后的 cred！绝不误伤上半部分合法的 cred 变量！
+          sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
           
-          # 1. 仅保留最基础的语法和编译报错修复，绝不碰核心逻辑！
-          patch_module_plts() { sed -i '1i #include <asm/insn.h> \/* FIXED_MODULE_PLTS *\/' arch/arm64/kernel/module-plts.c; }
-          patch_cpuset() { sed -i '1i struct cs_target { const char *name; char *cpus; }; \/* FIXED_CS_TARGET *\/' kernel/cgroup/cpuset.c; }
-          patch_lz4() { sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_partial);/d' lib/lz4/lz4_decompress.c; sed -i '/EXPORT_SYMBOL(LZ4_setStreamDecode);/d' lib/lz4/lz4_decompress.c; sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_continue);/d' lib/lz4/lz4_decompress.c; sed -i '/EXPORT_SYMBOL(LZ4_decompress_fast_continue);/d' lib/lz4/lz4_decompress.c; sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_usingDict);/d' lib/lz4/lz4_decompress.c; sed -i '/EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/d' lib/lz4/lz4_decompress.c; }
-          patch_sdhci() { sed -i 's|//\* void sdhci_set_uhs_signaling|/* FIXED_SDHCI */ void sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c; sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);|g' drivers/mmc/host/sdhci.c; }
-          patch_dvb() { sed -i 's/CONFIG_DVB_MPQ=m/# CONFIG_DVB_MPQ is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig; sed -i 's/CONFIG_DVB_MPQ_DEMUX=m/# CONFIG_DVB_MPQ_DEMUX is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig; echo "# CONFIG_DVB_MPQ is not set /* FIXED_DVB_CONFIG */" >> arch/arm64/configs/vendor/lito-perf_defconfig; if [ -d "drivers/media/platform/msm/dvb" ]; then find drivers/media/platform/msm/dvb -name "Makefile" -type f -exec sed -i 's/obj-$(CONFIG/DISABLED_obj-$(CONFIG/g' {} +; find drivers/media/platform/msm/dvb -name "Makefile" -type f -exec sed -i 's/obj-m/DISABLED_obj-m/g' {} +; find drivers/media/platform/msm/dvb -name "Makefile" -type f -exec sed -i 's/obj-y/DISABLED_obj-y/g' {} +; fi; }
+          # 2. 修复 supercalls.c 的宏定义套娃与链接报错
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
           
-          # 2. 贯彻你的意志：只关掉干扰的宏，物理切除 LLVM 报错，绝对保留原厂模块校验逻辑！
-          patch_minimal_survival() {
-              sed -i '/CONFIG_MODVERSIONS/d' arch/arm64/configs/vendor/lito-perf_defconfig
-              echo "CONFIG_MODVERSIONS=y /* FIXED_MODVERSIONS */" >> arch/arm64/configs/vendor/lito-perf_defconfig
-              find include arch/arm64 -name "export.h" -type f -exec sed -i '/__crc_/d' {} +
-              sed -i '/CONFIG_KSU/d' arch/arm64/configs/vendor/lito-perf_defconfig
-              echo "# CONFIG_KSU is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
-              echo "# CONFIG_KSU_SUSFS is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
-          }
+          # 3. 屏蔽内核中烦人的无用函数警告
+          echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
+          echo "ccflags-y += -Wno-error" >> fs/Makefile
+          #  接通被阉割的用户命名空间，拯救模块挂载 
+          sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
+          
+          # 4. 防止 LTO 爆内存，并强制唤醒挂载引擎
+          sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
+          sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
+          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig
 
-          apply_patch "语法修复: module-plts" arch/arm64/kernel/module-plts.c has "FIXED_MODULE_PLTS" patch_module_plts
-          apply_patch "语法修复: cpuset" kernel/cgroup/cpuset.c has "FIXED_CS_TARGET" patch_cpuset
-          apply_patch "语法修复: lz4" lib/lz4/lz4_decompress.c no "EXPORT_SYMBOL(LZ4_decompress_safe_partial);" patch_lz4
-          apply_patch "语法修复: sdhci" drivers/mmc/host/sdhci.c has "FIXED_SDHCI" patch_sdhci
-          apply_patch "切除无用盲肠: DVB" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_DVB_CONFIG" patch_dvb
+          # >>>>>> ：修复探测 su 掉包漏洞 <<<<<<
+          echo "==== 正在切断 su->sh 的无差别篡改大动脉 ===="
+          sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c
+     
+      - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
+        uses: ./.github/workflows/patch-susfs-new
           
-          # 🚨 按照你的直觉，仅执行极简保命，拔除所有 module.c 欺骗！
-          apply_patch "极简保命 (消灭 LLVM 报错并闭源免疫)" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_MODVERSIONS" patch_minimal_survival
+      - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 正在收集打孔后的核心文件，准备验尸 ===="
+          mkdir -p patched_source_files/fs/devpts
+          mkdir -p patched_source_files/drivers/input
+          mkdir -p patched_source_files/security/selinux
+          mkdir -p patched_source_files/fs/proc
           
-          echo "ccflags-y += -Wno-error" >> Makefile
-          echo "✅ 极简真理版装甲加载完毕！"
+          # 1. 提取咱们自己手打的神级孔
+          cp device_kernel/fs/exec.c patched_source_files/fs/ || true
+          cp device_kernel/fs/open.c patched_source_files/fs/ || true
+          cp device_kernel/fs/read_write.c patched_source_files/fs/ || true
+          cp device_kernel/fs/stat.c patched_source_files/fs/ || true
+          cp device_kernel/fs/namespace.c patched_source_files/fs/ || true
+          cp device_kernel/fs/devpts/inode.c patched_source_files/fs/devpts/ || true
+          cp device_kernel/drivers/input/input.c patched_source_files/drivers/input/ || true
+          cp device_kernel/security/selinux/hooks.c patched_source_files/security/selinux/ || true
+          cp device_kernel/fs/proc/cmdline.c patched_source_files/fs/proc/ || true
+          
+          # 2. 🚨 重点提取 SuSFS 的核心大动脉，验明真身！
+          cp device_kernel/fs/susfs.c patched_source_files/fs/ || true
+          cp device_kernel/fs/dcache.c patched_source_files/fs/ || true
+          cp device_kernel/fs/readdir.c patched_source_files/fs/ || true
+          cp device_kernel/fs/namei.c patched_source_files/fs/ || true
+          
+          cd patched_source_files
+          zip -r ../Patched_Source_Files.zip .
+          
+      - name: 📦 上传打孔后源码验证包
+        uses: actions/upload-artifact@v4
+        with:
+          name: Patched_Source_Files
+          path: Patched_Source_Files.zip
+
+      - name: 📤 提取官方 SukiSU 补丁脚本 (用于法医级审查)
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 正在查抄官方补丁目录 ===="
+          mkdir -p Official_Patches
+          
+          # 1. 尝试从 /tmp 临时目录把所有原版补丁和脚本端出来
+          cp -r /tmp/Patches/* Official_Patches/ || true
+          
+          # 2. 尝试从内核执行目录把刚才跑过的脚本抓出来
+          cp device_kernel/backport_patches.sh Official_Patches/ || true
+          cp device_kernel/backport_selinux_patches.sh Official_Patches/ || true
+          cp device_kernel/*.patch Official_Patches/ || true
+          
+          cd Official_Patches
+          zip -r ../Official_Patches.zip .
+
+      - name: 📦 上传官方补丁审查包
+        uses: actions/upload-artifact@v4
+        with:
+          name: Official_Patches
+          path: Official_Patches.zip
+
+      - name: 📤 提取 SuSFS 冲突原件 ( .rej 查抄)
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "==== 正在满世界抓捕 .rej 冲突文件 ===="
+          mkdir -p Rej_Files
+          
+          # 从内核源码目录把所有打不进去的 .rej 尸体全搜出来，复制到专案组文件夹
+          find device_kernel -name "*.rej" -exec cp {} Rej_Files/ \; || true
+          
+          cd Rej_Files
+          # 如果没有冲突，压缩包可能为空，加上 || true 防报错
+          zip -r ../Rej_Files.zip . || true
+
+      - name: 📦 上传冲突审查包 (.rej)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuSFS_Rej_Files
+          path: Rej_Files.zip
+          if-no-files-found: ignore
+
+      - name: 🧰 Patch Kernel of Re:Kernel
+        uses: ./.github/workflows/patch-rekernel
+
+      - name: 🔒 Patch Kernel of Baseband Guard
+        uses: ./.github/workflows/patch-baseband-guard
+
+      - name: 🔧 Patch Hide Stuff
+        uses: ./.github/workflows/patch-hide-stuff
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
