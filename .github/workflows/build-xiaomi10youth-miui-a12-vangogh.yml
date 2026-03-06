@@ -44,7 +44,7 @@ env:
   ROM_TEXT : "miui_a12"
   PYTHON_VERSION: "2"
   PACK_METHOD: "Anykernel3"
-  KERNELSU_METHOD: "none"
+  KERNELSU_METHOD: "shell"
   PATCHES_SOURCE: ""
   PATCHES_BRANCH: ""
   SUSFS_FOLDER_FIXED: ""
