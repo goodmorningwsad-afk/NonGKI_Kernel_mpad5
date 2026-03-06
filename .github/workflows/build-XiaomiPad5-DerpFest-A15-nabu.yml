@@ -132,9 +132,6 @@ jobs:
               exit 1
           fi
 
-      - name: 🪝 Patch Kernel of SUSFS
-        uses: ./.github/workflows/patch-susfs
-
       - name: 📦 提取 SukiSU 底层源码寻找真名
         run: |
           cd $GITHUB_WORKSPACE
