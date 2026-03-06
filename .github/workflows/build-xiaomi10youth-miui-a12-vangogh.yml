@@ -160,7 +160,7 @@ jobs:
           }
           
           # ===================================================
-          # 🧰 所有修补逻辑函数化 (已剔除不治而愈的 namei 和 namespace)
+          # 🧰 所有修补逻辑函数化 (强行注入唯一防伪钢印)
           # ===================================================
           
           patch_module_plts() {
@@ -219,11 +219,25 @@ jobs:
               echo "# CONFIG_KSU_SUSFS is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
           }
           
+          # 👇 [本次夺冠新增：切除引发报错的 DVB 盲肠模块]
+          patch_dvb() {
+              # 取消 defconfig 中的模块配置
+              sed -i 's/CONFIG_DVB_MPQ=m/# CONFIG_DVB_MPQ is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
+              sed -i 's/CONFIG_DVB_MPQ_DEMUX=m/# CONFIG_DVB_MPQ_DEMUX is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
+              echo "# CONFIG_DVB_MPQ is not set /* FIXED_DVB_CONFIG */" >> arch/arm64/configs/vendor/lito-perf_defconfig
+              
+              # 直接物理摧毁 DVB 目录下的所有 Makefile 编译链
+              if [ -d "drivers/media/platform/msm/dvb" ]; then
+                  find drivers/media/platform/msm/dvb -name "Makefile" -type f -exec sed -i 's/obj-$(CONFIG/DISABLED_obj-$(CONFIG/g' {} +
+                  find drivers/media/platform/msm/dvb -name "Makefile" -type f -exec sed -i 's/obj-m/DISABLED_obj-m/g' {} +
+                  find drivers/media/platform/msm/dvb -name "Makefile" -type f -exec sed -i 's/obj-y/DISABLED_obj-y/g' {} +
+              fi
+          }
+          
           # ===================================================
           # 🎯 精准部署任务流水线 (强制校验物理钢印)
           # ===================================================
           
-          # [剔除] apply_patch "修补 namei.c" ... 因为它已经通过宏控制免疫了！
           apply_patch "修补 module-plts.c" arch/arm64/kernel/module-plts.c has "FIXED_MODULE_PLTS" patch_module_plts
           apply_patch "修补 cpuset.c" kernel/cgroup/cpuset.c has "FIXED_CS_TARGET" patch_cpuset
           apply_patch "修补 cpu.c" kernel/cpu.c has "FIXED_CPU_MASK" patch_cpu
@@ -236,6 +250,9 @@ jobs:
           apply_patch "修复 内存回收机制" mm/madvise.c has "FIXED_RECLAIM" patch_madvise
           apply_patch "修复 SDHCI 乱码注释" drivers/mmc/host/sdhci.c has "FIXED_SDHCI" patch_sdhci
           apply_patch "物理关闭 MODVERSIONS 与 KSU 强效宏" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_MODVERSIONS" patch_modversions
+          
+          # 🚨 注入斩首指令
+          apply_patch "切除无用的 DVB 数字电视驱动模块" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_DVB_CONFIG" patch_dvb
           
           echo "---------------------------------------------------"
           echo "💉 注入镇静剂，屏蔽无效的编译器警告"
@@ -250,7 +267,7 @@ jobs:
           echo "ccflags-y += -Wno-shift-count-overflow -Wno-error" >> drivers/mmc/host/Makefile
           echo "ccflags-y += -Wno-logical-op-parentheses -Wno-error" >> net/ipv4/Makefile
           
-          echo "✅ 极客级防伪自检装甲加载完毕，编译护盾全开，通关吧！"
+          echo "✅ 所有雷区排空！主内核已成形，准备见证 Anykernel3 出包奇迹！"
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
