@@ -223,14 +223,14 @@ jobs:
               fi
           }
           
-          # 👇 [大结局终极核心：结构体体型伪装 + LLD 瞎眼战术]
+          # 👇 [修复核心1：物理级抹除 CRC 校验生成，彻底消灭 R_AARCH64_ABS32]
           patch_modversions() {
-              # 1. 强行保留 MODVERSIONS，保持内核与外挂驱动在内存中的体型绝对一致，防止 UFS 闪存驱动崩溃掉 Recovery！
+              # 强行保留 MODVERSIONS，保持内核与外挂驱动在内存中的体型一致，防止 UFS 闪存崩溃掉 Recovery！
               sed -i '/CONFIG_MODVERSIONS/d' arch/arm64/configs/vendor/lito-perf_defconfig
               echo "CONFIG_MODVERSIONS=y /* FIXED_MODVERSIONS */" >> arch/arm64/configs/vendor/lito-perf_defconfig
               
-              # 2. 神级瞎眼战术：将所有的 __crc_ 替换为 "0 //" 变成注释，从物理层面让绝对重定位消失，10000% 杜绝 R_AARCH64_ABS32 报错！
-              find include arch/arm64 -name "export.h" -type f -exec perl -pi -e 's/__crc_/0 \/\//g' {} +
+              # 核心手术：从物理层面暴力删掉 export.h 中所有生成 __crc_ 的汇编代码行！
+              find include arch/arm64 -name "export.h" -type f -exec sed -i '/__crc_/d' {} +
               
               # 关闭 KSU
               sed -i '/CONFIG_KSU/d' arch/arm64/configs/vendor/lito-perf_defconfig
@@ -238,7 +238,7 @@ jobs:
               echo "# CONFIG_KSU_SUSFS is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
           }
 
-          # 👇 [大结局辅助核心：强制骗过 MIUI，解决黑屏和触控罢工！]
+          # 👇 [修复核心2：终极黑客欺骗术，让所有外挂驱动免检放行！解决黑屏、无触控！]
           patch_module_spoof() {
               # 遇到任何 CRC 校验，强行 return 1 (成功)！
               perl -0777 -pi -e 's/(int check_version.*?\{)/$1\n\treturn 1; \/* FIXED_CRC *\//s' kernel/module.c
