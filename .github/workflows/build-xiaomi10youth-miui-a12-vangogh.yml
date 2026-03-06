@@ -213,10 +213,16 @@ jobs:
               sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);|g' drivers/mmc/host/sdhci.c
           }
           patch_modversions() {
-              sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
-              echo "# CONFIG_MODVERSIONS is not set /* FIXED_MODVERSIONS */" >> arch/arm64/configs/vendor/lito-perf_defconfig
-              echo "# CONFIG_KSU is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
-              echo "# CONFIG_KSU_SUSFS is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
+              # 仅关闭 KSU 宏，绝对不再碰 MODVERSIONS！保留 MIUI 原厂的模块校验机制！
+              sed -i 's/CONFIG_KSU=y/# CONFIG_KSU is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
+              sed -i 's/CONFIG_KSU_SUSFS=y/# CONFIG_KSU_SUSFS is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
+              echo "# CONFIG_KSU is not set /* FIXED_MODVERSIONS */" >> arch/arm64/configs/vendor/lito-perf_defconfig
+          }
+          patch_module_spoof() {
+              # 遇到任何 CRC 校验，强行 return 1 (成功)！
+              perl -0777 -pi -e 's/(static int check_version.*?\{)/$1\n\treturn 1; \/* FIXED_CRC *\//s' kernel/module.c
+              # 遇到任何 Vermagic 签名比对，强行 return 1 (成功)！
+              perl -0777 -pi -e 's/(static inline int same_magic.*?\{)/$1\n\treturn 1; \/* FIXED_VERMAGIC *\//s' kernel/module.c
           }
           
           # 👇 [本次夺冠新增：切除引发报错的 DVB 盲肠模块]
@@ -266,7 +272,9 @@ jobs:
           echo "ccflags-y += -Wno-declaration-after-statement -Wno-error" >> drivers/leds/Makefile
           echo "ccflags-y += -Wno-shift-count-overflow -Wno-error" >> drivers/mmc/host/Makefile
           echo "ccflags-y += -Wno-logical-op-parentheses -Wno-error" >> net/ipv4/Makefile
-          
+          apply_patch "物理关闭 KSU 强效宏" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_MODVERSIONS" patch_modversions
+          # 👇 加上这句
+          apply_patch "内核级驱动欺骗 (解决黑屏无触控)" kernel/module.c has "FIXED_VERMAGIC" patch_module_spoof
           echo "✅ 所有雷区排空！主内核已成形，准备见证 Anykernel3 出包奇迹！"
           
       - name: 🚀 Build Process
