@@ -87,6 +87,36 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 📦 Extract Pristine Source Code (Before Patching)
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          echo "==== 正在提取案发现场绝对纯净的原厂源码 ===="
+          # 将所有嫌疑文件打包成一个 zip
+          zip -r pristine_sources.zip \
+            fs/namespace.c \
+            fs/namei.c \
+            kernel/cgroup/cpuset.c \
+            kernel/cpu.c \
+            kernel/sched/tune.c \
+            arch/arm64/kernel/module-plts.c \
+            lib/lz4/lz4_decompress.c \
+            net/ipv4/tcp_ipv4.c \
+            net/ipv6/tcp_ipv6.c \
+            lib/zstd/common/compiler.h \
+            drivers/input/touchscreen/focaltech_touch/focaltech_core.h \
+            drivers/input/touchscreen/focaltech_touch/focaltech_core.c \
+            drivers/mmc/core/core.c \
+            mm/madvise.c \
+            drivers/mmc/host/sdhci.c
+            
+      # 👇 [新增步骤 2：将打包好的原厂源码作为 Artifact 上传，供你下载]
+      - name: 📤 Upload Pristine Sources Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pristine_kernel_sources
+          path: device_kernel/pristine_sources.zip
+
       - name: 🪛 Extra Kernel Options (Safe Mode)
         shell: bash
         run: |
