@@ -234,7 +234,30 @@ runs:
         }
         #endif"
         patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
+        echo "==== [擦屁股行动] 修复 LineageOS 官方 Bug (极客精准追踪版) ===="
+        
+        # 1. 修复 cpuset.c 变量越界未定义 Bug
+        # 🚨 锚点：直接锁定函数定义的第一行，零误差注入！
+        CPUSET_HOOK_1="
+        #ifdef CONFIG_CPUSET_ASSIST
+        /* CPUSET_ASSIST_FIX_START */"
+        patch_file "kernel/cgroup/cpuset.c" "static ssize_t cpuset_write_resmask_assist(struct kernfs_open_file *of," 0 "$CPUSET_HOOK_1" "CPUSET_ASSIST_FIX_START"
+        
+        CPUSET_HOOK_2="
+        /* CPUSET_ASSIST_FIX_END */
+        #endif"
+        patch_file "kernel/cgroup/cpuset.c" "static ssize_t cpuset_write_resmask_wrapper(struct kernfs_open_file *of," 0 "$CPUSET_HOOK_2" "CPUSET_ASSIST_FIX_END"
+        
+        # 2. 修复 module-plts.c 找不到指令集的 Bug
+        # 🚨 锚点：锁定最后一行头文件，精准排队插入！
+        INSN_HOOK="
+        /* MODULE_PLTS_INSN_FIX */
+        #include <asm/insn.h>"
+        patch_file "arch/arm64/kernel/module-plts.c" "#include <linux/sort.h>" 0 "$INSN_HOOK" "MODULE_PLTS_INSN_FIX"
 
+        sed -i 's/-dirty//g' scripts/setlocalversion
+       
+        echo "✅ 修复所有链接符号，全境畅通，起飞！"
         sed -i 's/-dirty//g' scripts/setlocalversion
        
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
