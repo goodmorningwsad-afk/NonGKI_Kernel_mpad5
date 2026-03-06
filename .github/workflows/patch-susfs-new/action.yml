@@ -286,6 +286,14 @@ runs:
         #define fts_fod_reg_write(client, reg, val) (0)
         #endif"
         patch_file "drivers/input/touchscreen/focaltech_touch/focaltech_core.c" "#include \"focaltech_core.h\"" 0 "$FOCAL_HOOK_2" "FOCAL_FUNC_FIX"
+        # 6. 修复 sdhci.c 官方注释手抖拼写错误导致的顶层语法崩溃
+        # 🚨 物理真相：原作者想用 /* */，结果手抖敲成了 //* 和 *//，导致大括号裸奔！
+        echo "🩹 正在缝合 drivers/mmc/host/sdhci.c ..."
+        sed -i 's|//\* void sdhci_set_uhs_signaling|/* void sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c || true
+        sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); */|g' drivers/mmc/host/sdhci.c || true
+
+        sed -i 's/-dirty//g' scripts/setlocalversion
+       
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
         
         sed -i 's/-dirty//g' scripts/setlocalversion
