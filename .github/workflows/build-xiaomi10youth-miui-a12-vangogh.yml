@@ -110,7 +110,6 @@ jobs:
             mm/madvise.c \
             drivers/mmc/host/sdhci.c
             
-      # 👇 [新增步骤 2：将打包好的原厂源码作为 Artifact 上传，供你下载]
       - name: 📤 Upload Pristine Sources Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -122,6 +121,9 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
+          # ===================================================
+          # 🛡️ 核心自检与防御框架：防重复、防静默失败
+          # ===================================================
           apply_patch() {
               local name="$1"
               local file="$2"
@@ -157,9 +159,10 @@ jobs:
               exit 1
           }
           
-          patch_namei() {
-              sed -i 's/struct user_namespace \*s_user_ns;/struct user_namespace \*s_user_ns;\n\tint error = 0; \/\* FIXED_NAMEI \*\//g' fs/namei.c
-          }
+          # ===================================================
+          # 🧰 所有修补逻辑函数化 (已剔除不治而愈的 namei 和 namespace)
+          # ===================================================
+          
           patch_module_plts() {
               sed -i '1i #include <asm/insn.h> \/* FIXED_MODULE_PLTS *\/' arch/arm64/kernel/module-plts.c
           }
@@ -210,15 +213,17 @@ jobs:
               sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);|g' drivers/mmc/host/sdhci.c
           }
           patch_modversions() {
-              # 同时强行关闭 KSU 相关宏定义，实现基因免疫！
               sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
               echo "# CONFIG_MODVERSIONS is not set /* FIXED_MODVERSIONS */" >> arch/arm64/configs/vendor/lito-perf_defconfig
               echo "# CONFIG_KSU is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
               echo "# CONFIG_KSU_SUSFS is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
           }
           
-          # 🎯 移除 namespace 修补，因为本体是健康的！
-          apply_patch "修补 namei.c" fs/namei.c has "FIXED_NAMEI" patch_namei
+          # ===================================================
+          # 🎯 精准部署任务流水线 (强制校验物理钢印)
+          # ===================================================
+          
+          # [剔除] apply_patch "修补 namei.c" ... 因为它已经通过宏控制免疫了！
           apply_patch "修补 module-plts.c" arch/arm64/kernel/module-plts.c has "FIXED_MODULE_PLTS" patch_module_plts
           apply_patch "修补 cpuset.c" kernel/cgroup/cpuset.c has "FIXED_CS_TARGET" patch_cpuset
           apply_patch "修补 cpu.c" kernel/cpu.c has "FIXED_CPU_MASK" patch_cpu
@@ -245,7 +250,7 @@ jobs:
           echo "ccflags-y += -Wno-shift-count-overflow -Wno-error" >> drivers/mmc/host/Makefile
           echo "ccflags-y += -Wno-logical-op-parentheses -Wno-error" >> net/ipv4/Makefile
           
-          echo "✅ 所有雷区排空！准备见证绿灯奇迹！"
+          echo "✅ 极客级防伪自检装甲加载完毕，编译护盾全开，通关吧！"
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
