@@ -185,7 +185,6 @@ jobs:
               sed -i 's/\.write_u64 = prefer_idle_write_wrapper/.write_u64 = prefer_idle_write/g' kernel/sched/tune.c
           }
           patch_namespace() {
-              # 终极修复：针对真实的、带着 umount_tree 的原厂源码！吞噬后面所有的乱码右括号！
               perl -0777 -pi -e 's/(umount_tree\(mnt, UMOUNT_SYNC\);\s*unlock_mount_hash\(\);\s*\})[\s\}]+/$1\n out2: \/* FIXED_NAMESPACE *\/\n\tunlock_mount(mp);\n out:\n\tpath_put(\&old_path);\n\treturn err;\n}\n\n/g' fs/namespace.c
           }
           patch_lz4() {
@@ -217,7 +216,8 @@ jobs:
               sed -i 's/reclaim_pages([^)]*)/0 \/\* FIXED_RECLAIM \*\//g' mm/madvise.c
           }
           patch_sdhci() {
-              sed -i 's|\/\/\* void sdhci_set_uhs|void sdhci_set_uhs \/* FIXED_SDHCI *\/|g' drivers/mmc/host/sdhci.c
+              # 👇 [修复断词问题：完整匹配整个函数名，并将防伪钢印放在函数声明的前面，不再将其硬生生劈开！]
+              sed -i 's|//\* void sdhci_set_uhs_signaling|/* FIXED_SDHCI */ void sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c
               sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);|g' drivers/mmc/host/sdhci.c
           }
           patch_modversions() {
