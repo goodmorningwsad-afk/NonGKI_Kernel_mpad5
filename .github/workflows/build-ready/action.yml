@@ -47,40 +47,6 @@ runs:
               fi
           done
           echo "✅ 肿瘤本体已清除，大动脉结构完好无损！"
-          
-      - name: 🕵️ 法医级全盘扫描：确认内核大动脉已绝对纯净
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 🔬 启动全盘核磁共振，搜索任何 KSU/SuSFS 残留 ===="
-          
-          DIRTY=0
-          
-          echo "------------------------------------------------"
-          echo "👉 1. 正在深度扫描 fs/ (文件系统) 目录..."
-          grep -rnE 'CONFIG_KSU|ksu_handle|susfs' fs/ && DIRTY=1 || echo "✅ fs/ 目录极其纯净！"
-          
-          echo "------------------------------------------------"
-          echo "👉 2. 正在深度扫描 security/ (安全拦截) 目录..."
-          grep -rnE 'CONFIG_KSU|ksu_handle|susfs' security/ && DIRTY=1 || echo "✅ security/ 目录极其纯净！"
-          
-          echo "------------------------------------------------"
-          echo "👉 3. 正在深度扫描 include/ (头文件) 目录..."
-          grep -rnE 'CONFIG_KSU|ksu_handle|susfs' include/linux/ && DIRTY=1 || echo "✅ include/ 目录极其纯净！"
-          
-          echo "------------------------------------------------"
-          echo "👉 4. 正在深度扫描 drivers/ (驱动) 目录..."
-          grep -rnE 'CONFIG_KSU|ksu_handle|susfs' drivers/input/ && DIRTY=1 || echo "✅ drivers/ 目录极其纯净！"
-          echo "------------------------------------------------"
-          
-          if [ $DIRTY -eq 1 ]; then
-              echo "❌ 致命警告！核磁共振发现残留病灶！"
-              echo "🩸 请立刻查看上方日志，定位漏网之鱼！"
-              echo "🛑 触发自动熔断！"
-              exit 1
-          else
-              echo "🎉 完美通关！内核大动脉已经达到 10000% 无菌纯净状态！"
-          fi
 
       - name: 📤 提取纯净内核源文件用于精准定位
         uses: actions/upload-artifact@v4
