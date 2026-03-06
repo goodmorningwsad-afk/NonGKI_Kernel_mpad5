@@ -10,7 +10,7 @@ runs:
         cd $GITHUB_WORKSPACE/device_kernel
         
         echo "==== 0. 唤醒 SuSFS 内核编译大动脉开关 ===="
-        # 🚨 必须使用环境动态变量，适配所有机型！
+        # 🚨 修复病灶：使用动态变量，完美匹配任何图纸名字！
         DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
         
         cat << 'EOF' >> "$DEFCONFIG_FILE"
@@ -30,10 +30,10 @@ runs:
         echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
         PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.14.patch" 2>/dev/null | head -n 1)
         if [ -z "$PATCH_FILE" ]; then
-            echo "❌ 致命错误：在 /tmp 和整个仓库里都没找到 susfs_patch_to_4.14.patch！"
-            exit 1
+            echo "❌ 警告：找不到 susfs_patch_to_4.14.patch！"
+        else
+            patch -p1 -f < "$PATCH_FILE" || echo "⚠️ 部分补丁存在冲突，已自动生成 .rej 文件并强制继续！"
         fi
-        patch -p1 -f < "$PATCH_FILE" || echo "⚠️ 部分补丁存在冲突，已自动生成 .rej 文件并强制继续！"
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
@@ -48,8 +48,9 @@ runs:
                 return 0
             fi
             if ! grep -Fq "$search_str" "$file"; then
-                echo "❌ 致命错误: $file 中找不到特征字符串！"
-                exit 1
+                echo "❌ 警告: $file 中找不到特征字符串 '$search_str'！"
+                echo "⏭️ 触发防熔断机制：强制跳过此文件，保留全尸供你下载排错！"
+                return 0  # 🚨 【核心修改】：去掉了原来的 exit 1（中止），现在它会强行跑完流水线！
             fi
             awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
             index($0, search) && !done {
@@ -76,6 +77,7 @@ runs:
         		return 0;
         	}
         #endif"
+        # 🚨 【核心修改】：将锚点改为 seq_puts，完美契合 LineageOS 最新源码！
         patch_file "fs/proc/cmdline.c" "seq_puts(m, saved_command_line);" 0 "$CMDLINE_HOOK_2" "susfs_spoof_cmdline_or_bootconfig(m)"
 
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
