@@ -88,8 +88,7 @@ runs:
                 ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
         }
         #endif"
-        patch_file "fs/exec.c" "bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
-
+        patch_file "fs/exec.c" "return __do_execve_file(fd, filename, argv, envp, flags, NULL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
         OPEN_HOOK="
         #ifdef CONFIG_KSU
         {
