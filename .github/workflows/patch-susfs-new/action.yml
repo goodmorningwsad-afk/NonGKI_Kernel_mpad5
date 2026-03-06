@@ -254,10 +254,21 @@ runs:
         /* MODULE_PLTS_INSN_FIX */
         #include <asm/insn.h>"
         patch_file "arch/arm64/kernel/module-plts.c" "#include <linux/sort.h>" 0 "$INSN_HOOK" "MODULE_PLTS_INSN_FIX"
-
+        # 3. 修复 tune.c 结构体未定义 wrapper 的官方残疾 Bug
+        # 🚨 锚点：锁定结构体定义正上方，用宏定义物理桥接断裂的神经！
+        TUNE_HOOK="
+        /* STUNE_ASSIST_WRAPPER_FIX */
+        #ifndef CONFIG_STUNE_ASSIST
+        #define sched_boost_override_write_wrapper sched_boost_override_write
+        #define sched_colocate_write_wrapper sched_colocate_write
+        #define boost_write_wrapper boost_write
+        #define prefer_idle_write_wrapper prefer_idle_write
+        #endif"
+        patch_file "kernel/sched/tune.c" "static struct cftype files[] = {" 0 "$TUNE_HOOK" "STUNE_ASSIST_WRAPPER_FIX"
         sed -i 's/-dirty//g' scripts/setlocalversion
        
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
+        
         sed -i 's/-dirty//g' scripts/setlocalversion
        
-        echo "✅ 修复所有链接符号，全境畅通，起飞！"
+        
