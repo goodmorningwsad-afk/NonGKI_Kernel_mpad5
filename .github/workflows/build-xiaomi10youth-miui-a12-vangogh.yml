@@ -106,7 +106,7 @@ jobs:
               echo "🔍 检查补丁: [$name] -> $file"
               
               if [ "$mode" = "has" ] && grep -Fq "$marker" "$file"; then
-                  echo "⏭️  [跳过] 目标已包含补丁特征，防止重复修补。"
+                  echo "⏭️  [跳过] 目标已包含防伪钢印，防止重复修补。"
                   return 0
               fi
               if [ "$mode" = "no" ] && ! grep -Fq "$marker" "$file"; then
@@ -118,7 +118,7 @@ jobs:
               $func
               
               if [ "$mode" = "has" ] && grep -Fq "$marker" "$file"; then
-                  echo "✅ [成功] 补丁已完美融合！"
+                  echo "✅ [成功] 防伪钢印已注入，补丁完美融合！"
                   return 0
               fi
               if [ "$mode" = "no" ] && ! grep -Fq "$marker" "$file"; then
@@ -126,22 +126,22 @@ jobs:
                   return 0
               fi
               
-              echo "❌ [致命错误] 补丁应用失败！未能在 $file 中找到特征码 ($mode: $marker)。"
+              echo "❌ [致命错误] 补丁应用失败！未能在 $file 中找到钢印 ($mode: $marker)。"
               exit 1
           }
           
           # ===================================================
-          # 🧰 所有修补逻辑函数化 (将你的心血全部封装)
+          # 🧰 所有修补逻辑函数化 (强行注入唯一防伪钢印)
           # ===================================================
           
           patch_namei() {
-              sed -i 's/struct user_namespace \*s_user_ns;/struct user_namespace \*s_user_ns;\n\tint error = 0;/g' fs/namei.c
+              sed -i 's/struct user_namespace \*s_user_ns;/struct user_namespace \*s_user_ns;\n\tint error = 0; \/\* FIXED_NAMEI \*\//g' fs/namei.c
           }
           patch_module_plts() {
-              sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
+              sed -i '1i #include <asm/insn.h> \/* FIXED_MODULE_PLTS *\/' arch/arm64/kernel/module-plts.c
           }
           patch_cpuset() {
-              sed -i '1i struct cs_target { const char *name; char *cpus; };' kernel/cgroup/cpuset.c
+              sed -i '1i struct cs_target { const char *name; char *cpus; }; \/* FIXED_CS_TARGET *\/' kernel/cgroup/cpuset.c
           }
           patch_cpu() {
               sed -i 's/^#if CONFIG_LITTLE_CPU_MASK/#if 0 \/\* FIXED_CPU_MASK \*\//g' kernel/cpu.c
@@ -149,14 +149,14 @@ jobs:
               sed -i 's/^#if CONFIG_PRIME_CPU_MASK/#if 0 \/\* FIXED_CPU_MASK \*\//g' kernel/cpu.c
           }
           patch_sched_tune() {
-              sed -i 's/\.write_u64 = sched_boost_override_write_wrapper/.write_u64 = sched_boost_override_write/g' kernel/sched/tune.c
+              sed -i 's/\.write_u64 = sched_boost_override_write_wrapper/.write_u64 = sched_boost_override_write \/\* FIXED_TUNE \*\//g' kernel/sched/tune.c
               sed -i 's/\.write_u64 = sched_colocate_write_wrapper/.write_u64 = sched_colocate_write/g' kernel/sched/tune.c
               sed -i 's/\.write_s64 = boost_write_wrapper/.write_s64 = boost_write/g' kernel/sched/tune.c
               sed -i 's/\.write_u64 = prefer_idle_write_wrapper/.write_u64 = prefer_idle_write/g' kernel/sched/tune.c
           }
           patch_namespace() {
-              # 👇 [本次终极修正：基于真实源码物理切片，直击文件末尾 (EOF) 进行全盘替换！]
-              perl -0777 -pi -e 's/err = graft_tree\(mnt, parent, mp\);\s*if\s*\(err\)\s*\{\s*lock_mount_hash\(\);[\s\}]*$/err = graft_tree(mnt, parent, mp);\n\tif (err) {\n\t\tlock_mount_hash();\n\t\tumount_tree(mnt, UMOUNT_SYNC);\n\t\tunlock_mount_hash();\n\t}\n out2:\n\tunlock_mount(mp);\n out:\n\tpath_put(\&old_path);\n\treturn err;\n}\n/g' fs/namespace.c
+              # 终极修复：针对真实的、带着 umount_tree 的原厂源码！吞噬后面所有的乱码右括号！
+              perl -0777 -pi -e 's/(umount_tree\(mnt, UMOUNT_SYNC\);\s*unlock_mount_hash\(\);\s*\})[\s\}]+/$1\n out2: \/* FIXED_NAMESPACE *\/\n\tunlock_mount(mp);\n out:\n\tpath_put(\&old_path);\n\treturn err;\n}\n\n/g' fs/namespace.c
           }
           patch_lz4() {
               sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_partial);/d' lib/lz4/lz4_decompress.c
@@ -167,52 +167,52 @@ jobs:
               sed -i '/EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/d' lib/lz4/lz4_decompress.c
           }
           patch_tcp() {
-              perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s*static\s*#endif/#ifndef CONFIG_MPTCP\n#endif/g' net/ipv4/tcp_ipv4.c
-              perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s*static\s*#endif/#ifndef CONFIG_MPTCP\n#endif/g' net/ipv6/tcp_ipv6.c
+              perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s*static\s*#endif/#ifndef CONFIG_MPTCP\n#endif\n\/* FIXED_TCP *\//g' net/ipv4/tcp_ipv4.c
+              perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s*static\s*#endif/#ifndef CONFIG_MPTCP\n#endif\n\/* FIXED_TCP *\//g' net/ipv6/tcp_ipv6.c
               sed -i 's/static const struct inet_connection_sock_af_ops ipv6_mapped;/const struct inet_connection_sock_af_ops ipv6_mapped;/g' net/ipv6/tcp_ipv6.c
               sed -i 's/static const struct inet_connection_sock_af_ops ipv6_specific;/const struct inet_connection_sock_af_ops ipv6_specific;/g' net/ipv6/tcp_ipv6.c
           }
           patch_zstd() {
-              sed -i 's/#define ZSTD_FALLTHROUGH fallthrough/#define ZSTD_FALLTHROUGH __attribute__((__fallthrough__))/g' lib/zstd/common/compiler.h
+              sed -i 's/#define ZSTD_FALLTHROUGH fallthrough/#define ZSTD_FALLTHROUGH __attribute__((__fallthrough__)) \/\* FIXED_ZSTD \*\//g' lib/zstd/common/compiler.h
           }
           patch_focaltech() {
-              perl -pi -e 's/(int aod_status;)/$1\n\tbool fod_finger_skip;\n\tint fod_down_time;\n\tbool point_id_changed;\n\tint fod_status;\n\tbool finger_in_fod;\n\tint fod_x;\n\tint fod_y;/g' drivers/input/touchscreen/focaltech_touch/focaltech_core.h
+              perl -pi -e 's/(int aod_status;)/$1\n\tbool fod_finger_skip; \/* FIXED_FOCALTECH *\/\n\tint fod_down_time;\n\tbool point_id_changed;\n\tint fod_status;\n\tbool finger_in_fod;\n\tint fod_x;\n\tint fod_y;/g' drivers/input/touchscreen/focaltech_touch/focaltech_core.h
               sed -i '/#include "focaltech_core.h"/a int fts_fod_reg_write(struct i2c_client *client, u8 reg, u8 value);' drivers/input/touchscreen/focaltech_touch/focaltech_core.c
               sed -i 's/fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_ON, true);/0;/g' drivers/input/touchscreen/focaltech_touch/focaltech_core.c
           }
           patch_mmc() {
-              sed -i 's/mmc_card_doing_bkops(card)/0/g' drivers/mmc/core/core.c
+              sed -i 's/mmc_card_doing_bkops(card)/0 \/\* FIXED_MMC \*\//g' drivers/mmc/core/core.c
           }
           patch_madvise() {
               sed -i 's/reclaim_pages([^)]*)/0 \/\* FIXED_RECLAIM \*\//g' mm/madvise.c
           }
           patch_sdhci() {
-              sed -i 's|//\* void sdhci_set_uhs|void sdhci_set_uhs|g' drivers/mmc/host/sdhci.c
+              sed -i 's|\/\/\* void sdhci_set_uhs|void sdhci_set_uhs \/* FIXED_SDHCI *\/|g' drivers/mmc/host/sdhci.c
               sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);|g' drivers/mmc/host/sdhci.c
           }
           patch_modversions() {
               sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
-              echo "# CONFIG_MODVERSIONS is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
+              echo "# CONFIG_MODVERSIONS is not set /* FIXED_MODVERSIONS */" >> arch/arm64/configs/vendor/lito-perf_defconfig
           }
           
           # ===================================================
-          # 🎯 精准部署任务流水线
+          # 🎯 精准部署任务流水线 (强制校验物理钢印)
           # ===================================================
           
-          apply_patch "修补 namei.c" fs/namei.c has "int error = 0;" patch_namei
-          apply_patch "修补 module-plts.c" arch/arm64/kernel/module-plts.c has "#include <asm/insn.h>" patch_module_plts
-          apply_patch "修补 cpuset.c" kernel/cgroup/cpuset.c has "const char *name; char *cpus;" patch_cpuset
+          apply_patch "修补 namei.c" fs/namei.c has "FIXED_NAMEI" patch_namei
+          apply_patch "修补 module-plts.c" arch/arm64/kernel/module-plts.c has "FIXED_MODULE_PLTS" patch_module_plts
+          apply_patch "修补 cpuset.c" kernel/cgroup/cpuset.c has "FIXED_CS_TARGET" patch_cpuset
           apply_patch "修补 cpu.c" kernel/cpu.c has "FIXED_CPU_MASK" patch_cpu
-          apply_patch "修补 sched/tune.c" kernel/sched/tune.c has ".write_u64 = sched_boost_override_write" patch_sched_tune
-          apply_patch "修补 namespace.c (VFS核心)" fs/namespace.c has "out2:" patch_namespace
+          apply_patch "修补 sched/tune.c" kernel/sched/tune.c has "FIXED_TUNE" patch_sched_tune
+          apply_patch "修补 namespace.c (VFS核心)" fs/namespace.c has "FIXED_NAMESPACE" patch_namespace
           apply_patch "清理 lz4 幽灵导出" lib/lz4/lz4_decompress.c no "EXPORT_SYMBOL(LZ4_decompress_safe_partial);" patch_lz4
-          apply_patch "修复 TCP 网络协议" net/ipv6/tcp_ipv6.c no "static const struct inet_connection_sock_af_ops ipv6_mapped;" patch_tcp
-          apply_patch "修复 ZSTD 压缩库" lib/zstd/common/compiler.h has "__attribute__((__fallthrough__))" patch_zstd
-          apply_patch "修复 小米触控屏指纹" drivers/input/touchscreen/focaltech_touch/focaltech_core.h has "bool fod_finger_skip;" patch_focaltech
-          apply_patch "修复 MMC 闪存驱动" drivers/mmc/core/core.c no "mmc_card_doing_bkops(card)" patch_mmc
+          apply_patch "修复 TCP 网络协议" net/ipv4/tcp_ipv4.c has "FIXED_TCP" patch_tcp
+          apply_patch "修复 ZSTD 压缩库" lib/zstd/common/compiler.h has "FIXED_ZSTD" patch_zstd
+          apply_patch "修复 小米触控屏指纹" drivers/input/touchscreen/focaltech_touch/focaltech_core.h has "FIXED_FOCALTECH" patch_focaltech
+          apply_patch "修复 MMC 闪存驱动" drivers/mmc/core/core.c has "FIXED_MMC" patch_mmc
           apply_patch "修复 内存回收机制" mm/madvise.c has "FIXED_RECLAIM" patch_madvise
-          apply_patch "修复 SDHCI 乱码注释" drivers/mmc/host/sdhci.c no "//\* void sdhci_set_uhs" patch_sdhci
-          apply_patch "关闭 MODVERSIONS 强校验" arch/arm64/configs/vendor/lito-perf_defconfig has "# CONFIG_MODVERSIONS is not set" patch_modversions
+          apply_patch "修复 SDHCI 乱码注释" drivers/mmc/host/sdhci.c has "FIXED_SDHCI" patch_sdhci
+          apply_patch "关闭 MODVERSIONS 强校验" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_MODVERSIONS" patch_modversions
           
           echo "---------------------------------------------------"
           echo "💉 注入镇静剂，屏蔽无效的编译器警告"
@@ -227,7 +227,7 @@ jobs:
           echo "ccflags-y += -Wno-shift-count-overflow -Wno-error" >> drivers/mmc/host/Makefile
           echo "ccflags-y += -Wno-logical-op-parentheses -Wno-error" >> net/ipv4/Makefile
           
-          echo "✅ 极客级自检装甲加载完毕，编译护盾全开，直接通关吧！"
+          echo "✅ 极客级防伪自检装甲加载完毕，编译护盾全开，通关吧！"
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
