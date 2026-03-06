@@ -10,7 +10,8 @@ runs:
         cd $GITHUB_WORKSPACE/device_kernel
         
         echo "==== 0. 唤醒 SuSFS 内核编译大动脉开关 ===="
-        DEFCONFIG_FILE="arch/arm64/configs/vendor/xiaomi/nabu_inflated_defconfig"
+        # 🚨 必须使用环境动态变量，适配所有机型！
+        DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
         
         cat << 'EOF' >> "$DEFCONFIG_FILE"
         CONFIG_KSU_SUSFS=y
