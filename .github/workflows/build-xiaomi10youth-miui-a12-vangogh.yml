@@ -122,9 +122,6 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
-          # ===================================================
-          # 🛡️ 核心自检与防御框架：防重复、防静默失败
-          # ===================================================
           apply_patch() {
               local name="$1"
               local file="$2"
@@ -160,10 +157,6 @@ jobs:
               exit 1
           }
           
-          # ===================================================
-          # 🧰 所有修补逻辑函数化 (强行注入唯一防伪钢印)
-          # ===================================================
-          
           patch_namei() {
               sed -i 's/struct user_namespace \*s_user_ns;/struct user_namespace \*s_user_ns;\n\tint error = 0; \/\* FIXED_NAMEI \*\//g' fs/namei.c
           }
@@ -183,9 +176,6 @@ jobs:
               sed -i 's/\.write_u64 = sched_colocate_write_wrapper/.write_u64 = sched_colocate_write/g' kernel/sched/tune.c
               sed -i 's/\.write_s64 = boost_write_wrapper/.write_s64 = boost_write/g' kernel/sched/tune.c
               sed -i 's/\.write_u64 = prefer_idle_write_wrapper/.write_u64 = prefer_idle_write/g' kernel/sched/tune.c
-          }
-          patch_namespace() {
-              perl -0777 -pi -e 's/(umount_tree\(mnt, UMOUNT_SYNC\);\s*unlock_mount_hash\(\);\s*\})[\s\}]+/$1\n out2: \/* FIXED_NAMESPACE *\/\n\tunlock_mount(mp);\n out:\n\tpath_put(\&old_path);\n\treturn err;\n}\n\n/g' fs/namespace.c
           }
           patch_lz4() {
               sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_partial);/d' lib/lz4/lz4_decompress.c
@@ -216,25 +206,23 @@ jobs:
               sed -i 's/reclaim_pages([^)]*)/0 \/\* FIXED_RECLAIM \*\//g' mm/madvise.c
           }
           patch_sdhci() {
-              # 👇 [修复断词问题：完整匹配整个函数名，并将防伪钢印放在函数声明的前面，不再将其硬生生劈开！]
               sed -i 's|//\* void sdhci_set_uhs_signaling|/* FIXED_SDHCI */ void sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c
               sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);|g' drivers/mmc/host/sdhci.c
           }
           patch_modversions() {
+              # 同时强行关闭 KSU 相关宏定义，实现基因免疫！
               sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' arch/arm64/configs/vendor/lito-perf_defconfig
               echo "# CONFIG_MODVERSIONS is not set /* FIXED_MODVERSIONS */" >> arch/arm64/configs/vendor/lito-perf_defconfig
+              echo "# CONFIG_KSU is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
+              echo "# CONFIG_KSU_SUSFS is not set" >> arch/arm64/configs/vendor/lito-perf_defconfig
           }
           
-          # ===================================================
-          # 🎯 精准部署任务流水线 (强制校验物理钢印)
-          # ===================================================
-          
+          # 🎯 移除 namespace 修补，因为本体是健康的！
           apply_patch "修补 namei.c" fs/namei.c has "FIXED_NAMEI" patch_namei
           apply_patch "修补 module-plts.c" arch/arm64/kernel/module-plts.c has "FIXED_MODULE_PLTS" patch_module_plts
           apply_patch "修补 cpuset.c" kernel/cgroup/cpuset.c has "FIXED_CS_TARGET" patch_cpuset
           apply_patch "修补 cpu.c" kernel/cpu.c has "FIXED_CPU_MASK" patch_cpu
           apply_patch "修补 sched/tune.c" kernel/sched/tune.c has "FIXED_TUNE" patch_sched_tune
-          apply_patch "修补 namespace.c (VFS核心)" fs/namespace.c has "FIXED_NAMESPACE" patch_namespace
           apply_patch "清理 lz4 幽灵导出" lib/lz4/lz4_decompress.c no "EXPORT_SYMBOL(LZ4_decompress_safe_partial);" patch_lz4
           apply_patch "修复 TCP 网络协议" net/ipv4/tcp_ipv4.c has "FIXED_TCP" patch_tcp
           apply_patch "修复 ZSTD 压缩库" lib/zstd/common/compiler.h has "FIXED_ZSTD" patch_zstd
@@ -242,7 +230,7 @@ jobs:
           apply_patch "修复 MMC 闪存驱动" drivers/mmc/core/core.c has "FIXED_MMC" patch_mmc
           apply_patch "修复 内存回收机制" mm/madvise.c has "FIXED_RECLAIM" patch_madvise
           apply_patch "修复 SDHCI 乱码注释" drivers/mmc/host/sdhci.c has "FIXED_SDHCI" patch_sdhci
-          apply_patch "关闭 MODVERSIONS 强校验" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_MODVERSIONS" patch_modversions
+          apply_patch "物理关闭 MODVERSIONS 与 KSU 强效宏" arch/arm64/configs/vendor/lito-perf_defconfig has "FIXED_MODVERSIONS" patch_modversions
           
           echo "---------------------------------------------------"
           echo "💉 注入镇静剂，屏蔽无效的编译器警告"
@@ -257,7 +245,7 @@ jobs:
           echo "ccflags-y += -Wno-shift-count-overflow -Wno-error" >> drivers/mmc/host/Makefile
           echo "ccflags-y += -Wno-logical-op-parentheses -Wno-error" >> net/ipv4/Makefile
           
-          echo "✅ 极客级防伪自检装甲加载完毕，编译护盾全开，通关吧！"
+          echo "✅ 所有雷区排空！准备见证绿灯奇迹！"
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
