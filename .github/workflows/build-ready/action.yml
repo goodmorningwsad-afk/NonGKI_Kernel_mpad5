@@ -372,5 +372,6 @@ runs:
           
           # 5. 确保 fs/Makefile 认领了 susfs.o，防止有器官没连血管
           grep -q "susfs.o" fs/Makefile || echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
-          
+          # 🚨 物理修复：强制为 module-plts.c 注入缺失的 ARM64 汇编指令头文件！
+          sed -i '/#include <linux\/sort.h>/a #include <asm\/insn.h>' arch/arm64/kernel/module-plts.c
           echo "==== 🚑 SuSFS 物理器官植入完成！ ===="
