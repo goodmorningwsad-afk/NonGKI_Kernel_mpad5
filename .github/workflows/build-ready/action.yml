@@ -330,3 +330,47 @@ runs:
                 echo "CONFIG_KSU_NONE_HOOK=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
             fi
           fi
+
+      - name: 🚑 强制物理植入 SuSFS 核心器官 (Fix File Not Found)
+        if: env.SUSFS_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          echo "==== 🚑 开始全盘搜索并植入 SuSFS 源代码 ===="
+          
+          # 1. 自动搜索隐藏在工作区任何角落的器官文件
+          SUSFS_H=$(find $GITHUB_WORKSPACE -type f -name "susfs.h" | head -n 1)
+          SUSFS_DEF_H=$(find $GITHUB_WORKSPACE -type f -name "susfs_def.h" | head -n 1)
+          SUSFS_C=$(find $GITHUB_WORKSPACE -type f -name "susfs.c" | head -n 1)
+          
+          # 2. 物理接驳 include/linux/susfs.h
+          if [ -n "$SUSFS_H" ]; then
+              cp -f "$SUSFS_H" include/linux/susfs.h
+              echo "✅ 成功找到并植入: include/linux/susfs.h"
+          else
+              echo "⚠️ 紧急预案: 从远端拉取 susfs.h"
+              curl -LSs "https://raw.githubusercontent.com/simonpunk/susfs4ksu/gki-android14-5.15/kernel_patches/include/linux/susfs.h" -o include/linux/susfs.h
+          fi
+          
+          # 3. 物理接驳 include/linux/susfs_def.h (解决 task_mmu.c 报错的核心)
+          if [ -n "$SUSFS_DEF_H" ]; then
+              cp -f "$SUSFS_DEF_H" include/linux/susfs_def.h
+              echo "✅ 成功找到并植入: include/linux/susfs_def.h"
+          else
+              echo "⚠️ 紧急预案: 从远端拉取 susfs_def.h"
+              curl -LSs "https://raw.githubusercontent.com/simonpunk/susfs4ksu/gki-android14-5.15/kernel_patches/include/linux/susfs_def.h" -o include/linux/susfs_def.h
+          fi
+          
+          # 4. 物理接驳 fs/susfs.c (大动脉泵血机)
+          if [ -n "$SUSFS_C" ]; then
+              cp -f "$SUSFS_C" fs/susfs.c
+              echo "✅ 成功找到并植入: fs/susfs.c"
+          else
+              echo "⚠️ 紧急预案: 从远端拉取 susfs.c"
+              curl -LSs "https://raw.githubusercontent.com/simonpunk/susfs4ksu/gki-android14-5.15/kernel_patches/fs/susfs.c" -o fs/susfs.c
+          fi
+          
+          # 5. 确保 fs/Makefile 认领了 susfs.o，防止有器官没连血管
+          grep -q "susfs.o" fs/Makefile || echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
+          
+          echo "==== 🚑 SuSFS 物理器官植入完成！ ===="
