@@ -358,4 +358,17 @@ runs:
           sed -i '3168s/^/    int error = 0; \/* FIXED_UNDECLARED_VAR *\/ \n/' fs/namei.c
           # 🚨 精确点杀：铲除 dcache.c 里残留的 susfs 头文件调用
           sed -i '/susfs/d' fs/dcache.c
+          # 🚨 战场一：修复误伤的 dcache.c，直接换原装
+          curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/fs/dcache.c" -o fs/dcache.c
+          
+          # 🚨 战场二：抚平 Clang 19 的严苛脾气，替换 #if 为 #ifdef
+          sed -i 's/#if CONFIG_LITTLE_CPU_MASK/#ifdef CONFIG_LITTLE_CPU_MASK/g' kernel/cpu.c
+          sed -i 's/#if CONFIG_BIG_CPU_MASK/#ifdef CONFIG_BIG_CPU_MASK/g' kernel/cpu.c
+          sed -i 's/#if CONFIG_PRIME_CPU_MASK/#ifdef CONFIG_PRIME_CPU_MASK/g' kernel/cpu.c
+          
+          # 🚨 战场三：强行补全触摸驱动缺失的结构体成员与隐式函数
+          # 1. 在 aod_status 后面强行插入缺少的 FOD 变量 (写在同一行防断行错误)
+          sed -i '/int aod_status;/a \    bool fod_finger_skip; int fod_down_time; bool point_id_changed; int fod_status; bool finger_in_fod; int fod_x; int fod_y;' drivers/input/touchscreen/focaltech_touch/focaltech_core.h
+          # 2. 强行在文件顶部声明缺失的底层寄存器写入函数
+          sed -i '1i int fts_fod_reg_write(void *client, int reg, int val);' drivers/input/touchscreen/focaltech_touch/focaltech_core.c
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
