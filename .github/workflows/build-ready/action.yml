@@ -378,4 +378,8 @@ runs:
           
           # 🚨 战场五：修复原作者写残的 sdhci.c，原装覆盖！
           curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/drivers/mmc/host/sdhci.c" -o drivers/mmc/host/sdhci.c
+          # 🚨 终极核弹：暴力替换 cpu.c 中的空宏为空掩码 (针对 SM7250 架构)
+          sed -i 's/CONFIG_LITTLE_CPU_MASK/0x3F/g' kernel/cpu.c
+          sed -i 's/CONFIG_BIG_CPU_MASK/0x40/g' kernel/cpu.c
+          sed -i 's/CONFIG_PRIME_CPU_MASK/0x80/g' kernel/cpu.c
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
