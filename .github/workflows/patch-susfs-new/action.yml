@@ -9,29 +9,31 @@ runs:
       run: |
         cd $GITHUB_WORKSPACE/device_kernel
         
-        echo "==== 0. 唤醒 SuSFS 内核编译大动脉开关 ===="
+        echo "==== 0. 唤醒 SuSFS 与文件系统大动脉开关 ===="
+        # 🚨 终极制导雷达：自动锁定正确的图纸
         DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
         
         # 🚨 终极斩首：物理阉割导致 10000 行警告和 LLD 链接暴毙的元凶 (模块版本校验)
-        sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' "$DEFCONFIG_FILE"
+        sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' "$DEFCONFIG_FILE" || true
         
-        cat << 'EOF' >> "$DEFCONFIG_FILE"
-        CONFIG_KSU_SUSFS=y
-        CONFIG_KSU_SUSFS_SUS_PATH=y
-        CONFIG_KSU_SUSFS_SUS_MOUNT=y
-        CONFIG_KSU_SUSFS_SUS_KSTAT=y
-        CONFIG_KSU_SUSFS_SUS_MAP=y
-        CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-        CONFIG_KSU_SUSFS_ENABLE_LOG=y
-        CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-        CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-        CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-        CONFIG_BLK_DEV_LOOP=y
-        CONFIG_SQUASHFS=y
-        CONFIG_EROFS_FS=y
-        EOF
-        EOF
-        echo "✅ SuSFS 物理开关全数合闸！"
+        # 🚨 极客防弹注入法：无视 YAML 缩进，暴力追加大动脉开关
+        echo "CONFIG_KSU_SUSFS=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$DEFCONFIG_FILE"
+        
+        # 🚨 现代 Android (15) 挂载 APEX 模块续命三件套
+        echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_SQUASHFS=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_EROFS_FS=y" >> "$DEFCONFIG_FILE"
+        
+        echo "✅ SuSFS 物理开关与 APEX 挂载防线全数合闸！"
 
         echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
         # 🚨 史诗级修正：匹配 SM7250 的真实内核版本 4.19！
