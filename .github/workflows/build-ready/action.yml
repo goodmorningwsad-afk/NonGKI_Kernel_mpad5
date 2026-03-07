@@ -346,7 +346,7 @@ runs:
           rm -f fs/susfs.c fs/sus_su.c
           rm -f include/linux/susfs.h include/linux/susfs_def.h include/linux/sus_su.h
           sed -i '/susfs.o/d' fs/Makefile || true
-          
+          sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
           echo "==== 3. 启动静默疗法：全盘抹除残留宏调用 ===="
           # 暴力搜寻并干掉所有尝试包含 susfs 的头文件引用，只要不 include，剩下的游离代码就是死代码！
           find fs/ include/ drivers/ arch/ -type f -exec sed -i '/#include <linux\/susfs/d' {} + || true
