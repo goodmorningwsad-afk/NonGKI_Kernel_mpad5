@@ -354,5 +354,7 @@ runs:
           curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/fs/proc/task_mmu.c" -o fs/proc/task_mmu.c
           # 🚨 剥除过时的 cgroup wrapper 包装，直指本体函数
           sed -i 's/write_wrapper/write/g' kernel/sched/tune.c
+          # 🚨 物理补全缺失的变量声明：强行给野生代码发身份证
+          sed -i '3168s/^/    int error = 0; \/* FIXED_UNDECLARED_VAR *\/ \n/' fs/namei.c
           
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
