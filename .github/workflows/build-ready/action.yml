@@ -353,6 +353,7 @@ runs:
           # 2. 擦屁股行动：抹除官方作者 alecchangod 粗心遗留的幽灵 #endif
           sed -i '23c\/* FIXED_GHOST_ENDIF *\/' fs/proc/task_mmu.c
           echo "==== 3. 启动静默疗法：全盘抹除残留宏调用 ===="
+          sed -i '24c\/* FIXED_ORPHAN_ENDIF *\/' fs/proc/task_mmu.c
           # 暴力搜寻并干掉所有尝试包含 susfs 的头文件引用，只要不 include，剩下的游离代码就是死代码！
           find fs/ include/ drivers/ arch/ -type f -exec sed -i '/#include <linux\/susfs/d' {} + 
           
