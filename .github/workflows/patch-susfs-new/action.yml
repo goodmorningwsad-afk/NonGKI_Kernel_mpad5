@@ -286,12 +286,10 @@ runs:
         #define fts_fod_reg_write(client, reg, val) (0)
         #endif"
         patch_file "drivers/input/touchscreen/focaltech_touch/focaltech_core.c" "#include \"focaltech_core.h\"" 0 "$FOCAL_HOOK_2" "FOCAL_FUNC_FIX"
-        # 6. 修复 sdhci.c 官方注释手抖拼写错误导致的顶层语法崩溃
-        # 🚨 物理真相：原作者想用 /* */，结果手抖敲成了 //* 和 *//，导致大括号裸奔！
+        # 6. 修复 sdhci.c 官方注释错误 (终极 #if 0 封印版，防嵌套注释爆炸)
         echo "🩹 正在缝合 drivers/mmc/host/sdhci.c ..."
-        sed -i 's|//\* void sdhci_set_uhs_signaling|/* void sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c || true
-        sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); */|g' drivers/mmc/host/sdhci.c || true
-
+        sed -i 's|//\* void sdhci_set_uhs_signaling|#if 0\nvoid sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c 
+        sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\n#endif|g' drivers/mmc/host/sdhci.c 
         sed -i 's/-dirty//g' scripts/setlocalversion
         # 7. 修复 core.c 缺失 mmc_card_doing_bkops 宏的官方残疾 Bug
         # 🚨 锚点：锁定报错函数正上方，注入伪造的宏定义，把未定义的方法强行变成 0 (false)
@@ -302,6 +300,12 @@ runs:
         #define mmc_card_doing_bkops(c) (0)
         #endif"
         patch_file "drivers/mmc/core/core.c" "static bool mmc_is_valid_state_for_clk_scaling(struct mmc_host *host)" 0 "$MMC_BKOPS_HOOK" "MMC_BKOPS_FIX"
+        # 8. 修复 kernel/cpu.c 宏定义值为字符串导致的预处理崩溃
+        # 🚨 锚点：直接将判断字符串的弱智宏斩首，强制走 #else 的安全默认逻辑！
+        echo "🩹 正在缝合 kernel/cpu.c ..."
+        sed -i 's/#if CONFIG_LITTLE_CPU_MASK/#if 0/g' kernel/cpu.c 
+        sed -i 's/#if CONFIG_BIG_CPU_MASK/#if 0/g' kernel/cpu.c 
+        sed -i 's/#if CONFIG_PRIME_CPU_MASK/#if 0/g' kernel/cpu.c 
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
         
         sed -i 's/-dirty//g' scripts/setlocalversion
