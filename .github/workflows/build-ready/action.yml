@@ -338,17 +338,17 @@ runs:
           
           echo "==== 1. 连根拔起老旧的 KernelSU 本体 ===="
           rm -rf KernelSU kernelsu drivers/kernelsu
-          sed -i '/KernelSU/d' .gitmodules || true
-          sed -i '/kernelsu/d' drivers/Makefile || true
-          sed -i '/kernelsu/d' drivers/Kconfig || true
+          sed -i '/KernelSU/d' .gitmodules 
+          sed -i '/kernelsu/d' drivers/Makefile 
+          sed -i '/kernelsu/d' drivers/Kconfig 
           
           echo "==== 2. 物理爆破老旧的 SuSFS 器官 ===="
           rm -f fs/susfs.c fs/sus_su.c
           rm -f include/linux/susfs.h include/linux/susfs_def.h include/linux/sus_su.h
-          sed -i '/susfs.o/d' fs/Makefile || true
+          sed -i '/susfs.o/d' fs/Makefile
           sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
           echo "==== 3. 启动静默疗法：全盘抹除残留宏调用 ===="
           # 暴力搜寻并干掉所有尝试包含 susfs 的头文件引用，只要不 include，剩下的游离代码就是死代码！
-          find fs/ include/ drivers/ arch/ -type f -exec sed -i '/#include <linux\/susfs/d' {} + || true
+          find fs/ include/ drivers/ arch/ -type f -exec sed -i '/#include <linux\/susfs/d' {} + 
           
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
