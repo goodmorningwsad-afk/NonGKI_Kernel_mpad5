@@ -357,6 +357,5 @@ runs:
           # 🚨 物理补全缺失的变量声明：强行给野生代码发身份证
           sed -i '3168s/^/    int error = 0; \/* FIXED_UNDECLARED_VAR *\/ \n/' fs/namei.c
           # 🚨 精确点杀：铲除 dcache.c 里残留的 susfs 头文件调用
-          sed -i '/susfs/d' fs/dcache.concurrency: 
-          
+          sed -i '/susfs/d' fs/dcache.c
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
