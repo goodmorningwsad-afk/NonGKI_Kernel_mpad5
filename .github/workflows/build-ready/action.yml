@@ -371,4 +371,6 @@ runs:
           sed -i '/int aod_status;/a \    bool fod_finger_skip; int fod_down_time; bool point_id_changed; int fod_status; bool finger_in_fod; int fod_x; int fod_y;' drivers/input/touchscreen/focaltech_touch/focaltech_core.h
           # 2. 强行在文件顶部声明缺失的底层寄存器写入函数
           sed -i '1i int fts_fod_reg_write(void *client, int reg, int val);' drivers/input/touchscreen/focaltech_touch/focaltech_core.c
+          # 🚨 存储驱动抢救：用逻辑 0 (False) 暴力替换丢失的 BKOPS 检测函数
+          sed -i 's/mmc_card_doing_bkops(card)/0/g' drivers/mmc/core/core.c
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
