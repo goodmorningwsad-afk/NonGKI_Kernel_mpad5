@@ -38,7 +38,7 @@ runs:
         echo "CONFIG_SQUASHFS_LZ4=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_LZO=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_XZ=y" >> "$DEFCONFIG_FILE"
-        echo "CONFIG_SQUASHFS_ZSTD=y" >> "$DEFCONFIG_FILE"
+        
         
         # 唤醒满血 EROFS 及其 LZ4 核心解压算法
         echo "CONFIG_EROFS_FS=y" >> "$DEFCONFIG_FILE"
