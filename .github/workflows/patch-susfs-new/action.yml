@@ -10,8 +10,10 @@ runs:
         cd $GITHUB_WORKSPACE/device_kernel
         
         echo "==== 0. 唤醒 SuSFS 内核编译大动脉开关 ===="
-        # 🚨 修复病灶：使用动态变量，完美匹配任何图纸名字！
         DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+        
+        # 🚨 终极斩首：物理阉割导致 10000 行警告和 LLD 链接暴毙的元凶 (模块版本校验)
+        sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' "$DEFCONFIG_FILE"
         
         cat << 'EOF' >> "$DEFCONFIG_FILE"
         CONFIG_KSU_SUSFS=y
