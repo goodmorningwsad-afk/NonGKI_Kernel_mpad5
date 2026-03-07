@@ -385,4 +385,6 @@ runs:
           # 🚨 物理修复 sdhci.c：使用 #if 0 预编译魔法彻底隐身残废函数
           sed -i 's|//\* void sdhci_set_uhs_signaling|#if 0\nvoid sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c
           sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\n#endif|g' drivers/mmc/host/sdhci.c
+          # 🚨 终极语法纠偏：把非法的 #ifdef 0x 全部削回 #if 0x
+          sed -i 's/#ifdef 0x/#if 0x/g' kernel/cpu.c
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
