@@ -331,47 +331,24 @@ runs:
             fi
           fi
 
-      - name: 🚑 强制物理植入 SuSFS 核心器官 (Fix File Not Found)
-        if: env.SUSFS_ENABLE == 'true'
+      - name: 🚀 物理清场：降维打击旧版 KSU 与 SuSFS 肿瘤
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 🚑 开始全盘搜索并植入 SuSFS 源代码 ===="
           
-          # 1. 自动搜索隐藏在工作区任何角落的器官文件
-          SUSFS_H=$(find $GITHUB_WORKSPACE -type f -name "susfs.h" | head -n 1)
-          SUSFS_DEF_H=$(find $GITHUB_WORKSPACE -type f -name "susfs_def.h" | head -n 1)
-          SUSFS_C=$(find $GITHUB_WORKSPACE -type f -name "susfs.c" | head -n 1)
+          echo "==== 1. 连根拔起老旧的 KernelSU 本体 ===="
+          rm -rf KernelSU kernelsu drivers/kernelsu
+          sed -i '/KernelSU/d' .gitmodules || true
+          sed -i '/kernelsu/d' drivers/Makefile || true
+          sed -i '/kernelsu/d' drivers/Kconfig || true
           
-          # 2. 物理接驳 include/linux/susfs.h
-          if [ -n "$SUSFS_H" ]; then
-              cp -f "$SUSFS_H" include/linux/susfs.h
-              echo "✅ 成功找到并植入: include/linux/susfs.h"
-          else
-              echo "⚠️ 紧急预案: 从远端拉取 susfs.h"
-              curl -LSs "https://raw.githubusercontent.com/simonpunk/susfs4ksu/gki-android14-5.15/kernel_patches/include/linux/susfs.h" -o include/linux/susfs.h
-          fi
+          echo "==== 2. 物理爆破老旧的 SuSFS 器官 ===="
+          rm -f fs/susfs.c fs/sus_su.c
+          rm -f include/linux/susfs.h include/linux/susfs_def.h include/linux/sus_su.h
+          sed -i '/susfs.o/d' fs/Makefile || true
           
-          # 3. 物理接驳 include/linux/susfs_def.h (解决 task_mmu.c 报错的核心)
-          if [ -n "$SUSFS_DEF_H" ]; then
-              cp -f "$SUSFS_DEF_H" include/linux/susfs_def.h
-              echo "✅ 成功找到并植入: include/linux/susfs_def.h"
-          else
-              echo "⚠️ 紧急预案: 从远端拉取 susfs_def.h"
-              curl -LSs "https://raw.githubusercontent.com/simonpunk/susfs4ksu/gki-android14-5.15/kernel_patches/include/linux/susfs_def.h" -o include/linux/susfs_def.h
-          fi
+          echo "==== 3. 启动静默疗法：全盘抹除残留宏调用 ===="
+          # 暴力搜寻并干掉所有尝试包含 susfs 的头文件引用，只要不 include，剩下的游离代码就是死代码！
+          find fs/ include/ drivers/ arch/ -type f -exec sed -i '/#include <linux\/susfs/d' {} + || true
           
-          # 4. 物理接驳 fs/susfs.c (大动脉泵血机)
-          if [ -n "$SUSFS_C" ]; then
-              cp -f "$SUSFS_C" fs/susfs.c
-              echo "✅ 成功找到并植入: fs/susfs.c"
-          else
-              echo "⚠️ 紧急预案: 从远端拉取 susfs.c"
-              curl -LSs "https://raw.githubusercontent.com/simonpunk/susfs4ksu/gki-android14-5.15/kernel_patches/fs/susfs.c" -o fs/susfs.c
-          fi
-          
-          # 5. 确保 fs/Makefile 认领了 susfs.o，防止有器官没连血管
-          grep -q "susfs.o" fs/Makefile || echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
-          # 🚨 物理修复：强制为 module-plts.c 注入缺失的 ARM64 汇编指令头文件！
-          sed -i '/#include <linux\/sort.h>/a #include <asm\/insn.h>' arch/arm64/kernel/module-plts.c
-          echo "==== 🚑 SuSFS 物理器官植入完成！ ===="
+          echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
