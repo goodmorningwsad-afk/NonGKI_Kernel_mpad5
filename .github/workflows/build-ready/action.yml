@@ -350,7 +350,7 @@ runs:
           # 1. 修复 Clang 19 编译老内核的通病：提前补齐缺失的结构体
           sed -i '1i struct cs_target { const char *name; char *cpus; };' kernel/cgroup/cpuset.c
           
-    # 🚨 终极物理器官移植：强行用 LineageOS 官方纯净版覆盖残废的 task_mmu.c
+          # 🚨 终极物理器官移植：强行用 LineageOS 官方纯净版覆盖残废的 task_mmu.c
           curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/fs/proc/task_mmu.c" -o fs/proc/task_mmu.c
           
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
