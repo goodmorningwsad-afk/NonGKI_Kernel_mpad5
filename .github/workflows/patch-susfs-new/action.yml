@@ -325,7 +325,10 @@ runs:
         # 🚨 物理真相：老旧的编译器不认识 ZSTD 里的 fallthrough，直接把它替换成物理注释！
         echo "🩹 正在缝合 lib/zstd/common/bitstream.h ..."
         sed -i 's/ZSTD_FALLTHROUGH;/\/\* fallthrough \*\//g' lib/zstd/common/bitstream.h
-
+        # 12. 全盘清剿 zstd 目录下的 fallthrough 穿越者 Bug
+        echo "🩹 正在全盘缝合 lib/zstd/ 目录下的 ZSTD_FALLTHROUGH ..."
+        find lib/zstd -type f -exec sed -i 's/ZSTD_FALLTHROUGH;/\/\* fallthrough \*\//g' {} +
+        
         sed -i 's/-dirty//g' scripts/setlocalversion
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
        
