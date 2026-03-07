@@ -26,6 +26,10 @@ runs:
         CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
         CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
         CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+        CONFIG_BLK_DEV_LOOP=y
+        CONFIG_SQUASHFS=y
+        CONFIG_EROFS_FS=y
+        EOF
         EOF
         echo "✅ SuSFS 物理开关全数合闸！"
 
