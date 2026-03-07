@@ -306,8 +306,23 @@ runs:
         sed -i 's/#if CONFIG_LITTLE_CPU_MASK/#if 0/g' kernel/cpu.c 
         sed -i 's/#if CONFIG_BIG_CPU_MASK/#if 0/g' kernel/cpu.c 
         sed -i 's/#if CONFIG_PRIME_CPU_MASK/#if 0/g' kernel/cpu.c 
-        echo "✅ 修复所有链接符号，全境畅通，起飞！"
-        
+        # 9. 修复 lz4_decompress.c 导出未定义符号的致命错误
+        # 🚨 锚点：既然原厂忘了删，咱们直接用注释把这6个报错的导出宏物理屏蔽！
+        echo "🩹 正在缝合 lib/lz4/lz4_decompress.c ..."
+        sed -i 's/EXPORT_SYMBOL(LZ4_decompress_safe_partial);/\/\/ EXPORT_SYMBOL(LZ4_decompress_safe_partial);/g' lib/lz4/lz4_decompress.c
+        sed -i 's/EXPORT_SYMBOL(LZ4_setStreamDecode);/\/\/ EXPORT_SYMBOL(LZ4_setStreamDecode);/g' lib/lz4/lz4_decompress.c
+        sed -i 's/EXPORT_SYMBOL(LZ4_decompress_safe_continue);/\/\/ EXPORT_SYMBOL(LZ4_decompress_safe_continue);/g' lib/lz4/lz4_decompress.c
+        sed -i 's/EXPORT_SYMBOL(LZ4_decompress_fast_continue);/\/\/ EXPORT_SYMBOL(LZ4_decompress_fast_continue);/g' lib/lz4/lz4_decompress.c
+        sed -i 's/EXPORT_SYMBOL(LZ4_decompress_safe_usingDict);/\/\/ EXPORT_SYMBOL(LZ4_decompress_safe_usingDict);/g' lib/lz4/lz4_decompress.c
+        sed -i 's/EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/\/\/ EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/g' lib/lz4/lz4_decompress.c
+
+        # 10. 修复 tcp_ipv6.c 和 tcp_ipv4.c 的 static 声明冲突
+        # 🚨 锚点：抹除 static 关键字，让它的身份与头文件的 extern 声明强制统一！
+        echo "🩹 正在缝合 net/ipv6/tcp_ipv6.c 和 net/ipv4/tcp_ipv4.c ..."
+        sed -i 's/static const struct tcp_request_sock_ops tcp_request_sock_ipv6_ops/const struct tcp_request_sock_ops tcp_request_sock_ipv6_ops/g' net/ipv6/tcp_ipv6.c
+        sed -i 's/static const struct tcp_request_sock_ops tcp_request_sock_ipv4_ops/const struct tcp_request_sock_ops tcp_request_sock_ipv4_ops/g' net/ipv4/tcp_ipv4.c
+
         sed -i 's/-dirty//g' scripts/setlocalversion
+        echo "✅ 修复所有链接符号，全境畅通，起飞！"
        
         
