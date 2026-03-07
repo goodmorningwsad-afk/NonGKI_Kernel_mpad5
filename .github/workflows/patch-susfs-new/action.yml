@@ -293,7 +293,15 @@ runs:
         sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); */|g' drivers/mmc/host/sdhci.c || true
 
         sed -i 's/-dirty//g' scripts/setlocalversion
-       
+        # 7. 修复 core.c 缺失 mmc_card_doing_bkops 宏的官方残疾 Bug
+        # 🚨 锚点：锁定报错函数正上方，注入伪造的宏定义，把未定义的方法强行变成 0 (false)
+        echo "🩹 正在缝合 drivers/mmc/core/core.c ..."
+        MMC_BKOPS_HOOK="
+        /* MMC_BKOPS_FIX */
+        #ifndef mmc_card_doing_bkops
+        #define mmc_card_doing_bkops(c) (0)
+        #endif"
+        patch_file "drivers/mmc/core/core.c" "static bool mmc_is_valid_state_for_clk_scaling(struct mmc_host *host)" 0 "$MMC_BKOPS_HOOK" "MMC_BKOPS_FIX"
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
         
         sed -i 's/-dirty//g' scripts/setlocalversion
