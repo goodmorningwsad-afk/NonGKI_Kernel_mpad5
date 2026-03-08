@@ -392,4 +392,11 @@ runs:
           perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s+static\s+#endif\s+const struct tcp_request_sock_ops tcp_request_sock_ipv6_ops/#ifndef CONFIG_MPTCP\n\n#endif\nconst struct tcp_request_sock_ops tcp_request_sock_ipv6_ops/g' net/ipv6/tcp_ipv6.c
           # 🚨 终极器官移植：替换被厂商炫技改废的 LZ4 解压算法库
           curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/lib/lz4/lz4_decompress.c" -o lib/lz4/lz4_decompress.c
+          # 🚨 终极擦屁股：物理删除 lz4_decompress.c 底部遗留的幽灵导出符号
+          sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_partial);/d' lib/lz4/lz4_decompress.c
+          sed -i '/EXPORT_SYMBOL(LZ4_setStreamDecode);/d' lib/lz4/lz4_decompress.c
+          sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_continue);/d' lib/lz4/lz4_decompress.c
+          sed -i '/EXPORT_SYMBOL(LZ4_decompress_fast_continue);/d' lib/lz4/lz4_decompress.c
+          sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_usingDict);/d' lib/lz4/lz4_decompress.c
+          sed -i '/EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/d' lib/lz4/lz4_decompress.c
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
