@@ -412,5 +412,7 @@ runs:
           # 3. 填补 sdhci.c 缺失的底层信号函数肉身及导出声明
           echo 'void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}' >> drivers/mmc/host/sdhci.c
           echo 'EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);' >> drivers/mmc/host/sdhci.c
+          # 🚨 终极净化：直接从 Makefile 编译清单中强行抹除无用的 DVB 数字电视模块
+          sed -i '/mpq-dmx-hw-plugin/d' drivers/media/platform/msm/dvb/demux/Makefile
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
           
