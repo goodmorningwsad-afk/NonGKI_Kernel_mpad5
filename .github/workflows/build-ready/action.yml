@@ -399,4 +399,6 @@ runs:
           sed -i '/EXPORT_SYMBOL(LZ4_decompress_fast_continue);/d' lib/lz4/lz4_decompress.c
           sed -i '/EXPORT_SYMBOL(LZ4_decompress_safe_usingDict);/d' lib/lz4/lz4_decompress.c
           sed -i '/EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/d' lib/lz4/lz4_decompress.c
+          # 🚨 拔除 ZSTD 里的地雷：用标准的编译器属性强行替换未定义的 fallthrough 关键字
+          sed -i 's/define ZSTD_FALLTHROUGH fallthrough/define ZSTD_FALLTHROUGH __attribute__((__fallthrough__))/g' lib/zstd/common/compiler.h
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
