@@ -387,7 +387,7 @@ runs:
           sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling); \*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\n#endif|g' drivers/mmc/host/sdhci.c
           # 🚨 终极语法纠偏：把非法的 #ifdef 0x 全部削回 #if 0x
           sed -i 's/#ifdef 0x/#if 0x/g' kernel/cpu.c
-          # 🚨 终极清障：无视所有空格与Tab，强杀 IPv4 和 IPv6 结构体声明里的 static
-          sed -i '/tcp_request_sock_ipv4_ops/s/static[ \t]*//g' net/ipv4/tcp_ipv4.c
-          sed -i '/tcp_request_sock_ipv6_ops/s/static[ \t]*//g' net/ipv6/tcp_ipv6.c
+          # 🚨 终极多行绞杀：无视回车换行，强行跨行抹除 MPTCP 引入的幽灵 static
+          perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s+static\s+#endif\s+const struct tcp_request_sock_ops tcp_request_sock_ipv4_ops/#ifndef CONFIG_MPTCP\n\n#endif\nconst struct tcp_request_sock_ops tcp_request_sock_ipv4_ops/g' net/ipv4/tcp_ipv4.c
+          perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s+static\s+#endif\s+const struct tcp_request_sock_ops tcp_request_sock_ipv6_ops/#ifndef CONFIG_MPTCP\n\n#endif\nconst struct tcp_request_sock_ops tcp_request_sock_ipv6_ops/g' net/ipv6/tcp_ipv6.c
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
