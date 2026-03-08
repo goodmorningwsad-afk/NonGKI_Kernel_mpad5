@@ -40,8 +40,8 @@ env:
   AK3_BRANCH : "master"
 
   BOOT_SOURCE : ""
-  NEED_DTBO : "false"
-  NEED_SAFE_DTBO : "false"
+  NEED_DTBO : "true"
+  NEED_SAFE_DTBO : "true"
   ROM_TEXT : "miui_a12"
   PYTHON_VERSION: "2"
   PACK_METHOD: "Anykernel3"
