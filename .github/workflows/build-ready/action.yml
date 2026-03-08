@@ -406,8 +406,8 @@ runs:
           # 1. 填补 madvise.c 缺失的 reclaim_pages 肉身
           echo 'unsigned long reclaim_pages(struct list_head *page_list) { return 0; }' >> mm/madvise.c
           
-          # 2. 填补 focaltech_core.c 缺失的屏幕指纹寄存器写入函数肉身
-          echo 'int fts_fod_reg_write(void *client, int reg, int val) { return 0; }' >> drivers/input/touchscreen/focaltech_touch/focaltech_core.c
+          # 🚨 顶级 VIP 插队：将屏幕指纹空壳函数强行写在第 1 行，同时骗过编译器和链接器！
+          sed -i '1i int fts_fod_reg_write(void *client, int reg, int val) { return 0; }' drivers/input/touchscreen/focaltech_touch/focaltech_core.c
           
           # 3. 填补 sdhci.c 缺失的底层信号函数肉身及导出声明
           echo 'void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}' >> drivers/mmc/host/sdhci.c
