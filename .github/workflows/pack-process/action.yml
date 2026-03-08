@@ -1,8 +1,3 @@
-name: 'Pack Process.'
-
-runs:
-  using: 'composite'
-  steps:
       - name: Make Anykernel3 Flasher
         if: env.PACK_METHOD == 'Anykernel3'
         shell: bash
@@ -19,31 +14,32 @@ runs:
           mkdir -p tmp
 
           if [[ "${{ env.AK3_SOURCE }}" =~ "osm0sis" ]]; then
-            echo '### AnyKernel3 Ramdisk Mod Script' > Anykernel3/anykernel.sh
-            echo "properties() { '" >> Anykernel3/anykernel.sh
-            echo 'kernel.string=Xiaomi Youth Custom Kernel (Pure)' >> Anykernel3/anykernel.sh
-            echo 'do.devicecheck=0' >> Anykernel3/anykernel.sh
-            echo 'do.modules=0' >> Anykernel3/anykernel.sh
-            echo 'do.systemless=1' >> Anykernel3/anykernel.sh
-            echo 'do.cleanup=1' >> Anykernel3/anykernel.sh
-            echo 'do.cleanuponabort=0' >> Anykernel3/anykernel.sh
-            echo "'; }" >> Anykernel3/anykernel.sh
-            echo '' >> Anykernel3/anykernel.sh
-            echo 'block=auto;' >> Anykernel3/anykernel.sh
-            echo 'is_slot_device=auto;' >> Anykernel3/anykernel.sh
-            echo 'ramdisk_compression=auto;' >> Anykernel3/anykernel.sh
-            echo 'patch_vbmeta_flag=auto;' >> Anykernel3/anykernel.sh
-            echo '' >> Anykernel3/anykernel.sh
-            echo '. tools/ak3-core.sh;' >> Anykernel3/anykernel.sh
-            echo '' >> Anykernel3/anykernel.sh
-            echo 'boot_attributes() {' >> Anykernel3/anykernel.sh
-            echo 'set_perm_recursive 0 0 755 644 $ramdisk/*;' >> Anykernel3/anykernel.sh
-            echo 'set_perm_recursive 0 0 750 750 $ramdisk/init* $ramdisk/sbin;' >> Anykernel3/anykernel.sh
-            echo '}' >> Anykernel3/anykernel.sh
-            echo '' >> Anykernel3/anykernel.sh
-            echo 'dump_boot;' >> Anykernel3/anykernel.sh
-            echo 'write_boot;' >> Anykernel3/anykernel.sh
-            echo "✅ 极简防砖版 anykernel.sh 已生成！"
+            AK="Anykernel3/anykernel.sh"
+            echo '### AnyKernel3 Ramdisk Mod Script' > $AK
+            echo "properties() { '" >> $AK
+            echo 'kernel.string=Xiaomi Youth Custom Kernel (Pure)' >> $AK
+            echo 'do.devicecheck=0' >> $AK
+            echo 'do.modules=0' >> $AK
+            echo 'do.systemless=1' >> $AK
+            echo 'do.cleanup=1' >> $AK
+            echo 'do.cleanuponabort=0' >> $AK
+            echo "'; }" >> $AK
+            echo '' >> $AK
+            echo 'block=auto;' >> $AK
+            echo 'is_slot_device=auto;' >> $AK
+            echo 'ramdisk_compression=auto;' >> $AK
+            echo 'patch_vbmeta_flag=auto;' >> $AK
+            echo '' >> $AK
+            echo '. tools/ak3-core.sh;' >> $AK
+            echo '' >> $AK
+            echo 'boot_attributes() {' >> $AK
+            echo 'set_perm_recursive 0 0 755 644 $ramdisk/*;' >> $AK
+            echo 'set_perm_recursive 0 0 750 750 $ramdisk/init* $ramdisk/sbin;' >> $AK
+            echo '}' >> $AK
+            echo '' >> $AK
+            echo 'dump_boot;' >> $AK
+            echo 'write_boot;' >> $AK
+            echo "✅ 极简防砖版 anykernel.sh 已生成并强行覆盖完成！"
           else
             echo "Now using custom Anykernel3."
           fi
@@ -58,8 +54,6 @@ runs:
             cp -fp $IMAGE_DIR/zImage-dtb tmp
             echo "Found zImage-dtb (ARMV7A) !"
           elif [[ -f "$IMAGE_DIR/Image" ]]; then
-            # gzip -c $IMAGE_DIR/Image > $IMAGE_DIR/Image.gz
-            # cp -fp $IMAGE_DIR/Image.gz tmp
             cp -fp $IMAGE_DIR/Image tmp
             echo "Found Image !"
           fi
