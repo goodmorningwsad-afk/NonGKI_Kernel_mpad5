@@ -18,34 +18,55 @@ runs:
 
           mkdir -p tmp
 
-          # 🚨 极客强制介入：无视原有替换逻辑，强行覆写极简防砖版 anykernel.sh，彻底斩断卡米隐患！
-          cat << 'EOF' > Anykernel3/anykernel.sh
-          ### AnyKernel3 Ramdisk Mod Script
-          properties() { '
-          kernel.string=Xiaomi Youth Custom Kernel (Pure)
-          do.devicecheck=0
-          do.modules=0
-          do.systemless=1
-          do.cleanup=1
-          do.cleanuponabort=0
-          '; }
+          # 🚨 终极收获：全自动打包 AnyKernel3 (极客智能雷达：优先搜寻完全体内核)
+          echo "==== 准备 AnyKernel3 刷机包 ===="
+          git clone https://github.com/osm0sis/AnyKernel3.git -b master AnyKernel3
           
-          block=auto;
-          is_slot_device=auto;
-          ramdisk_compression=auto;
-          patch_vbmeta_flag=auto;
+          IMAGE_DIR="out/arch/arm64/boot"
           
-          . tools/ak3-core.sh;
+          # 极客智能雷达：按优先级寻找内核
+          if [ -f "$IMAGE_DIR/Image.gz-dtb" ]; then
+            cp $IMAGE_DIR/Image.gz-dtb AnyKernel3/
+            echo "✅ 找到了 Image.gz-dtb (包含设备树的完全体内核)！"
+          elif [ -f "$IMAGE_DIR/Image.gz" ]; then
+            cp $IMAGE_DIR/Image.gz AnyKernel3/
+            echo "✅ 找到了 Image.gz (高压缩比内核)！"
+          else
+            cp $IMAGE_DIR/Image AnyKernel3/
+            echo "✅ 找到了 Image (裸内核)！"
+          fi
           
-          boot_attributes() {
-          set_perm_recursive 0 0 755 644 $ramdisk/*;
-          set_perm_recursive 0 0 750 750 $ramdisk/init* $ramdisk/sbin;
-          }
+          cd AnyKernel3
           
-          dump_boot;
-          write_boot;
-          EOF
-          echo "✅ 极简防砖版 anykernel.sh 已生成并强行覆盖完成！"
+          # 🚨 暴力单行写入：绝对无视 YAML 缩进错位，生成极简防砖 anykernel.sh
+          echo '### AnyKernel3 Ramdisk Mod Script' > anykernel.sh
+          echo "properties() { '" >> anykernel.sh
+          echo 'kernel.string=Xiaomi Youth Custom Kernel (Pure)' >> anykernel.sh
+          echo 'do.devicecheck=0' >> anykernel.sh
+          echo 'do.modules=0' >> anykernel.sh
+          echo 'do.systemless=1' >> anykernel.sh
+          echo 'do.cleanup=1' >> anykernel.sh
+          echo 'do.cleanuponabort=0' >> anykernel.sh
+          echo "'; }" >> anykernel.sh
+          echo '' >> anykernel.sh
+          echo 'block=auto;' >> anykernel.sh
+          echo 'is_slot_device=auto;' >> anykernel.sh
+          echo 'ramdisk_compression=auto;' >> anykernel.sh
+          echo 'patch_vbmeta_flag=auto;' >> anykernel.sh
+          echo '' >> anykernel.sh
+          echo '. tools/ak3-core.sh;' >> anykernel.sh
+          echo '' >> anykernel.sh
+          echo 'boot_attributes() {' >> anykernel.sh
+          echo 'set_perm_recursive 0 0 755 644 $ramdisk/*;' >> anykernel.sh
+          echo 'set_perm_recursive 0 0 750 750 $ramdisk/init* $ramdisk/sbin;' >> anykernel.sh
+          echo '}' >> anykernel.sh
+          echo '' >> anykernel.sh
+          echo 'dump_boot;' >> anykernel.sh
+          echo 'write_boot;' >> anykernel.sh
+          
+          # 封包生成 ZIP
+          zip -r9 ../Custom-Kernel-mpad5.zip * -x .git README.md *placeholder
+          echo "✅ 刷机包打包完成：Custom-Kernel-mpad5.zip"
 
           if [[ -f "$IMAGE_DIR/Image.gz-dtb" ]]; then
             cp -fp $IMAGE_DIR/Image.gz-dtb tmp
