@@ -390,4 +390,6 @@ runs:
           # 🚨 终极多行绞杀：无视回车换行，强行跨行抹除 MPTCP 引入的幽灵 static
           perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s+static\s+#endif\s+const struct tcp_request_sock_ops tcp_request_sock_ipv4_ops/#ifndef CONFIG_MPTCP\n\n#endif\nconst struct tcp_request_sock_ops tcp_request_sock_ipv4_ops/g' net/ipv4/tcp_ipv4.c
           perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\s+static\s+#endif\s+const struct tcp_request_sock_ops tcp_request_sock_ipv6_ops/#ifndef CONFIG_MPTCP\n\n#endif\nconst struct tcp_request_sock_ops tcp_request_sock_ipv6_ops/g' net/ipv6/tcp_ipv6.c
+          # 🚨 终极器官移植：替换被厂商炫技改废的 LZ4 解压算法库
+          curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/lib/lz4/lz4_decompress.c" -o lib/lz4/lz4_decompress.c
           echo "✅ 肿瘤已完全切除，母体强制恢复无菌状态！"
