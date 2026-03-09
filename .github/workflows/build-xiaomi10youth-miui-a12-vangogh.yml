@@ -96,21 +96,27 @@ jobs:
           echo "==== 搜查结束，请复制以上输出的文件列表 ===="
 
       
+      
       - name: 🩹 修复基础语法代沟 (严格排错版)
+        shell: bash
         run: |
           # 开启严格模式：遇到任何错误立即终止
           set -ex
           
-          cd device_kernel
+          cd $GITHUB_WORKSPACE/device_kernel
           
           echo "==== 1. 修复高版本 Clang 编译老内核的通病 ===="
+          # 仅保留 module-plts.c 的指令头文件修复，移除 cpuset.c 的重定义
           sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
-          sed -i '1i struct cs_target { const char *name; char *cpus; };' kernel/cgroup/cpuset.c
 
           echo "==== 2. 修复 cgroup 函数名拼写错误 ===="
           sed -i 's/write_wrapper/write/g' kernel/sched/tune.c
 
-          echo "✅ 基础语法修补完毕！(已撤销所有硬件空壳补丁)"
+          echo "==== 3. 抹除 NTFS3 驱动中老编译器不识别的超前参数 ===="
+          sed -i 's/-Wunused-but-set-variable//g' fs/ntfs3/Makefile
+          sed -i 's/-Wno-unused-but-set-variable//g' fs/ntfs3/Makefile
+
+          echo "✅ 基础语法修补完毕！"
           
 
       - name: 🛠️ 强行注入 pstore 抓错机制 (温柔追加版)
