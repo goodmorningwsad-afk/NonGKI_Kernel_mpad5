@@ -54,7 +54,11 @@ runs:
         
         echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
         # 🚨 史诗级修正：匹配 SM7250 的真实内核版本 4.19！
+        # 🛡️ 临时关闭严格模式，防止 find 扫描无权限目录引发 pipefail 连坐暴毙
+        set +e
         PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" 2>/dev/null | head -n 1)
+        set -e
+        
         if [ -z "$PATCH_FILE" ]; then
             echo "❌ 警告：找不到 susfs_patch_to_4.19.patch！"
         else
