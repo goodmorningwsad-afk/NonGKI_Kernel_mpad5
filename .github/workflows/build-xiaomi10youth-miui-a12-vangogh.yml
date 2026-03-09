@@ -127,8 +127,8 @@ jobs:
           
           echo "==== 侦察结束 ===="
 
-          - name: 🛠️ 强行注入 pstore 抓错机制 (修改配置与 DTS)
-          run: |
+      - name: 🛠️ 强行注入 pstore 抓错机制 (修改配置与 DTS)
+        run: |
           cd device_kernel
           
           echo "==== 1. 强行打开 defconfig 开关 ===="
