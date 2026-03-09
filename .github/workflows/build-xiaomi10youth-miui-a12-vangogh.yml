@@ -88,6 +88,45 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 🕵️ 战前侦察：检查 pstore 工人、场地与开关
+        run: |
+          echo "==== 开始侦察 pstore 崩溃抓取机制 ===="
+          # 进入内核源码目录（根据下方封印代码的习惯推测）
+          cd device_kernel || { echo "❌ 找不到内核源码目录，请检查上一步 clone 路径"; exit 1; }
+
+          echo ">> 1. 查岗：寻找 pstore '工人' (核心代码与驱动)"
+          if [ -d "fs/pstore" ] && { [ -f "fs/pstore/ram.c" ] || [ -f "fs/pstore/ram_core.c" ]; }; then
+              echo "✅ '工人' 在岗：找到了 fs/pstore 核心工作组！"
+          else
+              echo "❌ 警告：未找到 fs/pstore/ram.c，这套内核源码可能被作者阉割了抓错功能！"
+          fi
+
+          echo ">> 2. 查场地：寻找 ramoops 保留内存"
+          echo "正在 arch/arm64/boot/dts/ 目录下进行地毯式搜索..."
+          if grep -rnw "arch/arm64/boot/dts/" -e "ramoops" > /dev/null; then
+              echo "✅ '场地' 已批：在设备树 (DTS) 中找到了 ramoops 分配节点！"
+              echo ">> 📍 具体的场地坐标如下："
+              # 打印出具体在哪个 dts 文件里找到了 ramoops
+              grep -rnw "arch/arm64/boot/dts/" -e "ramoops" | awk -F: '{print "   - "$1}' | sort | uniq
+          else
+              echo "❌ 致命警告：设备树中未找到 ramoops 内存分配！"
+              echo "   (即便你开了开关，崩溃瞬间工人也会因为没有内存写日志而导致抓取失败)"
+          fi
+
+          echo ">> 3. 查指令：检查 defconfig 配置文件开关"
+          # 读取你在上方 env 中定义的 DEFCONFIG_NAME 变量
+          DEF_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          if [ -f "$DEF_FILE" ]; then
+              echo "🔍 正在审查配置文件: $DEF_FILE"
+              grep -q "CONFIG_PSTORE=y" "$DEF_FILE" && echo "✅ 开关已开: CONFIG_PSTORE=y" || echo "❌ 缺失开关: CONFIG_PSTORE=y"
+              grep -q "CONFIG_PSTORE_CONSOLE=y" "$DEF_FILE" && echo "✅ 开关已开: CONFIG_PSTORE_CONSOLE=y" || echo "❌ 缺失开关: CONFIG_PSTORE_CONSOLE=y"
+              grep -q "CONFIG_PSTORE_RAM=y" "$DEF_FILE" && echo "✅ 开关已开: CONFIG_PSTORE_RAM=y" || echo "❌ 缺失开关: CONFIG_PSTORE_RAM=y"
+          else
+              echo "❌ 找不到指定的 defconfig 文件：$DEF_FILE，请检查路径是否正确。"
+          fi
+          
+          echo "==== 侦察结束 ===="
+
       # 🚨🚨🚨 【未来科技区】：SuKiSU + SuSFS 2.0.0 强制换血手术刀 🚨🚨🚨
       # 当前为封印状态。等你用原装 yuragi 测试能完美进系统后，再解开这里的注释！
       # - name: 💉 强行剥离自带旧版，植入纯血 SuKiSU 2.0.0
