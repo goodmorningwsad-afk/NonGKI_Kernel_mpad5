@@ -96,6 +96,11 @@ jobs:
           sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c || true
           # 补齐 cpuset.c 缺失的结构体定义
           sed -i '1i struct cs_target { const char *name; char *cpus; };' kernel/cgroup/cpuset.c || true
+          
+          echo "==== 修复原作者 cgroup 函数名写错的低级 Bug ===="
+          # 剥除过时的 cgroup wrapper 包装，直指本体函数
+          sed -i 's/write_wrapper/write/g' kernel/sched/tune.c || true
+          
           echo "✅ 源码硬伤修复完毕！"
 
       - name: 🛠️ 强行注入 pstore 抓错机制 (温柔追加版)
