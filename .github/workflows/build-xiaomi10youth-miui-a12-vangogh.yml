@@ -144,7 +144,8 @@ jobs:
           # sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c || true
           # echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
           # echo "ccflags-y += -Wno-error" >> fs/Makefile
-          
+          echo "==== 4. 物理补全 namei.c 缺失的变量声明 ===="
+          sed -i '3168s/^/    int error = 0; \/* FIXED_UNDECLARED_VAR *\/ \n/' fs/namei.c
           echo "==== 5. 防止 LTO 爆内存，强制保留 ===="
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/milito_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/milito_defconfig
