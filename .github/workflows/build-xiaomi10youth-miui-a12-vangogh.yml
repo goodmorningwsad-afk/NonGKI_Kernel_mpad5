@@ -1,4 +1,4 @@
-name: Build Xiaomi 10 Youth (vangogh) ( NO MIUI A12)
+name: Build Xiaomi 10 Youth (vangogh) (PURE TEST)
 
 on:
   workflow_call:
@@ -11,7 +11,6 @@ env:
   CUSTOM_CMDS : "CLANG_TRIPLE=aarch64-linux-gnu-"
   EXTRA_CMDS : "LD=ld.lld LLVM=1 LLVM_IAS=1 PYTHON=/usr/bin/python2"
 
-  # 🚨 神装大动脉：自带 KernelSU, SuSFS 1.5.5, 且极大概率修复了 Android 15 挂载
   KERNEL_SOURCE : "https://github.com/furkancakmak34x/kernel_xiaomi_sm7250.git"
   KERNEL_BRANCH : "yuragi"
 
@@ -62,6 +61,7 @@ env:
   HIDE_STUFF: "false"
   GENERATE_DTB: "true"
   GENERATE_CHIP: "qcom"
+ 
   BUILD_DEBUGGER: "true"
   SKIP_PATCH: "false"
   BUILD_OTHER_CONFIG: "false"
@@ -88,46 +88,7 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-      - name: 🕵️ 战前侦察：检查 pstore 工人、场地与开关
-        run: |
-          echo "==== 开始侦察 pstore 崩溃抓取机制 ===="
-          # 进入内核源码目录（根据下方封印代码的习惯推测）
-          cd device_kernel || { echo "❌ 找不到内核源码目录，请检查上一步 clone 路径"; exit 1; }
-
-          echo ">> 1. 查岗：寻找 pstore '工人' (核心代码与驱动)"
-          if [ -d "fs/pstore" ] && { [ -f "fs/pstore/ram.c" ] || [ -f "fs/pstore/ram_core.c" ]; }; then
-              echo "✅ '工人' 在岗：找到了 fs/pstore 核心工作组！"
-          else
-              echo "❌ 警告：未找到 fs/pstore/ram.c，这套内核源码可能被作者阉割了抓错功能！"
-          fi
-
-          echo ">> 2. 查场地：寻找 ramoops 保留内存"
-          echo "正在 arch/arm64/boot/dts/ 目录下进行地毯式搜索..."
-          if grep -rnw "arch/arm64/boot/dts/" -e "ramoops" > /dev/null; then
-              echo "✅ '场地' 已批：在设备树 (DTS) 中找到了 ramoops 分配节点！"
-              echo ">> 📍 具体的场地坐标如下："
-              # 打印出具体在哪个 dts 文件里找到了 ramoops
-              grep -rnw "arch/arm64/boot/dts/" -e "ramoops" | awk -F: '{print "   - "$1}' | sort | uniq
-          else
-              echo "❌ 致命警告：设备树中未找到 ramoops 内存分配！"
-              echo "   (即便你开了开关，崩溃瞬间工人也会因为没有内存写日志而导致抓取失败)"
-          fi
-
-          echo ">> 3. 查指令：检查 defconfig 配置文件开关"
-          # 读取你在上方 env 中定义的 DEFCONFIG_NAME 变量
-          DEF_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          if [ -f "$DEF_FILE" ]; then
-              echo "🔍 正在审查配置文件: $DEF_FILE"
-              grep -q "CONFIG_PSTORE=y" "$DEF_FILE" && echo "✅ 开关已开: CONFIG_PSTORE=y" || echo "❌ 缺失开关: CONFIG_PSTORE=y"
-              grep -q "CONFIG_PSTORE_CONSOLE=y" "$DEF_FILE" && echo "✅ 开关已开: CONFIG_PSTORE_CONSOLE=y" || echo "❌ 缺失开关: CONFIG_PSTORE_CONSOLE=y"
-              grep -q "CONFIG_PSTORE_RAM=y" "$DEF_FILE" && echo "✅ 开关已开: CONFIG_PSTORE_RAM=y" || echo "❌ 缺失开关: CONFIG_PSTORE_RAM=y"
-          else
-              echo "❌ 找不到指定的 defconfig 文件：$DEF_FILE，请检查路径是否正确。"
-          fi
-          
-          echo "==== 侦察结束 ===="
-
-      - name: 🛠️ 强行注入 pstore 抓错机制 (修改配置与 DTS)
+      - name: 🛠️ 强行注入 pstore 抓错机制 (温柔追加版)
         run: |
           cd device_kernel
           
@@ -144,12 +105,9 @@ jobs:
           echo "✅ 开关已强行写入 $DEF_FILE"
 
           echo "==== 2. 强行给 lito 设备树划拨 ramoops 内存 ===="
-          # 寻找 lito 的基础设备树文件
           LITO_DTS=$(find arch/arm64/boot/dts/ -name "lito.dtsi" | head -n 1)
           
           if [ -n "$LITO_DTS" ]; then
-              echo "📍 找到目标设备树: $LITO_DTS"
-              # 弃用危险的 sed 硬插入，改在文件末尾优雅追加扩展节点
               cat << 'EOF' >> "$LITO_DTS"
 
           / {
@@ -164,171 +122,34 @@ jobs:
               };
           };
           EOF
-              echo "✅ 成功在 DTS 文件末尾追加 0xa0000000 内存节点，语法冲突已解除！"
+              echo "✅ 成功在 DTS 文件末尾追加保留内存！"
           else
-              echo "❌ 找不到 lito.dtsi 文件，自动打补丁失败！"
+              echo "❌ 找不到 lito.dtsi 文件！"
               exit 1
           fi
 
-      # 🚨🚨🚨 【未来科技区】：SuKiSU + SuSFS 2.0.0 强制换血手术刀 🚨🚨🚨
-      # 当前为封印状态。等你用原装 yuragi 测试能完美进系统后，再解开这里的注释！
+      # 🚨🚨🚨 【未来科技区】已被封印 🚨🚨🚨
       # - name: 💉 强行剥离自带旧版，植入纯血 SuKiSU 2.0.0
       #   run: |
       #     cd device_kernel
       #     echo "==== 1. 物理切除原作者自带的 KernelSU 肿瘤 ===="
-      #     # rm -rf drivers/kernelsu
-      #     # rm -rf KernelSU
-      #     echo "==== 2. 暴力洗刷原作者的 SuSFS 代码 (强行恢复到纯净状态) ===="
-      #     # git checkout HEAD fs/ include/linux/ security/selinux/
-      #     echo "==== 3. 注入纯血 SuKiSU 与 SuSFS 2.0.0 ===="
-      #     # (未来在这里填入你的 SuKiSU 和 SuSFS 打孔脚本指令)
-      #     # curl -LSs "https://raw.githubusercontent.com/rsuntk/SuKiSU/main/setup.sh" | bash -
-      #     # patch -p1 < ../susfs_patches/fs.patch || true
 
-      # 🚨🚨🚨 【旧日封存区】：以下是你之前手搓的验证、修复和打孔脚本。🚨🚨🚨
-      # 因为新仓库已经自带，运行这些必爆冲突！已全部加 # 物理封印，一字未删！
+      # 🚨🚨🚨 【旧日封存区】：你之前手搓的验证、修复和打孔脚本，已全部加 # 物理封印，一字未删！🚨🚨🚨
       
       # - name: ⏪ 物理时光机：精准回溯 3 号提交
       #   shell: bash
       #   run: |
       #     echo "==== 启动 Git 级时光机，直接回退 ===="
-      #     KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
-      #     if [ -n "$KSU_DIR" ]; then
-      #         echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
-      #         cd "$KSU_DIR"
-      #         git reset --hard c1fd51c
-      #         echo "✅ 源码已成功回溯至 3 月 2 日纯净版！"
-      #     else
-      #         echo "❌ 致命错误：未找到 SukiSU 源码目录，时光机启动失败！"
-      #         exit 1
-      #     fi
 
-      # - name: 📦 提取 SukiSU 底层源码寻找真名
-      #   run: |
-      #     cd $GITHUB_WORKSPACE
-      #     echo "==== 正在查抄 SukiSU 底层核心寻找隐藏函数 ===="
-      #     mkdir -p SukiSU_Source
-      #     cp -r device_kernel/drivers/kernelsu/* SukiSU_Source/ || echo "❌ 未找到 SukiSU 源码"
-      #     cd SukiSU_Source
-      #     zip -r ../SukiSU_Source.zip .
-          
-      # - name: 📤 上传 SukiSU 源码
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: SukiSU_Source
-          # path: SukiSU_Source.zip
+      # 【以下三个额外模块为了纯净测试，暂且封印，测试完可解封】
+      # - name: 🧰 Patch Kernel of Re:Kernel
+      #   uses: ./.github/workflows/patch-rekernel
 
-      # - name: 📦 提取核心源码进行验证 (包含 hooks.c)
-      #   run: |
-      #     cd $GITHUB_WORKSPACE
-      #     echo "==== 正在提取 hooks.c 和 exec.c 进行验证 ===="
-      #     mkdir -p verify_files/security/selinux
-      #     mkdir -p verify_files/fs
-      #     cp device_kernel/security/selinux/hooks.c verify_files/security/selinux/ || echo "❌ 未找到 hooks.c"
-      #     cp device_kernel/fs/exec.c verify_files/fs/ || echo "❌ 未找到 exec.c"
-      #     cd verify_files
-      #     zip -r ../Kernel_Verify_Files.zip .
+      # - name: 🔒 Patch Kernel of Baseband Guard
+      #   uses: ./.github/workflows/patch-baseband-guard
 
-      # - name: 📤 上传源码验证包到云端
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: Kernel_Verify_Files
-      #     path: Kernel_Verify_Files.zip
-
-      # - name: 🩹 Fix SukiSU Source Bugs & Extra Options
-      #   run: |
-      #     cd $GITHUB_WORKSPACE/device_kernel
-      #     echo "==== 开始清理与修复 SukiSU 原厂 Bug ===="
-      #     sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
-      #     sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
-      #     sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
-      #     sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
-      #     sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
-      #     sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
-      #     echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
-      #     echo "ccflags-y += -Wno-error" >> fs/Makefile
-      #     sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/g' "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-      #     sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-      #     sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-      #     echo "CONFIG_KSU_MANUAL_HOOK=y" >> "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-      #     echo "==== 正在切断 su->sh 的无差别篡改大动脉 ===="
-      #     sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c
- 
-      # - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
-      #   uses: ./.github/workflows/patch-susfs-new
-          
-      # - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
-      #   run: |
-      #     cd $GITHUB_WORKSPACE
-      #     echo "==== 正在收集打孔后的核心文件，准备验尸 ===="
-      #     mkdir -p patched_source_files/fs/devpts
-      #     mkdir -p patched_source_files/drivers/input
-      #     mkdir -p patched_source_files/security/selinux
-      #     mkdir -p patched_source_files/fs/proc
-      #     cp device_kernel/fs/exec.c patched_source_files/fs/ || true
-      #     cp device_kernel/fs/open.c patched_source_files/fs/ || true
-      #     cp device_kernel/fs/read_write.c patched_source_files/fs/ || true
-      #     cp device_kernel/fs/stat.c patched_source_files/fs/ || true
-      #     cp device_kernel/fs/namespace.c patched_source_files/fs/ || true
-      #     cp device_kernel/fs/devpts/inode.c patched_source_files/fs/devpts/ || true
-      #     cp device_kernel/drivers/input/input.c patched_source_files/drivers/input/ || true
-      #     cp device_kernel/security/selinux/hooks.c patched_source_files/security/selinux/ || true
-      #     cp device_kernel/fs/proc/cmdline.c patched_source_files/fs/proc/ || true
-      #     cp device_kernel/fs/susfs.c patched_source_files/fs/ || true
-      #     cp device_kernel/fs/dcache.c patched_source_files/fs/ || true
-      #     cp device_kernel/fs/readdir.c patched_source_files/fs/ || true
-      #     cp device_kernel/fs/namei.c patched_source_files/fs/ || true
-      #     cd patched_source_files
-      #     zip -r ../Patched_Source_Files.zip .
-          
-      # - name: 📦 上传打孔后源码验证包
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: Patched_Source_Files
-      #     path: Patched_Source_Files.zip
-
-      # - name: 📤 提取官方 SukiSU 补丁脚本 (用于法医级审查)
-      #   run: |
-      #     cd $GITHUB_WORKSPACE
-      #     echo "==== 正在查抄官方补丁目录 ===="
-      #     mkdir -p Official_Patches
-      #     cp -r /tmp/Patches/* Official_Patches/ || true
-      #     cp device_kernel/backport_patches.sh Official_Patches/ || true
-      #     cp device_kernel/backport_selinux_patches.sh Official_Patches/ || true
-      #     cp device_kernel/*.patch Official_Patches/ || true
-      #     cd Official_Patches
-      #     zip -r ../Official_Patches.zip .
-
-      # - name: 📦 上传官方补丁审查包
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: Official_Patches
-      #     path: Official_Patches.zip
-
-      # - name: 📤 提取 SuSFS 冲突原件 ( .rej 查抄)
-      #   run: |
-      #     cd $GITHUB_WORKSPACE
-      #     echo "==== 正在满世界抓捕 .rej 冲突文件 ===="
-      #     mkdir -p Rej_Files
-      #     find device_kernel -name "*.rej" -exec cp {} Rej_Files/ \; || true
-      #     cd Rej_Files
-      #     zip -r ../Rej_Files.zip . || true
-
-      # - name: 📦 上传冲突审查包 (.rej)
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: SuSFS_Rej_Files
-      #     path: Rej_Files.zip
-      #     if-no-files-found: ignore
-
-      - name: 🧰 Patch Kernel of Re:Kernel
-        uses: ./.github/workflows/patch-rekernel
-
-      - name: 🔒 Patch Kernel of Baseband Guard
-        uses: ./.github/workflows/patch-baseband-guard
-
-      - name: 🔧 Patch Hide Stuff
-        uses: ./.github/workflows/patch-hide-stuff
+      # - name: 🔧 Patch Hide Stuff
+      #   uses: ./.github/workflows/patch-hide-stuff
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
