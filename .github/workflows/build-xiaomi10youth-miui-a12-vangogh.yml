@@ -127,6 +127,37 @@ jobs:
           
           echo "==== 侦察结束 ===="
 
+          - name: 🛠️ 强行注入 pstore 抓错机制 (修改配置与 DTS)
+          run: |
+          cd device_kernel
+          
+          echo "==== 1. 强行打开 defconfig 开关 ===="
+          DEF_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          {
+            echo ""
+            echo "# PSTORE DEBUG CONFIG"
+            echo "CONFIG_PSTORE=y"
+            echo "CONFIG_PSTORE_CONSOLE=y"
+            echo "CONFIG_PSTORE_PMSG=y"
+            echo "CONFIG_PSTORE_RAM=y"
+          } >> "$DEF_FILE"
+          echo "✅ 开关已强行写入 $DEF_FILE"
+
+          echo "==== 2. 强行给 lito 设备树划拨 ramoops 内存 ===="
+          # 寻找 lito 的基础设备树文件
+          LITO_DTS=$(find arch/arm64/boot/dts/ -name "lito.dtsi" | head -n 1)
+          
+          if [ -n "$LITO_DTS" ]; then
+              echo "📍 找到目标设备树: $LITO_DTS"
+              # 用 sed 在 reserved-memory 节点内部强行插入 ramoops 节点
+              sed -i '/reserved-memory {/a\
+              \t\tramoops_mem: ramoops@a0000000 {\n\t\t\tcompatible = "ramoops";\n\t\t\treg = <0x0 0xa0000000 0x0 0x200000>;\n\t\t\trecord-size = <0x40000>;\n\t\t\tconsole-size = <0x40000>;\n\t\t\tpmsg-size = <0x40000>;\n\t\t};' "$LITO_DTS"
+              echo "✅ 成功在 DTS 中划拨 0xa0000000 地址作为抓错保留内存！"
+          else
+              echo "❌ 找不到 lito.dtsi 文件，自动打补丁失败！"
+              exit 1
+          fi
+
       # 🚨🚨🚨 【未来科技区】：SuKiSU + SuSFS 2.0.0 强制换血手术刀 🚨🚨🚨
       # 当前为封印状态。等你用原装 yuragi 测试能完美进系统后，再解开这里的注释！
       # - name: 💉 强行剥离自带旧版，植入纯血 SuKiSU 2.0.0
