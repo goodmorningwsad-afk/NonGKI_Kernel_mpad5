@@ -149,10 +149,22 @@ jobs:
           
           if [ -n "$LITO_DTS" ]; then
               echo "📍 找到目标设备树: $LITO_DTS"
-              # 用 sed 在 reserved-memory 节点内部强行插入 ramoops 节点
-              sed -i '/reserved-memory {/a\
-              \t\tramoops_mem: ramoops@a0000000 {\n\t\t\tcompatible = "ramoops";\n\t\t\treg = <0x0 0xa0000000 0x0 0x200000>;\n\t\t\trecord-size = <0x40000>;\n\t\t\tconsole-size = <0x40000>;\n\t\t\tpmsg-size = <0x40000>;\n\t\t};' "$LITO_DTS"
-              echo "✅ 成功在 DTS 中划拨 0xa0000000 地址作为抓错保留内存！"
+              # 弃用危险的 sed 硬插入，改在文件末尾优雅追加扩展节点
+              cat << 'EOF' >> "$LITO_DTS"
+
+          / {
+              reserved-memory {
+                  ramoops_mem: ramoops@a0000000 {
+                      compatible = "ramoops";
+                      reg = <0x0 0xa0000000 0x0 0x200000>;
+                      record-size = <0x40000>;
+                      console-size = <0x40000>;
+                      pmsg-size = <0x40000>;
+                  };
+              };
+          };
+          EOF
+              echo "✅ 成功在 DTS 文件末尾追加 0xa0000000 内存节点，语法冲突已解除！"
           else
               echo "❌ 找不到 lito.dtsi 文件，自动打补丁失败！"
               exit 1
