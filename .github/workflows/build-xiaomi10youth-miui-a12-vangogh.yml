@@ -152,7 +152,9 @@ jobs:
           
           echo "==== 6. su 篡改修复 (纯净版已封印) ===="
           # echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/milito_defconfig
-          # sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c || true
+          # sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c 
+          echo "==== 7. 拯救被摧毁的 namespace.c (纯软件层安全覆盖) ===="
+          curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/fs/namespace.c" -o fs/namespace.c
 
       # 🚨🚨🚨 以下所有魔改与抓错提取步骤已被物理封印 🚨🚨🚨
       
