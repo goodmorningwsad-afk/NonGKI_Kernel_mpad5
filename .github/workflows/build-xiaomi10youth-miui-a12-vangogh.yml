@@ -88,6 +88,16 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 🩹 修复原厂源码遗漏的头文件与结构体
+        run: |
+          cd device_kernel
+          echo "==== 补充源码缺失的头文件和结构体 ===="
+          # 补齐 module-plts.c 缺失的指令头文件
+          sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c || true
+          # 补齐 cpuset.c 缺失的结构体定义
+          sed -i '1i struct cs_target { const char *name; char *cpus; };' kernel/cgroup/cpuset.c || true
+          echo "✅ 源码硬伤修复完毕！"
+
       - name: 🛠️ 强行注入 pstore 抓错机制 (温柔追加版)
         run: |
           cd device_kernel
