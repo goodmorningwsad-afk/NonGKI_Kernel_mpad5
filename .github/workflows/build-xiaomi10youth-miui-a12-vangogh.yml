@@ -88,7 +88,7 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-      - name: 🩹 修复原厂源码遗漏的头文件与结构体
+      
       - name: 🩹 修复原厂源码遗漏的头文件与结构体 (全局补丁汇总)
         run: |
           cd device_kernel
