@@ -1,4 +1,4 @@
-name: Build Xiaomi 10 Youth (vangogh) (SukiSU + SuSFS 2.0.0)
+name: Build Xiaomi 10 Youth (vangogh) (Pure Clean Test)
 
 on:
   workflow_call:
@@ -28,15 +28,14 @@ env:
   DEFCONFIG_NAME : "milito_defconfig"
   DEFCONFIG_ORIGIN_IMAGE: ""
   DEFCONFIG_FROM_BOOT: false
-  SUSFS_UPDATE : "true"
-
+  
+  # 临时关闭自动化获取，保证绝对纯净
+  SUSFS_UPDATE : "false"
   KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
-
-  KERNELSU_AUTO_GET : "true" 
+  KERNELSU_AUTO_GET : "false" 
   KERNELSU_AUTO_FORK : "sukisu" 
- 
-  SUSFS_ENABLE : "true"
+  SUSFS_ENABLE : "false"
   SUSFS_FIXED : ""
  
   AK3_SOURCE : "https://github.com/osm0sis/AnyKernel3.git"
@@ -48,35 +47,29 @@ env:
   NEED_SAFE_DTBO : "true"
 
   ROM_TEXT : "miui_a12"
-
   PYTHON_VERSION: "2" 
-
   PACK_METHOD: "Anykernel3" 
-
   KERNELSU_METHOD: "shell" 
 
   PATCHES_SOURCE: "" 
   PATCHES_BRANCH: "" 
-
   SUSFS_FOLDER_FIXED: "" 
   SUSFS_PATCH_FIXED: ""
-
   REKERNEL_ENABLE: "false" 
 
   HOOK_METHOD: "syscall" 
   HOOK_OLDER: "false" 
 
-  KERNEL_PATCH: "true" 
+  # 🚨 临时关闭自动打孔脚本
+  KERNEL_PATCH: "false" 
 
-  KPM_ENABLE: "true" 
+  KPM_ENABLE: "false" 
   KPM_INLINE: "false" 
   KPM_KPATCH_NEXT: "false" 
- 
   KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" 
 
   BASEBAND_GUARD_ENABLE: "false" 
   BASEBAND_GUARD_BOOT: "false" 
-
   HIDE_STUFF: "false" 
 
   GENERATE_DTB: "true" 
@@ -127,130 +120,57 @@ jobs:
           find fs/ include/ kernel/ -type f -exec sed -i '/#ifdef CONFIG_KSU_SUSFS.*/,/#endif/d' {} +
           echo "✅ 母体已完全清洗完毕，旧版隐患已清除！"
 
-      - name: 📦 提取 SukiSU 底层源码寻找真名
-        run: |
-          cd $GITHUB_WORKSPACE
-          echo "==== 正在查抄 SukiSU 底层核心寻找隐藏函数 ===="
-          mkdir -p SukiSU_Source
-          cp -r device_kernel/drivers/kernelsu/* SukiSU_Source/ || echo "❌ 未找到 SukiSU 源码"
-          cd SukiSU_Source
-          zip -r ../SukiSU_Source.zip .
-      - name: 📤 上传 SukiSU 源码
-        uses: actions/upload-artifact@v4
-        with:
-          name: SukiSU_Source
-          path: SukiSU_Source.zip
-
-      - name: 📦 提取核心源码进行验证 (包含 hooks.c)
-        run: |
-          cd $GITHUB_WORKSPACE
-          echo "==== 正在提取 hooks.c 和 exec.c 进行验证 ===="
-          mkdir -p verify_files/security/selinux
-          mkdir -p verify_files/fs
-          cp device_kernel/security/selinux/hooks.c verify_files/security/selinux/ || echo "❌ 未找到 hooks.c"
-          cp device_kernel/fs/exec.c verify_files/fs/ || echo "❌ 未找到 exec.c"
-          cd verify_files
-          zip -r ../Kernel_Verify_Files.zip .
-      - name: 📤 上传源码验证包到云端
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kernel_Verify_Files
-          path: Kernel_Verify_Files.zip
-
       - name: 🩹 Fix Kernel Bugs & Extra Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           echo "==== 1. 修复高版本 Clang 编译老内核的通病 ===="
           sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
+          
           echo "==== 2. 修复 cgroup 函数名拼写错误 ===="
           sed -i '/\.write_/s/write_wrapper/write/g' kernel/sched/tune.c
           sed -i 's/boost_write_wrapper(/__attribute__((unused)) boost_write_wrapper(/g' kernel/sched/tune.c
           sed -i 's/prefer_idle_write_wrapper(/__attribute__((unused)) prefer_idle_write_wrapper(/g' kernel/sched/tune.c
+          
           echo "==== 3. 抹除 NTFS3 驱动中老编译器不识别的超前参数 ===="
           sed -i 's/-Wunused-but-set-variable//g' fs/ntfs3/Makefile
           sed -i 's/-Wno-unused-but-set-variable//g' fs/ntfs3/Makefile
-          echo "==== 4. 修复 SukiSU 原厂 Bug ===="
-          sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c || true
-          sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c || true
-          sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c || true
-          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c || true
-          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c || true
-          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c || true
-          echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
-          echo "ccflags-y += -Wno-error" >> fs/Makefile
-          echo "==== 5. 防止 LTO 爆内存，并强制唤醒挂载引擎 ===="
+          
+          echo "==== 4. 修复 SukiSU 原厂 Bug (纯净版已封印) ===="
+          # sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c || true
+          # sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c || true
+          # sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c || true
+          # sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c || true
+          # sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c || true
+          # sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c || true
+          # echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
+          # echo "ccflags-y += -Wno-error" >> fs/Makefile
+          
+          echo "==== 5. 防止 LTO 爆内存，强制保留 ===="
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/milito_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/milito_defconfig
-          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/milito_defconfig
-          echo "==== 正在切断 su->sh 的无差别篡改大动脉 ===="
-          sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c || true
+          
+          echo "==== 6. su 篡改修复 (纯净版已封印) ===="
+          # echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/milito_defconfig
+          # sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c || true
 
-      - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
-        uses: ./.github/workflows/patch-susfs-new
+      # 🚨🚨🚨 以下所有魔改与抓错提取步骤已被物理封印 🚨🚨🚨
+      
+      # - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
+      #   uses: ./.github/workflows/patch-susfs-new
         
-      - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
-        run: |
-          cd $GITHUB_WORKSPACE
-          echo "==== 正在收集打孔后的核心文件，准备验尸 ===="
-          mkdir -p patched_source_files/fs/devpts
-          mkdir -p patched_source_files/drivers/input
-          mkdir -p patched_source_files/security/selinux
-          mkdir -p patched_source_files/fs/proc
-          
-          cp device_kernel/fs/exec.c patched_source_files/fs/ || true
-          cp device_kernel/fs/open.c patched_source_files/fs/ || true
-          cp device_kernel/fs/read_write.c patched_source_files/fs/ || true
-          cp device_kernel/fs/stat.c patched_source_files/fs/ || true
-          cp device_kernel/fs/namespace.c patched_source_files/fs/ || true
-          cp device_kernel/fs/devpts/inode.c patched_source_files/fs/devpts/ || true
-          cp device_kernel/drivers/input/input.c patched_source_files/drivers/input/ || true
-          cp device_kernel/security/selinux/hooks.c patched_source_files/security/selinux/ || true
-          cp device_kernel/fs/proc/cmdline.c patched_source_files/fs/proc/ || true
-          cp device_kernel/fs/susfs.c patched_source_files/fs/ || true
-          cp device_kernel/fs/dcache.c patched_source_files/fs/ || true
-          cp device_kernel/fs/readdir.c patched_source_files/fs/ || true
-          cp device_kernel/fs/namei.c patched_source_files/fs/ || true
-          
-          cd patched_source_files
-          zip -r ../Patched_Source_Files.zip .
-      - name: 📦 上传打孔后源码验证包
-        uses: actions/upload-artifact@v4
-        with:
-          name: Patched_Source_Files
-          path: Patched_Source_Files.zip
+      # - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
+      #   run: |
+      #     ... (全部注释保留，方便下次一键解封)
+      
+      # - name: 📦 上传打孔后源码验证包
+      #   uses: actions/upload-artifact@v4
+      # ...
 
-      - name: 📤 提取官方 SukiSU 补丁脚本 (用于法医级审查)
-        run: |
-          cd $GITHUB_WORKSPACE
-          echo "==== 正在查抄官方补丁目录 ===="
-          mkdir -p Official_Patches
-          cp -r /tmp/Patches/* Official_Patches/ || true
-          cp device_kernel/backport_patches.sh Official_Patches/ || true
-          cp device_kernel/backport_selinux_patches.sh Official_Patches/ || true
-          cp device_kernel/*.patch Official_Patches/ || true
-          cd Official_Patches
-          zip -r ../Official_Patches.zip .
-      - name: 📦 上传官方补丁审查包
-        uses: actions/upload-artifact@v4
-        with:
-          name: Official_Patches
-          path: Official_Patches.zip
+      # - name: 📤 提取官方 SukiSU 补丁脚本 (用于法医级审查)
+      # ...
 
-      - name: 📤 提取 SuSFS 冲突原件 ( .rej 查抄)
-        run: |
-          cd $GITHUB_WORKSPACE
-          echo "==== 正在满世界抓捕 .rej 冲突文件 ===="
-          mkdir -p Rej_Files
-          find device_kernel -name "*.rej" -exec cp {} Rej_Files/ \; || true
-          cd Rej_Files
-          zip -r ../Rej_Files.zip . || true
-
-      - name: 📦 上传冲突审查包 (.rej)
-        uses: actions/upload-artifact@v4
-        with:
-          name: SuSFS_Rej_Files
-          path: Rej_Files.zip
-          if-no-files-found: ignore
+      # - name: 📤 提取 SuSFS 冲突原件 ( .rej 查抄)
+      # ...
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
