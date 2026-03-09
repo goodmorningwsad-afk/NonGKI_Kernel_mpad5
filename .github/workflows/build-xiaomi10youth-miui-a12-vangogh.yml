@@ -35,7 +35,7 @@ env:
   KERNELSU_BRANCH : ""
   KERNELSU_AUTO_GET : "true" 
   KERNELSU_AUTO_FORK : "sukisu" 
-  SUSFS_ENABLE : "false"
+  SUSFS_ENABLE : "true"
   SUSFS_FIXED : ""
  
   AK3_SOURCE : "https://github.com/osm0sis/AnyKernel3.git"
@@ -158,7 +158,7 @@ jobs:
 
       # 🚨🚨🚨 以下所有魔改与抓错提取步骤已被物理封印 🚨🚨🚨
       
-      # - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
+       #- name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
       #   uses: ./.github/workflows/patch-susfs-new
         
       # - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
