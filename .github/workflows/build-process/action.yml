@@ -47,15 +47,29 @@ runs:
           fi
 
           if [[ "$BUILD_CLANG" == "true" ]]; then
-            echo "========================"
-            echo "=Read Defconfig (Clang)="
-            echo "========================"
-            make CC="ccache clang" O=out ARCH="${{ env.KERNEL_ARCH }}" ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.DEFCONFIG_NAME }}
+            echo "======================"
+            echo "=Execuate Clang Build="
+            echo "======================"
+
+            if [[ "${{ env.BASEBAND_GUARD_ENABLE }}" == "true" ]]; then
+                make -j$(nproc --all) CC="ccache clang" ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} O=out ARCH="${{ env.KERNEL_ARCH }}" security/selinux/
+                echo "[+] Pre-built SELinux done."
+            fi
+
+            # 🚨 极客死命令：强制 Clang 编译器必须交出 Image.gz-dtb 和 dtbs！
+            make -j$(nproc --all) CC="ccache clang" ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} O=out ARCH="${{ env.KERNEL_ARCH }}" Image.gz-dtb dtbs 2>&1|tee error.log
           else
-            echo "================"
-            echo "=Read Defconfig="
-            echo "================"
-            make O=out ARCH="${{ env.KERNEL_ARCH }}" ${{ env.DEFCONFIG_NAME }}
+            echo "===================="
+            echo "=Execuate GCC Build="
+            echo "===================="
+
+            if [[ "${{ env.BASEBAND_GUARD_ENABLE }}" == "true" ]]; then
+                make -j$(nproc --all) O=out ARCH="${{ env.KERNEL_ARCH }}" security/selinux/
+                echo "[+] Pre-built SELinux done."
+            fi
+
+            # 🚨 极客死命令：强制 GCC 编译器必须交出 Image.gz-dtb 和 dtbs！
+            make -j$(nproc --all) O=out ARCH="${{ env.KERNEL_ARCH }}" Image.gz-dtb dtbs 2>&1|tee error.log
           fi
 
           if [[ "${{ env.BUILD_OTHER_CONFIG }}"  == "true" ]]; then
