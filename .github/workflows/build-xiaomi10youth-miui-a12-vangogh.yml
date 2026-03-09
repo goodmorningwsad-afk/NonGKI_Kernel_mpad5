@@ -66,7 +66,7 @@ env:
   SKIP_PATCH: "false"
   BUILD_OTHER_CONFIG: "false"
   MERGE_CONFIG_FILES: ""
-  FREE_MORE_SPACE: "false"
+  FREE_MORE_SPACE: "true"
 
 jobs:
   build-kernel:
@@ -167,28 +167,28 @@ jobs:
               exit 1
           fi
 
-      # 🚨🚨🚨 【未来科技区】已被封印 🚨🚨🚨
-      # - name: 💉 强行剥离自带旧版，植入纯血 SuKiSU 2.0.0
-      #   run: |
-      #     cd device_kernel
-      #     echo "==== 1. 物理切除原作者自带的 KernelSU 肿瘤 ===="
+       
+      - name: 💉 强行剥离自带旧版，植入纯血 SuKiSU 2.0.0
+        run: |
+           cd device_kernel
+           echo "==== 1. 物理切除原作者自带的 KernelSU 肿瘤 ===="
 
-      # 🚨🚨🚨 【旧日封存区】：你之前手搓的验证、修复和打孔脚本，已全部加 # 物理封印，一字未删！🚨🚨🚨
+       
       
-      # - name: ⏪ 物理时光机：精准回溯 3 号提交
-      #   shell: bash
-      #   run: |
-      #     echo "==== 启动 Git 级时光机，直接回退 ===="
+      - name: ⏪ 物理时光机：精准回溯 3 号提交
+        shell: bash
+        run: |
+           echo "==== 启动 Git 级时光机，直接回退 ===="
 
       # 【以下三个额外模块为了纯净测试，暂且封印，测试完可解封】
-      # - name: 🧰 Patch Kernel of Re:Kernel
-      #   uses: ./.github/workflows/patch-rekernel
+      - name: 🧰 Patch Kernel of Re:Kernel
+        uses: ./.github/workflows/patch-rekernel
 
-      # - name: 🔒 Patch Kernel of Baseband Guard
-      #   uses: ./.github/workflows/patch-baseband-guard
+      - name: 🔒 Patch Kernel of Baseband Guard
+        uses: ./.github/workflows/patch-baseband-guard
 
-      # - name: 🔧 Patch Hide Stuff
-      #   uses: ./.github/workflows/patch-hide-stuff
+      - name: 🔧 Patch Hide Stuff
+        uses: ./.github/workflows/patch-hide-stuff
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
