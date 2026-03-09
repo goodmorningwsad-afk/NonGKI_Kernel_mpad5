@@ -118,6 +118,11 @@ jobs:
           echo "==== 3. 抹除 NTFS3 驱动中老编译器不识别的超前参数 ===="
           sed -i 's/-Wunused-but-set-variable//g' fs/ntfs3/Makefile
           sed -i 's/-Wno-unused-but-set-variable//g' fs/ntfs3/Makefile
+          echo "==== 4. 拆除 LTO 内存炸弹 (防止 GitHub Actions OOM 爆内存) ===="
+          sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/milito_defconfig
+          sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/milito_defconfig
+          
+          echo "✅ 基础语法修补完毕，且 LTO 内存炸弹已拆除！"
 
           echo "✅ 基础语法修补完毕！"
           
