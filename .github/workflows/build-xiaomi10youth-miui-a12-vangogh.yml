@@ -7,7 +7,7 @@ on:
 env:
   DEVICE_NAME : "Xiaomi 10 Youth"
   DEVICE_CODENAME : "vangogh"
-
+  SUSFS_UPDATE : "true"
   CUSTOM_CMDS : "CLANG_TRIPLE=aarch64-linux-gnu-"
   EXTRA_CMDS : "LD=ld.lld LLVM=1 LLVM_IAS=1 PYTHON=/usr/bin/python2"
 
@@ -50,10 +50,10 @@ env:
   SUSFS_FOLDER_FIXED: ""
   SUSFS_PATCH_FIXED: ""
   REKERNEL_ENABLE: "false"
-  HOOK_METHOD: "none"
+  HOOK_METHOD: "syscall"
   HOOK_OLDER: "false"
   KERNEL_PATCH: "false"
-  KPM_ENABLE: "false"
+  KPM_ENABLE: "true"
   KPM_INLINE: "false"
   KPM_KPATCH_NEXT: "false"
   BASEBAND_GUARD_ENABLE: "false"
