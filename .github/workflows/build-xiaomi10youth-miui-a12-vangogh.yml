@@ -106,11 +106,14 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           
           echo "==== 1. 修复高版本 Clang 编译老内核的通病 ===="
-          # 仅保留 module-plts.c 的指令头文件修复，移除 cpuset.c 的重定义
           sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
 
           echo "==== 2. 修复 cgroup 函数名拼写错误 ===="
-          sed -i 's/write_wrapper/write/g' kernel/sched/tune.c
+          # 精准点杀：只修改结构体赋值那一行，不搞全局替换，避免重定义冲突
+          sed -i '/\.write_/s/write_wrapper/write/g' kernel/sched/tune.c
+          # 给原作者留下的垃圾函数贴上“忽略警告”的封条，防止报 unused-function 错误
+          sed -i 's/boost_write_wrapper(/__attribute__((unused)) boost_write_wrapper(/g' kernel/sched/tune.c
+          sed -i 's/prefer_idle_write_wrapper(/__attribute__((unused)) prefer_idle_write_wrapper(/g' kernel/sched/tune.c
 
           echo "==== 3. 抹除 NTFS3 驱动中老编译器不识别的超前参数 ===="
           sed -i 's/-Wunused-but-set-variable//g' fs/ntfs3/Makefile
