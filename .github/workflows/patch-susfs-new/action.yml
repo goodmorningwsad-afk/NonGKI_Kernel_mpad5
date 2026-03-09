@@ -93,15 +93,59 @@ runs:
             ' "$file" > tmp_file && mv tmp_file "$file"
         }
 
+        
         echo "==== [手工缝合] 修复 LineageOS 专属的 .rej 冲突 ===="
         
-        # 🚨 针对最后一个 task_mmu.c 的头文件极客注入！
+        # 1. 针对 task_mmu.c 的头文件极客注入 (解决 task_mmu.c.rej)
         TASK_MMU_HOOK="
         #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP)
         #include <linux/susfs_def.h>
         #endif"
         patch_file "fs/proc/task_mmu.c" "#include <asm/elf.h>" 0 "$TASK_MMU_HOOK" "linux/susfs_def.h"
 
+        # 2. 补全 mount.h 缺失的挂载 ID 备份 (解决 mount.h.rej)
+        MOUNT_H_HOOK="
+        #ifdef CONFIG_KSU_SUSFS
+            u64 susfs_mnt_id_backup;
+        #endif"
+        patch_file "include/linux/mount.h" "void \*data;" 0 "$MOUNT_H_HOOK" "susfs_mnt_id_backup"
+
+        # 3. 补全 proc_namespace.c 的隐藏开关 (解决 proc_namespace.c.rej)
+        PROC_NS_HOOK="
+        #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+        #include <linux/susfs_def.h>
+        extern bool susfs_hide_sus_mnts_for_non_su_procs;
+        extern bool susfs_is_current_ksu_domain(void);
+        #endif"
+        patch_file "fs/proc_namespace.c" "#include \"internal.h\"" 0 "$PROC_NS_HOOK" "susfs_hide_sus_mnts_for_non_su_procs"
+
+        # 4. 补全 stat.c 的属性拦截头文件 (解决 stat.c.rej)
+        STAT_TOP_HOOK="
+        #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+        #include <linux/susfs_def.h>
+        extern void susfs_sus_ino_for_generic_fillattr(unsigned long ino, struct kstat *stat);
+        #endif"
+        patch_file "fs/stat.c" "#include <linux/compat.h>" 0 "$STAT_TOP_HOOK" "susfs_sus_ino_for_generic_fillattr"
+
+        # 5. 补全 namei.c 的核心路径隐藏防线一 (解决 namei.c.rej - may_create_in_sticky)
+        NAMEI_HOOK_1="
+        #ifdef CONFIG_KSU_SUSFS_SUS_PATH
+            if (unlikely(inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
+                return -ENOENT;
+            }
+        #endif"
+        patch_file "fs/namei.c" "if ((!sysctl_protected_fifos && S_ISFIFO(inode->i_mode)) ||" 0 "$NAMEI_HOOK_1" "BIT_SUS_PATH"
+
+        # 6. 补全 namei.c 的核心路径隐藏防线二 (解决 namei.c.rej - may_o_create)
+        NAMEI_HOOK_2="
+        #ifdef CONFIG_KSU_SUSFS_SUS_PATH
+            if (dentry->d_inode && unlikely(dentry->d_inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
+                int err_p = inode_permission(dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
+                if (err_p) return err_p;
+                return -ENOENT;
+            }
+        #endif"
+        patch_file "fs/namei.c" "struct user_namespace \*s_user_ns;" 1 "$NAMEI_HOOK_2" "err_p = inode_permission"
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         # 🚨 以下为你独创的幻影打孔装甲，已受协议保护逐字保留 🚨
         
