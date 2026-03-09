@@ -88,6 +88,13 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 🔍 搜查全库可用的 defconfig 配置文件
+        run: |
+          cd device_kernel
+          echo "==== 开始地毯式搜查所有的 defconfig 文件 ===="
+          find arch/arm64/configs -type f -name "*defconfig" | sort
+          echo "==== 搜查结束，请复制以上输出的文件列表 ===="
+
       
       - name: 🩹 修复原厂源码遗漏的头文件与结构体 (全局终极补丁汇总 - 严格排错版)
         run: |
