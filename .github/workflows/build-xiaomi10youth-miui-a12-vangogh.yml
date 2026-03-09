@@ -60,7 +60,7 @@ env:
   BASEBAND_GUARD_ENABLE: "false"
   BASEBAND_GUARD_BOOT: "false"
   HIDE_STUFF: "false"
-  GENERATE_DTB: "false"
+  GENERATE_DTB: "true"
   GENERATE_CHIP: "qcom"
   BUILD_DEBUGGER: "true"
   SKIP_PATCH: "false"
