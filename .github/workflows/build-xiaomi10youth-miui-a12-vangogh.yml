@@ -72,7 +72,7 @@ jobs:
   build-kernel:
     name: Build Kernel
     runs-on: ubuntu-latest
-    container: ubuntu:focal 
+   # container: ubuntu:focal 
     env:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
