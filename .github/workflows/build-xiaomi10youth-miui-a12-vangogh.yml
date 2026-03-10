@@ -149,6 +149,12 @@ jobs:
           echo "==== 5. 修复探测 su 掉包漏洞 (切断无差别篡改) ===="
           sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c || true
 
+          echo "==== 6. 强行拉起 SECCOMP 防线 (修复 mode 成员缺失报错) ===="
+          sed -i 's/# CONFIG_SECCOMP is not set/CONFIG_SECCOMP=y/g' arch/arm64/configs/milito_defconfig || true
+          sed -i 's/# CONFIG_SECCOMP_FILTER is not set/CONFIG_SECCOMP_FILTER=y/g' arch/arm64/configs/milito_defconfig || true
+          echo "CONFIG_SECCOMP=y" >> arch/arm64/configs/milito_defconfig
+          echo "CONFIG_SECCOMP_FILTER=y" >> arch/arm64/configs/milito_defconfig
+          
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
         
