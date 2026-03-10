@@ -317,46 +317,40 @@ jobs:
           # 🚨 路径绝对精准，直接从根目录抓取压缩包
           path: Suspect_Source.zip
 
-      - name: 🕵️‍♂️ 提取 SukiSU 核心隐身源码 (sucompat 案发现场)
+      - name: 🕵️‍♂️ 提取 SukiSU 核心隐身源码 (终极全盘扫描版)
         if: always()
         run: |
-          echo "==== 正在定位并提取 SukiSU 隐身核心源码 ===="
+          echo "==== 正在全盘雷达扫描 SukiSU 隐身核心源码 ===="
           mkdir -p $GITHUB_WORKSPACE/SukiSU_Suspects
           
-          # 精准定位 SukiSU 源码根目录
+          # 定位 SukiSU 大本营
           KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
           
           if [ -n "$KSU_DIR" ]; then
               echo "✅ 成功锁定 SukiSU 大本营: $KSU_DIR"
               
-              # 1. 提取拦截 /system/bin/su 的核心文件 (一号嫌疑犯)
-              cp $KSU_DIR/sucompat.c $GITHUB_WORKSPACE/SukiSU_Suspects/ || echo "找不到 sucompat.c"
-              cp $KSU_DIR/sucompat.h $GITHUB_WORKSPACE/SukiSU_Suspects/ || true
-              
-              # 2. 提取挂载命名空间隔离文件 (二号嫌疑犯)
-              cp $KSU_DIR/su_mount_ns.c $GITHUB_WORKSPACE/SukiSU_Suspects/ || true
-              
-              # 3. 提取白名单权限判定文件 (三号嫌疑犯)
-              cp $KSU_DIR/allowlist.c $GITHUB_WORKSPACE/SukiSU_Suspects/ || true
-              
-              # 4. 提取系统调用劫持核心
-              cp $KSU_DIR/syscall_handler.c $GITHUB_WORKSPACE/SukiSU_Suspects/ || true
+              # 🚨 史诗级修正：用 find 命令无视层级，直接地毯式抓捕！
+              find "$KSU_DIR" -name "sucompat.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "sucompat.h" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "su_mount_ns.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "allowlist.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "syscall_handler.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
               
           else
               echo "❌ 致命错误：未找到 SukiSU 源码目录！"
           fi
           
-          # 打包压缩
+          # 打包压缩 (加上 || true 防止空包时 Action 直接红灯)
           cd $GITHUB_WORKSPACE/SukiSU_Suspects
-          zip -r ../SukiSU_Suspects.zip .
+          zip -r ../SukiSU_Suspects.zip . || true
           
       - name: 📦 上传 SukiSU 嫌疑源码包
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: SukiSU_Suspect_Source
-          # 从根目录抓取压缩包
           path: SukiSU_Suspects.zip
+          if-no-files-found: ignore
 
       - name: 🔩 Pack Process
         uses: ./.github/workflows/pack-process
