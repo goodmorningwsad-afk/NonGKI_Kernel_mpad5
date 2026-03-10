@@ -119,23 +119,8 @@ runs:
         #endif"
         patch_file "fs/proc_namespace.c" "#include \"internal.h\"" 0 "$PROC_NS_HOOK" "susfs_hide_sus_mnts_for_non_su_procs"
 
-        # 4. 补全 stat.c 的属性拦截头文件 (解决 stat.c.rej)
-        STAT_TOP_HOOK="
-        #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-        #include <linux/susfs_def.h>
-        extern void susfs_sus_ino_for_generic_fillattr(unsigned long ino, struct kstat *stat);
-        #endif"
-        patch_file "fs/stat.c" "#include <linux/compat.h>" 0 "$STAT_TOP_HOOK" "susfs_sus_ino_for_generic_fillattr"
-
-        # 5. 补全 namei.c 的核心路径隐藏防线一 (解决 namei.c.rej - may_create_in_sticky)
-        NAMEI_HOOK_1="
-        #ifdef CONFIG_KSU_SUSFS_SUS_PATH
-            if (unlikely(inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
-                return -ENOENT;
-            }
-        #endif"
-        patch_file "fs/namei.c" "if ((!sysctl_protected_fifos && S_ISFIFO(inode->i_mode)) ||" 0 "$NAMEI_HOOK_1" "BIT_SUS_PATH"
-
+        
+        
         # 6. 补全 namei.c 的核心路径隐藏防线二 (解决 namei.c.rej - may_o_create)
         NAMEI_HOOK_2="
         #ifdef CONFIG_KSU_SUSFS_SUS_PATH
