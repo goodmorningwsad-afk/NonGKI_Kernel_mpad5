@@ -9,7 +9,7 @@ runs:
       run: |
         cd $GITHUB_WORKSPACE/device_kernel
         
-        # 🛡️ 终极全局防重复锁：检测到已执行过，直接跳过整个打孔流程！
+        # 🛡️ 终极全局防重复锁
         if [ -f ".phantom_hooks_applied" ]; then
             echo "⏭️ 检测到幻影打孔外挂已成功运行过，触发全局防重复机制，安全跳过！"
             exit 0
@@ -18,10 +18,8 @@ runs:
         echo "==== 0. 唤醒 SuSFS 与文件系统大动脉开关 ===="
         DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
         
-        # 🚨 物理阉割模块版本校验 (已剔除 || true)
         sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' "$DEFCONFIG_FILE"
         
-        # 🚨 SuSFS 隐身大动脉
         echo "CONFIG_KSU_SUSFS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$DEFCONFIG_FILE"
@@ -33,7 +31,6 @@ runs:
         echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$DEFCONFIG_FILE"
         
-        # 🚨 现代 Android (15) 挂载 APEX 模块续命全家桶
         echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
         
         echo "CONFIG_SQUASHFS=y" >> "$DEFCONFIG_FILE"
@@ -61,13 +58,11 @@ runs:
         
         if [ -z "$PATCH_FILE" ]; then
             echo "❌ 致命错误：找不到 susfs_patch_to_4.19.patch！"
-            exit 1 # 🚨 找不到补丁文件，立刻暴毙停止！
+            exit 1 
         else
-            # 🛡️ 补丁级防重复锁
             if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
-                echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，官方补丁已存在，安全跳过 patch 阶段！"
+                echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
             else
-                # 🚨 拒绝补丁别停止：允许产生 .rej 供后续手工缝合 🚨
                 patch -p1 -N -f < "$PATCH_FILE" || echo "⚠️ 补丁产生 .rej 拒绝文件，保留全尸继续！"
             fi
         fi
@@ -86,7 +81,7 @@ runs:
             fi
             if ! grep -Fq "$search_str" "$file"; then
                 echo "❌ 致命错误: $file 中找不到特征字符串 '$search_str'！"
-                exit 1 # 🚨 手工缝合找不到锚点，立刻暴毙停止！
+                exit 1 
             fi
             awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
             index($0, search) && !done {
@@ -100,6 +95,9 @@ runs:
         }
 
         echo "==== [手工缝合] 修复 LineageOS 专属的 .rej 冲突 ===="
+        
+        # 🚨 提前清理主工作流中留下的 error=0 脏补丁，防止干扰
+        sed -i '/FIXED_UNDECLARED_VAR/d' fs/namei.c || true
         
         # 1. 针对 task_mmu.c 的头文件极客注入
         TASK_MMU_HOOK="
@@ -146,18 +144,20 @@ runs:
         #endif"
         patch_file "fs/namei.c" "if ((!sysctl_protected_fifos && S_ISFIFO(inode->i_mode)) ||" 0 "$NAMEI_HOOK_1" "FIX_NAMEI_1_REJ"
 
-        # 6. 补全 namei.c 的核心路径隐藏防线二
+        # 6. 补全 namei.c 的核心路径隐藏防线二 
+        # 🚨 史诗级修复：用 offset 2 跨过大门，一并复活被清创手术误杀的 security_path_mknod！
         NAMEI_HOOK_2="
         /* FIX_NAMEI_2_REJ */
+        	int error = security_path_mknod(dir, dentry, mode, 0);
         #ifdef CONFIG_KSU_SUSFS_SUS_PATH
-            if (dentry->d_inode && unlikely(dentry->d_inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
-                int err_p = inode_permission(dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
-                if (err_p) return err_p;
-                return -ENOENT;
-            }
+        	if (dentry->d_inode && unlikely(dentry->d_inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
+        		int err_p = inode_permission2(dir->mnt, dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
+        		if (err_p) return err_p;
+        		return -ENOENT;
+        	}
         #endif"
-        patch_file "fs/namei.c" "inode_permission(dir->dentry->d_inode" 0 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
-        
+        patch_file "fs/namei.c" "static int may_o_create(const struct path *dir, struct dentry *dentry, umode_t mode)" 2 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
+
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         
         EXEC_HOOK="
@@ -173,7 +173,6 @@ runs:
         }
         #endif"
         patch_file "fs/exec.c" "return __do_execve_file(fd, filename, argv, envp, flags, NULL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
-        
         OPEN_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -392,7 +391,7 @@ runs:
         
         # 10. 全盘清剿 zstd 目录下的 fallthrough 穿越者 Bug
         echo "🩹 正在全盘缝合 lib/zstd/ 目录下的 ZSTD_FALLTHROUGH ..."
-        find lib/zstd -type f -exec sed -i 's/ZSTD_FALLTHROUGH;/\/\* fallthrough \*\//g' {} +
+        find lib/zstd -type f -exec sed -i 's/ZSTD_FALLTHROUGH;/\\/\* fallthrough \*\\//g' {} +
         
         # 11. 终结链接器 (ld.lld) 的最后 3 个幽灵符号报错
         echo "🩹 正在为 vmlinux 大一统注入最后的物理替身..."
