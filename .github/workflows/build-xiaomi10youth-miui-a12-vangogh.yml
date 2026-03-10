@@ -53,7 +53,7 @@ env:
   PATCHES_BRANCH: "" 
   SUSFS_FOLDER_FIXED: "" 
   SUSFS_PATCH_FIXED: ""
-  REKERNEL_ENABLE: "false" 
+  REKERNEL_ENABLE: "true" 
 
   HOOK_METHOD: "syscall" 
   HOOK_OLDER: "false" 
