@@ -291,6 +291,32 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
+      - name: 🚑 提取内核底层配置铁证 (防瞎猜验证包)
+        if: always()
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          echo "==== 正在收集底层证据 ===="
+          mkdir -p Evidence_Files
+          
+          # 证据 1：看看咱们的脚本到底有没有把开关写进原厂配置文件
+          cp arch/arm64/configs/${{ env.DEFCONFIG_NAME }} Evidence_Files/patched_defconfig.txt || echo "找不到 defconfig"
+          
+          # 证据 2：看看 fs/Makefile 里到底有没有 obj-$(CONFIG_KSU_SUSFS) += susfs.o
+          cp fs/Makefile Evidence_Files/fs_Makefile.txt || echo "找不到 fs/Makefile"
+          
+          # 证据 3 (最致命的铁证)：抓取编译系统最终生成的真实 .config 状态文件
+          find . -name ".config" -exec cp {} Evidence_Files/final_generated_config.txt \; || echo "找不到 .config"
+          
+          cd Evidence_Files
+          zip -r ../Evidence_Files.zip .
+          
+      - name: 📦 上传底层证据包
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Evidence_Files
+          path: Evidence_Files.zip
+
       - name: 🔩 Pack Process
         uses: ./.github/workflows/pack-process
 
