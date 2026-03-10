@@ -96,15 +96,21 @@ jobs:
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
 
-      # 🚨 注意：调用 build-ready (即 action.yml) 时，清创和下载新版 SukiSU 将在这一步的内部连贯完成！
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
       - name: 🩹 Fix Kernel Bugs & Extra Options
         run: |
+          set -e # 🚨 遇错立刻暴毙机制
           cd $GITHUB_WORKSPACE/device_kernel
+          
+          if [ -f ".kernel_bugs_fixed" ]; then
+              echo "⏭️ 内核 Bug 已修复过，防重复跳过！"
+              exit 0
+          fi
+
           echo "==== 1. 修复高版本 Clang 编译老内核的通病 ===="
-          sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
+          grep -q "<asm/insn.h>" arch/arm64/kernel/module-plts.c || sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
           
           echo "==== 2. 修复 cgroup 函数名拼写错误 ===="
           sed -i '/\.write_/s/write_wrapper/write/g' kernel/sched/tune.c
@@ -112,54 +118,72 @@ jobs:
           sed -i 's/prefer_idle_write_wrapper(/__attribute__((unused)) prefer_idle_write_wrapper(/g' kernel/sched/tune.c
           
           echo "==== 3. 抹除 NTFS3 驱动中老编译器不识别的超前参数 ===="
-          sed -i 's/-Wunused-but-set-variable//g' fs/ntfs3/Makefile
-          sed -i 's/-Wno-unused-but-set-variable//g' fs/ntfs3/Makefile
+          [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wunused-but-set-variable//g' fs/ntfs3/Makefile
+          [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wno-unused-but-set-variable//g' fs/ntfs3/Makefile
           
           echo "==== 4. 物理补全 namei.c 缺失的变量声明 ===="
-          sed -i '3168s/^/    int error = 0; \/* FIXED_UNDECLARED_VAR *\/ \n/' fs/namei.c
+          grep -q "FIXED_UNDECLARED_VAR" fs/namei.c || sed -i '3168s/^/    int error = 0; \/* FIXED_UNDECLARED_VAR *\/ \n/' fs/namei.c
           
           echo "==== 5. 拯救被摧毁的 namespace.c (纯软件层安全覆盖) ===="
-          curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/fs/namespace.c" -o fs/namespace.c
+          grep -q "LineageOS restored" fs/namespace.c || {
+              curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/fs/namespace.c" -o fs/namespace.c
+              echo "// LineageOS restored" >> fs/namespace.c
+          }
           
           echo "==== 6. 防止 LTO 爆内存，强制保留 ===="
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/milito_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/milito_defconfig
 
+          touch .kernel_bugs_fixed
+          echo "✅ 内核基础 Bug 修复完成！"
+
       - name: 🩹 Fix SukiSU Bugs & Defconfig Options
         run: |
+          set -e # 🚨 遇错立刻暴毙机制
           cd $GITHUB_WORKSPACE/device_kernel
+          
+          if [ -f ".sukisu_bugs_fixed" ]; then
+              echo "⏭️ SukiSU Bug 已修复过，防重复跳过！"
+              exit 0
+          fi
+
           echo "==== 1. 修复 SukiSU builtin 分支原厂笔误 ===="
-          sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c || true
-          sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c || true
-          sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c || true
+          sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
+          sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
+          sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
           
           echo "==== 2. 修复 supercalls.c 宏定义套娃 ===="
-          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c || true
-          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c || true
-          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c || true
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
           
           echo "==== 3. 屏蔽无用函数警告 ===="
-          echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
-          echo "ccflags-y += -Wno-error" >> fs/Makefile
+          grep -q "\-Wno-unused-function" fs/Makefile || echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
+          grep -q "\-Wno-error" fs/Makefile || echo "ccflags-y += -Wno-error" >> fs/Makefile
           
           echo "==== 4. 开启 SukiSU 必须的 MANUAL_HOOK 与 USER_NS ===="
-          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/milito_defconfig
-          sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/g' arch/arm64/configs/milito_defconfig || true
+          grep -q "CONFIG_KSU_MANUAL_HOOK=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/milito_defconfig
+          sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/g' arch/arm64/configs/milito_defconfig
+          grep -q "CONFIG_USER_NS=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_USER_NS=y" >> arch/arm64/configs/milito_defconfig
           
           echo "==== 5. 修复探测 su 掉包漏洞 (切断无差别篡改) ===="
-          sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c || true
+          grep -q "is_su_allowed" drivers/kernelsu/sucompat.c || sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c
 
           echo "==== 6. 强行拉起 SECCOMP 防线 (修复 mode 成员缺失报错) ===="
-          sed -i 's/# CONFIG_SECCOMP is not set/CONFIG_SECCOMP=y/g' arch/arm64/configs/milito_defconfig || true
-          sed -i 's/# CONFIG_SECCOMP_FILTER is not set/CONFIG_SECCOMP_FILTER=y/g' arch/arm64/configs/milito_defconfig || true
-          echo "CONFIG_SECCOMP=y" >> arch/arm64/configs/milito_defconfig
-          echo "CONFIG_SECCOMP_FILTER=y" >> arch/arm64/configs/milito_defconfig
-          
+          sed -i 's/# CONFIG_SECCOMP is not set/CONFIG_SECCOMP=y/g' arch/arm64/configs/milito_defconfig
+          sed -i 's/# CONFIG_SECCOMP_FILTER is not set/CONFIG_SECCOMP_FILTER=y/g' arch/arm64/configs/milito_defconfig
+          grep -q "^CONFIG_SECCOMP=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP=y" >> arch/arm64/configs/milito_defconfig
+          grep -q "^CONFIG_SECCOMP_FILTER=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP_FILTER=y" >> arch/arm64/configs/milito_defconfig
+
+          touch .sukisu_bugs_fixed
+          echo "✅ SukiSU 专属 Bug 与内核防线配置已全部合闸！"
+
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
         
       - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
         run: |
+          set -e
           cd $GITHUB_WORKSPACE
           echo "==== 正在收集打孔后的核心文件，准备验尸 ===="
           mkdir -p patched_source_files/fs/devpts
@@ -167,19 +191,19 @@ jobs:
           mkdir -p patched_source_files/security/selinux
           mkdir -p patched_source_files/fs/proc
           
-          cp device_kernel/fs/exec.c patched_source_files/fs/ || true
-          cp device_kernel/fs/open.c patched_source_files/fs/ || true
-          cp device_kernel/fs/read_write.c patched_source_files/fs/ || true
-          cp device_kernel/fs/stat.c patched_source_files/fs/ || true
-          cp device_kernel/fs/namespace.c patched_source_files/fs/ || true
-          cp device_kernel/fs/devpts/inode.c patched_source_files/fs/devpts/ || true
-          cp device_kernel/drivers/input/input.c patched_source_files/drivers/input/ || true
-          cp device_kernel/security/selinux/hooks.c patched_source_files/security/selinux/ || true
-          cp device_kernel/fs/proc/cmdline.c patched_source_files/fs/proc/ || true
-          cp device_kernel/fs/susfs.c patched_source_files/fs/ || true
-          cp device_kernel/fs/dcache.c patched_source_files/fs/ || true
-          cp device_kernel/fs/readdir.c patched_source_files/fs/ || true
-          cp device_kernel/fs/namei.c patched_source_files/fs/ || true
+          [ -f device_kernel/fs/exec.c ] && cp device_kernel/fs/exec.c patched_source_files/fs/
+          [ -f device_kernel/fs/open.c ] && cp device_kernel/fs/open.c patched_source_files/fs/
+          [ -f device_kernel/fs/read_write.c ] && cp device_kernel/fs/read_write.c patched_source_files/fs/
+          [ -f device_kernel/fs/stat.c ] && cp device_kernel/fs/stat.c patched_source_files/fs/
+          [ -f device_kernel/fs/namespace.c ] && cp device_kernel/fs/namespace.c patched_source_files/fs/
+          [ -f device_kernel/fs/devpts/inode.c ] && cp device_kernel/fs/devpts/inode.c patched_source_files/fs/devpts/
+          [ -f device_kernel/drivers/input/input.c ] && cp device_kernel/drivers/input/input.c patched_source_files/drivers/input/
+          [ -f device_kernel/security/selinux/hooks.c ] && cp device_kernel/security/selinux/hooks.c patched_source_files/security/selinux/
+          [ -f device_kernel/fs/proc/cmdline.c ] && cp device_kernel/fs/proc/cmdline.c patched_source_files/fs/proc/
+          [ -f device_kernel/fs/susfs.c ] && cp device_kernel/fs/susfs.c patched_source_files/fs/
+          [ -f device_kernel/fs/dcache.c ] && cp device_kernel/fs/dcache.c patched_source_files/fs/
+          [ -f device_kernel/fs/readdir.c ] && cp device_kernel/fs/readdir.c patched_source_files/fs/
+          [ -f device_kernel/fs/namei.c ] && cp device_kernel/fs/namei.c patched_source_files/fs/
           
           cd patched_source_files
           zip -r ../Patched_Source_Files.zip .
@@ -191,13 +215,14 @@ jobs:
 
       - name: 📤 提取官方 SukiSU 补丁脚本 (用于法医级审查)
         run: |
+          set -e
           cd $GITHUB_WORKSPACE
           echo "==== 正在查抄官方补丁目录 ===="
           mkdir -p Official_Patches
-          cp -r /tmp/Patches/* Official_Patches/ || true
-          cp device_kernel/backport_patches.sh Official_Patches/ || true
-          cp device_kernel/backport_selinux_patches.sh Official_Patches/ || true
-          cp device_kernel/*.patch Official_Patches/ || true
+          [ -d /tmp/Patches ] && cp -r /tmp/Patches/* Official_Patches/ || echo "无 /tmp/Patches 目录跳过"
+          [ -f device_kernel/backport_patches.sh ] && cp device_kernel/backport_patches.sh Official_Patches/
+          [ -f device_kernel/backport_selinux_patches.sh ] && cp device_kernel/backport_selinux_patches.sh Official_Patches/
+          cp device_kernel/*.patch Official_Patches/ 2>/dev/null || echo "无 .patch 文件跳过"
           cd Official_Patches
           zip -r ../Official_Patches.zip .
       - name: 📦 上传官方补丁审查包
@@ -208,12 +233,13 @@ jobs:
 
       - name: 📤 提取 SuSFS 冲突原件 ( .rej 查抄)
         run: |
+          set -e
           cd $GITHUB_WORKSPACE
           echo "==== 正在满世界抓捕 .rej 冲突文件 ===="
           mkdir -p Rej_Files
-          find device_kernel -name "*.rej" -exec cp {} Rej_Files/ \; || true
+          find device_kernel -name "*.rej" -exec cp {} Rej_Files/ \;
           cd Rej_Files
-          zip -r ../Rej_Files.zip . || true
+          zip -r ../Rej_Files.zip . || echo "空包安全跳过"
 
       - name: 📦 上传冲突审查包 (.rej)
         uses: actions/upload-artifact@v4
