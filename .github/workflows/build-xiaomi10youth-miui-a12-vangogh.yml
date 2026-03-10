@@ -291,32 +291,31 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
-      - name: 🚑 提取内核底层配置铁证 (防瞎猜验证包)
+      - name: 🕵️‍♂️ 提取核心嫌疑源码 (fs/susfs.c 案发现场)
         if: always()
         run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          echo "==== 正在收集底层证据 ===="
-          mkdir -p Evidence_Files
+          echo "==== 正在提取法医级源码物证 ===="
+          # 在根目录创建一个专门放嫌疑代码的文件夹
+          mkdir -p $GITHUB_WORKSPACE/Suspect_Source
           
-          # 证据 1：看看咱们的脚本到底有没有把开关写进原厂配置文件
-          cp arch/arm64/configs/${{ env.DEFCONFIG_NAME }} Evidence_Files/patched_defconfig.txt || echo "找不到 defconfig"
+          # 1. 提取心脏源码
+          cp $GITHUB_WORKSPACE/device_kernel/fs/susfs.c $GITHUB_WORKSPACE/Suspect_Source/ || echo "❌ 找不到 fs/susfs.c 源码！"
           
-          # 证据 2：看看 fs/Makefile 里到底有没有 obj-$(CONFIG_KSU_SUSFS) += susfs.o
-          cp fs/Makefile Evidence_Files/fs_Makefile.txt || echo "找不到 fs/Makefile"
+          # 2. 提取相关的头文件 (防止伪装宏定义藏在这里面)
+          cp $GITHUB_WORKSPACE/device_kernel/include/linux/susfs.h $GITHUB_WORKSPACE/Suspect_Source/ || true
+          cp $GITHUB_WORKSPACE/device_kernel/include/linux/susfs_def.h $GITHUB_WORKSPACE/Suspect_Source/ || true
           
-          # 证据 3 (最致命的铁证)：抓取编译系统最终生成的真实 .config 状态文件
-          find . -name ".config" -exec cp {} Evidence_Files/final_generated_config.txt \; || echo "找不到 .config"
+          # 打包压缩
+          cd $GITHUB_WORKSPACE/Suspect_Source
+          zip -r ../Suspect_Source.zip .
           
-          cd Evidence_Files
-          zip -r ../Evidence_Files.zip .
-          
-      - name: 📦 上传底层证据包
+      - name: 📦 上传嫌疑源码包
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Evidence_Files
-          # 🚨 致命修正：指明压缩包在 device_kernel 目录下！
-          path: device_kernel/Evidence_Files.zip
+          name: Suspect_Source_Files
+          # 🚨 路径绝对精准，直接从根目录抓取压缩包
+          path: Suspect_Source.zip
 
       - name: 🔩 Pack Process
         uses: ./.github/workflows/pack-process
