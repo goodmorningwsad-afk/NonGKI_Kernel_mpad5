@@ -318,6 +318,23 @@ runs:
         }
         #endif"
         patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
+
+        echo "==== [源码纠偏] 修复 SukiSU sucompat.c 权限泄露漏洞 ===="
+        SUCOMPAT_FILE=$(find $GITHUB_WORKSPACE -type f -name "sucompat.c" | head -n 1)
+        if [ -n "$SUCOMPAT_FILE" ]; then
+            echo "🩹 正在为 $SUCOMPAT_FILE 注入权限拦截大坝..."
+            
+            # 在 faccessat 函数中注入权限判断
+            sed -i '/int ksu_handle_faccessat/,/ksu_strncpy_from_user_nofault/ s/ksu_strncpy_from_user_nofault/if (!ksu_is_allow_uid_for_current(current_uid().val)) return 0;\n\n\tksu_strncpy_from_user_nofault/' "$SUCOMPAT_FILE"
+            
+            # 在 4.19 版的 ksu_handle_stat 函数中注入权限判断
+            sed -i '/int ksu_handle_stat(int \*dfd, const char __user \*\*filename_user/,/ksu_strncpy_from_user_nofault/ s/ksu_strncpy_from_user_nofault/if (!ksu_is_allow_uid_for_current(current_uid().val)) return 0;\n\n\tksu_strncpy_from_user_nofault/' "$SUCOMPAT_FILE"
+            
+            echo "✅ 漏洞修复完毕！检测软件再也无法通过 sh 借尸还魂了！"
+        else
+            echo "❌ 找不到 sucompat.c，纠偏失败！"
+            exit 1
+        fi
         
         echo "==== [擦屁股行动] 修复 LineageOS 官方 Bug (极客精准追踪版) ===="
         
