@@ -395,7 +395,7 @@ runs:
         
         # 11. 终结链接器 (ld.lld) 的最后 3 个幽灵符号报错
         echo "🩹 正在为 vmlinux 大一统注入最后的物理替身..."
-        echo "unsigned long reclaim_pages(struct list_head *page_list) { return 0; }" >> mm/madvise.c
+        
         echo "bool is_ksu_transition(const void *old_tsec, const void *new_tsec) { return false; }" >> security/selinux/hooks.c
         echo "void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}" >> drivers/mmc/host/sdhci-pltfm.c
         
