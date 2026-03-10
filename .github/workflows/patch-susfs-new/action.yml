@@ -387,11 +387,11 @@ runs:
 
         # 9. 修复 zstd 压缩库不支持 fallthrough 关键字导致的暴毙
         echo "🩹 正在缝合 lib/zstd/common/bitstream.h ..."
-        sed -i 's/ZSTD_FALLTHROUGH;/\/\* fallthrough \*\//g' lib/zstd/common/bitstream.h
+        sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' lib/zstd/common/bitstream.h
         
         # 10. 全盘清剿 zstd 目录下的 fallthrough 穿越者 Bug
         echo "🩹 正在全盘缝合 lib/zstd/ 目录下的 ZSTD_FALLTHROUGH ..."
-        find lib/zstd -type f -exec sed -i 's/ZSTD_FALLTHROUGH;/\\/\* fallthrough \*\\//g' {} +
+        find lib/zstd -type f -exec sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' {} +
         
         # 11. 终结链接器 (ld.lld) 的最后 3 个幽灵符号报错
         echo "🩹 正在为 vmlinux 大一统注入最后的物理替身..."
