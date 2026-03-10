@@ -156,8 +156,8 @@ runs:
                 return -ENOENT;
             }
         #endif"
-        patch_file "fs/namei.c" "int error = security_path_mknod(dir, dentry, mode, 0);" 0 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
-
+        patch_file "fs/namei.c" "inode_permission(dir->dentry->d_inode" 0 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
+        
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         
         EXEC_HOOK="
