@@ -154,20 +154,6 @@ jobs:
           sed -i 's/# CONFIG_SECCOMP_FILTER is not set/CONFIG_SECCOMP_FILTER=y/g' arch/arm64/configs/milito_defconfig || true
           echo "CONFIG_SECCOMP=y" >> arch/arm64/configs/milito_defconfig
           echo "CONFIG_SECCOMP_FILTER=y" >> arch/arm64/configs/milito_defconfig
-
-          echo "==== 7. 终极物理缝合：解决 action.yml 漏打的 .rej 头文件 ===="
-          # 1. 修复 fs/stat.c 缺失的头文件
-          sed -i '/#include <linux\/compat.h>/a #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT\n#include <linux\/susfs_def.h>\nextern void susfs_sus_ino_for_generic_fillattr(unsigned long ino, struct kstat *stat);\n#endif' fs/stat.c
-          
-          # 2. 修复 fs/proc_namespace.c 缺失的头文件
-          sed -i '/#include "internal.h"/a #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n#include <linux\/susfs_def.h>\nextern bool susfs_hide_sus_mnts_for_non_su_procs;\nextern bool susfs_is_current_ksu_domain(void);\n#endif' fs/proc_namespace.c
-          
-          # 3. 修复 include/linux/mount.h 缺失的变量
-          sed -i '/void \*data;/i #ifdef CONFIG_KSU_SUSFS\n\tu64 susfs_mnt_id_backup;\n#endif' include/linux/mount.h
-          
-          # 4. 修复 fs/namei.c 缺失的两处核心防线
-          sed -i '/if ((!sysctl_protected_fifos/i #ifdef CONFIG_KSU_SUSFS_SUS_PATH\n\tif (unlikely(inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {\n\t\treturn -ENOENT;\n\t}\n#endif' fs/namei.c
-          sed -i '/int error = security_path_mknod/i #ifdef CONFIG_KSU_SUSFS_SUS_PATH\n\tif (dentry->d_inode && unlikely(dentry->d_inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {\n\t\tint err_p = inode_permission(dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);\n\t\tif (err_p) return err_p;\n\t\treturn -ENOENT;\n\t}\n#endif' fs/namei.c
           
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
