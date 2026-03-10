@@ -99,6 +99,15 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 🚑 提取案发现场物证 (打孔崩溃时强制触发)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Crime_Scene_Files
+          path: |
+            device_kernel/fs/namei.c
+            device_kernel/**/*.rej
+
       - name: ⏪ 物理时光机：精准回溯 SukiSU 3号提交
         shell: bash
         run: |
