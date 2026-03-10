@@ -9,11 +9,17 @@ runs:
       run: |
         cd $GITHUB_WORKSPACE/device_kernel
         
+        # 🛡️ 终极全局防重复锁：检测到已执行过，直接跳过整个打孔流程！
+        if [ -f ".phantom_hooks_applied" ]; then
+            echo "⏭️ 检测到幻影打孔外挂已成功运行过，触发全局防重复机制，安全跳过！"
+            exit 0
+        fi
+        
         echo "==== 0. 唤醒 SuSFS 与文件系统大动脉开关 ===="
         DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
         
-        # 🚨 物理阉割模块版本校验
-        sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' "$DEFCONFIG_FILE" || true
+        # 🚨 物理阉割模块版本校验 (已剔除 || true)
+        sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' "$DEFCONFIG_FILE"
         
         # 🚨 SuSFS 隐身大动脉
         echo "CONFIG_KSU_SUSFS=y" >> "$DEFCONFIG_FILE"
@@ -27,10 +33,9 @@ runs:
         echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$DEFCONFIG_FILE"
         
-        # 🚨 现代 Android (15) 挂载 APEX 模块续命全家桶 (彻底打通压缩与挂载)
+        # 🚨 现代 Android (15) 挂载 APEX 模块续命全家桶
         echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
         
-        # 唤醒满血 SquashFS
         echo "CONFIG_SQUASHFS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_FILE_DIRECT=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_DECOMP_MULTI_PERCPU=y" >> "$DEFCONFIG_FILE"
@@ -39,28 +44,32 @@ runs:
         echo "CONFIG_SQUASHFS_LZO=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_XZ=y" >> "$DEFCONFIG_FILE"
         
-        # 唤醒满血 EROFS 及其 LZ4 核心解压算法
         echo "CONFIG_EROFS_FS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_EROFS_FS_ZIP=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_EROFS_FS_ZIP_LZ4=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_LZ4_DECOMPRESS=y" >> "$DEFCONFIG_FILE"
         
-        # 🚨 双重保险：强制确保内核 Kconfig 和 Makefile 认领了 EROFS
         grep -q "erofs" fs/Kconfig || sed -i '/source "fs\/ext4\/Kconfig"/a source "fs/erofs/Kconfig"' fs/Kconfig
         grep -q "erofs" fs/Makefile || echo 'obj-$(CONFIG_EROFS_FS) += erofs/' >> fs/Makefile
 
         echo "✅ SuSFS 物理开关与 APEX 满血挂载防线全数合闸！"
         
         echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
-        # 🛡️ 临时关闭严格模式，防止 find 扫描无权限目录引发 pipefail 连坐暴毙
         set +e
         PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" 2>/dev/null | head -n 1)
         set -e
         
         if [ -z "$PATCH_FILE" ]; then
-            echo "❌ 警告：找不到 susfs_patch_to_4.19.patch！"
+            echo "❌ 致命错误：找不到 susfs_patch_to_4.19.patch！"
+            exit 1 # 🚨 找不到补丁文件，立刻暴毙停止！
         else
-            patch -p1 -f < "$PATCH_FILE" || echo "⚠️ 部分补丁存在冲突，已自动生成 .rej 文件并强制继续！"
+            # 🛡️ 补丁级防重复锁
+            if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
+                echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，官方补丁已存在，安全跳过 patch 阶段！"
+            else
+                # 🚨 拒绝补丁别停止：允许产生 .rej 供后续手工缝合 🚨
+                patch -p1 -N -f < "$PATCH_FILE" || echo "⚠️ 补丁产生 .rej 拒绝文件，保留全尸继续！"
+            fi
         fi
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
@@ -72,13 +81,12 @@ runs:
             local identifier="$5"
             
             if grep -q "$identifier" "$file"; then
-                echo "⚠️ $file 已包含 $identifier，跳过。"
+                echo "⚠️ $file 已包含 $identifier，防重复跳过。"
                 return 0
             fi
             if ! grep -Fq "$search_str" "$file"; then
-                echo "❌ 警告: $file 中找不到特征字符串 '$search_str'！"
-                echo "⏭️ 触发防熔断机制：强制跳过此文件，保留全尸供你下载排错！"
-                return 0
+                echo "❌ 致命错误: $file 中找不到特征字符串 '$search_str'！"
+                exit 1 # 🚨 手工缝合找不到锚点，立刻暴毙停止！
             fi
             awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
             index($0, search) && !done {
@@ -93,7 +101,6 @@ runs:
 
         echo "==== [手工缝合] 修复 LineageOS 专属的 .rej 冲突 ===="
         
-        # 1. 针对 task_mmu.c 的头文件极客注入 (解决 task_mmu.c.rej)
         TASK_MMU_HOOK="
         /* FIX_TASK_MMU_REJ */
         #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP)
@@ -101,7 +108,6 @@ runs:
         #endif"
         patch_file "fs/proc/task_mmu.c" "#include <asm/elf.h>" 0 "$TASK_MMU_HOOK" "FIX_TASK_MMU_REJ"
 
-        # 2. 补全 mount.h 缺失的挂载 ID 备份 (解决 mount.h.rej)
         MOUNT_H_HOOK="
         /* FIX_MOUNT_H_REJ */
         #ifdef CONFIG_KSU_SUSFS
@@ -109,7 +115,6 @@ runs:
         #endif"
         patch_file "include/linux/mount.h" "void *data;" 0 "$MOUNT_H_HOOK" "FIX_MOUNT_H_REJ"
 
-        # 3. 补全 proc_namespace.c 的隐藏开关 (解决 proc_namespace.c.rej)
         PROC_NS_HOOK="
         /* FIX_PROC_NS_REJ */
         #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
@@ -119,7 +124,6 @@ runs:
         #endif"
         patch_file "fs/proc_namespace.c" "#include \"internal.h\"" 0 "$PROC_NS_HOOK" "FIX_PROC_NS_REJ"
 
-        # 4. 补全 stat.c 的属性拦截头文件 (解决 stat.c.rej)
         STAT_TOP_HOOK="
         /* FIX_STAT_REJ */
         #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
@@ -128,7 +132,6 @@ runs:
         #endif"
         patch_file "fs/stat.c" "#include <linux/compat.h>" 0 "$STAT_TOP_HOOK" "FIX_STAT_REJ"
 
-        # 5. 补全 namei.c 的核心路径隐藏防线一 (解决 namei.c.rej - may_create_in_sticky)
         NAMEI_HOOK_1="
         /* FIX_NAMEI_1_REJ */
         #ifdef CONFIG_KSU_SUSFS_SUS_PATH
@@ -138,7 +141,6 @@ runs:
         #endif"
         patch_file "fs/namei.c" "if ((!sysctl_protected_fifos && S_ISFIFO(inode->i_mode)) ||" 0 "$NAMEI_HOOK_1" "FIX_NAMEI_1_REJ"
 
-        # 6. 补全 namei.c 的核心路径隐藏防线二 (解决 namei.c.rej - may_o_create)
         NAMEI_HOOK_2="
         /* FIX_NAMEI_2_REJ */
         #ifdef CONFIG_KSU_SUSFS_SUS_PATH
@@ -313,7 +315,6 @@ runs:
         
         echo "==== [擦屁股行动] 修复 LineageOS 官方 Bug (极客精准追踪版) ===="
         
-        # 1. 修复 cpuset.c 变量越界未定义 Bug
         CPUSET_HOOK_1="
         #ifdef CONFIG_CPUSET_ASSIST
         /* CPUSET_ASSIST_FIX_START */"
@@ -324,13 +325,11 @@ runs:
         #endif"
         patch_file "kernel/cgroup/cpuset.c" "static ssize_t cpuset_write_resmask_wrapper(struct kernfs_open_file *of," 0 "$CPUSET_HOOK_2" "CPUSET_ASSIST_FIX_END"
         
-        # 2. 修复 module-plts.c 找不到指令集的 Bug
         INSN_HOOK="
         /* MODULE_PLTS_INSN_FIX */
         #include <asm/insn.h>"
         patch_file "arch/arm64/kernel/module-plts.c" "#include <linux/sort.h>" 0 "$INSN_HOOK" "MODULE_PLTS_INSN_FIX"
         
-        # 3. 修复 tune.c 结构体未定义 wrapper 的官方残疾 Bug
         TUNE_HOOK="
         /* STUNE_ASSIST_WRAPPER_FIX */
         #ifndef CONFIG_STUNE_ASSIST
@@ -342,13 +341,11 @@ runs:
         patch_file "kernel/sched/tune.c" "static struct cftype files[] = {" 0 "$TUNE_HOOK" "STUNE_ASSIST_WRAPPER_FIX"
         sed -i 's/-dirty//g' scripts/setlocalversion
         
-        # 4. 修复 sdhci.c 官方注释错误
         echo "🩹 正在缝合 drivers/mmc/host/sdhci.c ..."
         sed -i 's|//\* void sdhci_set_uhs_signaling|#if 0\nvoid sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c 
         sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\n#endif|g' drivers/mmc/host/sdhci.c 
         sed -i 's/-dirty//g' scripts/setlocalversion
         
-        # 5. 修复 core.c 缺失 mmc_card_doing_bkops 宏的官方残疾 Bug
         echo "🩹 正在缝合 drivers/mmc/core/core.c ..."
         MMC_BKOPS_HOOK="
         /* MMC_BKOPS_FIX */
@@ -357,13 +354,11 @@ runs:
         #endif"
         patch_file "drivers/mmc/core/core.c" "static bool mmc_is_valid_state_for_clk_scaling(struct mmc_host *host)" 0 "$MMC_BKOPS_HOOK" "MMC_BKOPS_FIX"
         
-        # 6. 修复 kernel/cpu.c 宏定义值为字符串导致的预处理崩溃
         echo "🩹 正在缝合 kernel/cpu.c ..."
         sed -i 's/#if CONFIG_LITTLE_CPU_MASK/#if 0/g' kernel/cpu.c 
         sed -i 's/#if CONFIG_BIG_CPU_MASK/#if 0/g' kernel/cpu.c 
         sed -i 's/#if CONFIG_PRIME_CPU_MASK/#if 0/g' kernel/cpu.c 
         
-        # 7. 修复 lz4_decompress.c 导出未定义符号的致命错误
         echo "🩹 正在缝合 lib/lz4/lz4_decompress.c ..."
         sed -i 's/EXPORT_SYMBOL(LZ4_decompress_safe_partial);/\/\/ EXPORT_SYMBOL(LZ4_decompress_safe_partial);/g' lib/lz4/lz4_decompress.c
         sed -i 's/EXPORT_SYMBOL(LZ4_setStreamDecode);/\/\/ EXPORT_SYMBOL(LZ4_setStreamDecode);/g' lib/lz4/lz4_decompress.c
@@ -372,22 +367,17 @@ runs:
         sed -i 's/EXPORT_SYMBOL(LZ4_decompress_safe_usingDict);/\/\/ EXPORT_SYMBOL(LZ4_decompress_safe_usingDict);/g' lib/lz4/lz4_decompress.c
         sed -i 's/EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/\/\/ EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/g' lib/lz4/lz4_decompress.c
 
-        # 8. 修复 tcp_ipv6.c 和 tcp_ipv4.c 的 static 声明冲突
         echo "🩹 正在缝合 net/ipv6/tcp_ipv6.c 和 net/ipv4/tcp_ipv4.c ..."
         perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\nstatic\n#endif\nconst struct tcp_request_sock_ops/const struct tcp_request_sock_ops/g' net/ipv4/tcp_ipv4.c
         perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\nstatic\n#endif\nconst struct tcp_request_sock_ops/const struct tcp_request_sock_ops/g' net/ipv6/tcp_ipv6.c
 
-        # 9. 修复 zstd 压缩库不支持 fallthrough 关键字导致的暴毙
         echo "🩹 正在缝合 lib/zstd/common/bitstream.h ..."
         sed -i 's/ZSTD_FALLTHROUGH;/\/\* fallthrough \*\//g' lib/zstd/common/bitstream.h
         
-        # 10. 全盘清剿 zstd 目录下的 fallthrough 穿越者 Bug
         echo "🩹 正在全盘缝合 lib/zstd/ 目录下的 ZSTD_FALLTHROUGH ..."
         find lib/zstd -type f -exec sed -i 's/ZSTD_FALLTHROUGH;/\/\* fallthrough \*\//g' {} +
         
-        # 11. 终结链接器 (ld.lld) 的最后 3 个幽灵符号报错
         echo "🩹 正在为 vmlinux 大一统注入最后的物理替身..."
-        
         echo "unsigned long reclaim_pages(struct list_head *page_list) { return 0; }" >> mm/madvise.c
         echo "bool is_ksu_transition(const void *old_tsec, const void *new_tsec) { return false; }" >> security/selinux/hooks.c
         echo "void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}" >> drivers/mmc/host/sdhci-pltfm.c
@@ -401,4 +391,7 @@ runs:
         EOF
         
         sed -i 's/-dirty//g' scripts/setlocalversion
+        
+        # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
+        touch .phantom_hooks_applied
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
