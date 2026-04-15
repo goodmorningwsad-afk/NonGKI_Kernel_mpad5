@@ -45,6 +45,12 @@ runs:
         echo "CONFIG_EROFS_FS_ZIP=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_EROFS_FS_ZIP_LZ4=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_LZ4_DECOMPRESS=y" >> "$DEFCONFIG_FILE"
+
+        # 👇👇👇 在这里插入下面这三行代码 👇👇👇
+        echo "CONFIG_TMPFS=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_TMPFS_XATTR=y" >> "$DEFCONFIG_FILE"
+        # 👆👆👆 插入结束 👆👆👆
         
         grep -q "erofs" fs/Kconfig || sed -i '/source "fs\/ext4\/Kconfig"/a source "fs/erofs/Kconfig"' fs/Kconfig
         grep -q "erofs" fs/Makefile || echo 'obj-$(CONFIG_EROFS_FS) += erofs/' >> fs/Makefile
