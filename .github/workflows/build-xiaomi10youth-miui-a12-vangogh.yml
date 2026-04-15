@@ -120,6 +120,10 @@ jobs:
           if [ -n "$KSU_DIR" ]; then
               echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
               cd "$KSU_DIR"
+
+             echo "==== 正在拉取历史记录 (深化 100 层) ===="
+              # 专门针对浅克隆的优化指令：只向历史深挖 100 个 commit
+              git fetch --deepen=100
               
               # 🚨 核心指令：直接硬重置到 3 月 2 日的最后一个正常提交 (c1fd51c)
               git reset --hard c1fd51c
