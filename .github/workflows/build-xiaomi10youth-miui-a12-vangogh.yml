@@ -108,45 +108,77 @@ jobs:
             device_kernel/fs/namei.c
             device_kernel/**/*.rej
 
-      
-
-      - name: 🩹 Fix Kernel Bugs & Extra Options
+      - name: 🩹 Fix SukiSU Bugs & Defconfig Options
         run: |
           set -e # 🚨 遇错立刻暴毙机制
           cd $GITHUB_WORKSPACE/device_kernel
           
-          if [ -f ".kernel_bugs_fixed" ]; then
-              echo "⏭️ 内核 Bug 已修复过，防重复跳过！"
+          if [ -f ".sukisu_bugs_fixed" ]; then
+              echo "⏭️ SukiSU Bug 已修复过，防重复跳过！"
               exit 0
           fi
 
-          echo "==== 1. 修复高版本 Clang 编译老内核的通病 ===="
-          grep -q "<asm/insn.h>" arch/arm64/kernel/module-plts.c || sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
+          echo "==== 🎯 0. 精准锁定 SukiSU 源码大本营 ===="
+          # 排除 out 等编译输出目录，精准抓取 KernelSU/SukiSU 文件夹
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" | head -n 1)
           
-          echo "==== 2. 修复 cgroup 函数名拼写错误 ===="
-          sed -i '/\.write_/s/write_wrapper/write/g' kernel/sched/tune.c
-          sed -i 's/boost_write_wrapper(/__attribute__((unused)) boost_write_wrapper(/g' kernel/sched/tune.c
-          sed -i 's/prefer_idle_write_wrapper(/__attribute__((unused)) prefer_idle_write_wrapper(/g' kernel/sched/tune.c
-          
-          echo "==== 3. 抹除 NTFS3 驱动中老编译器不识别的超前参数 ===="
-          [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wunused-but-set-variable//g' fs/ntfs3/Makefile
-          [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wno-unused-but-set-variable//g' fs/ntfs3/Makefile
-          
-          echo "==== 4. 物理补全 namei.c 缺失的变量声明 ===="
-          grep -q "FIXED_UNDECLARED_VAR" fs/namei.c || sed -i '3168s/^/    int error = 0; \/* FIXED_UNDECLARED_VAR *\/ \n/' fs/namei.c
-          
-          echo "==== 5. 拯救被摧毁的 namespace.c (纯软件层安全覆盖) ===="
-          grep -q "LineageOS restored" fs/namespace.c || {
-              curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/fs/namespace.c" -o fs/namespace.c
-              echo "// LineageOS restored" >> fs/namespace.c
-          }
-          
-          echo "==== 6. 防止 LTO 爆内存，强制保留 ===="
-          sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/milito_defconfig
-          sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/milito_defconfig
+          if [ -z "$KSU_DIR" ]; then
+              echo "⚠️ 警告：未找到 SukiSU/KernelSU 源码目录，将跳过 SukiSU 源码级修复！"
+          else
+              echo "✅ 成功锁定大本营：$KSU_DIR"
+              
+              echo "==== 1 & 2. 动态修复 SukiSU 原厂笔误 (域内精准寻址) ===="
+              # 只在 SukiSU 目录内部寻找
+              APP_PROFILE=$(find "$KSU_DIR" -type f -name "app_profile.c" | head -n 1)
+              if [ -n "$APP_PROFILE" ]; then
+                  echo "🩹 正在缝合 $APP_PROFILE"
+                  sed -i 's/profile->selinux_domain/profile.selinux_domain/g' "$APP_PROFILE" || true
+                  sed -i 's/newcreds\./newcreds->/g' "$APP_PROFILE" || true
+                  sed -i '300,$s/, cred)/, newcreds)/g' "$APP_PROFILE" || true
+              else
+                  echo "⏭️ 未找到 app_profile.c，安全跳过。"
+              fi
+              
+              SUPERCALLS=$(find "$KSU_DIR" -type f -name "supercalls.c" | head -n 1)
+              if [ -n "$SUPERCALLS" ]; then
+                  echo "🩹 正在缝合 $SUPERCALLS"
+                  sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' "$SUPERCALLS" || true
+                  sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' "$SUPERCALLS" || true
+                  sed -i '/ksu_mark_running_process/d' "$SUPERCALLS" || true
+              else
+                  echo "⏭️ 未找到 supercalls.c，安全跳过。"
+              fi
 
-          touch .kernel_bugs_fixed
-          echo "✅ 内核基础 Bug 修复完成！"
+              echo "==== 5. 修复探测 su 掉包漏洞 (域内精准寻址) ===="
+              SUCOMPAT_FILE=$(find "$KSU_DIR" -type f -name "sucompat.c" | head -n 1)
+              if [ -n "$SUCOMPAT_FILE" ]; then
+                  echo "🩹 正在缝合 $SUCOMPAT_FILE"
+                  grep -q "is_su_allowed" "$SUCOMPAT_FILE" || sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' "$SUCOMPAT_FILE"
+              else
+                  echo "⏭️ 未找到 sucompat.c，安全跳过。"
+              fi
+          fi
+          
+          echo "==== 3. 屏蔽无用函数警告 ===="
+          grep -q "\-Wno-unused-function" fs/Makefile || echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
+          grep -q "\-Wno-error" fs/Makefile || echo "ccflags-y += -Wno-error" >> fs/Makefile
+          
+          echo "==== 4. 开启 SukiSU 必须的 MANUAL_HOOK 与 USER_NS ===="
+          grep -q "CONFIG_KSU_MANUAL_HOOK=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/milito_defconfig
+          sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/g' arch/arm64/configs/milito_defconfig
+          grep -q "CONFIG_USER_NS=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_USER_NS=y" >> arch/arm64/configs/milito_defconfig
+
+          echo "==== 6. 强行拉起 SECCOMP 防线 (修复 mode 成员缺失报错) ===="
+          sed -i 's/# CONFIG_SECCOMP is not set/CONFIG_SECCOMP=y/g' arch/arm64/configs/milito_defconfig
+          sed -i 's/# CONFIG_SECCOMP_FILTER is not set/CONFIG_SECCOMP_FILTER=y/g' arch/arm64/configs/milito_defconfig
+          grep -q "^CONFIG_SECCOMP=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP=y" >> arch/arm64/configs/milito_defconfig
+          grep -q "^CONFIG_SECCOMP_FILTER=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP_FILTER=y" >> arch/arm64/configs/milito_defconfig
+
+          touch .sukisu_bugs_fixed
+          echo "✅ SukiSU 专属 Bug 与内核防线配置已全部合闸！"
+
+
+      
 
       - name: 🩹 Fix SukiSU Bugs & Defconfig Options
         run: |
