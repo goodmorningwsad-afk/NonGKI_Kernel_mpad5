@@ -314,6 +314,19 @@ runs:
         #endif"
         patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
 
+        # 👇👇👇 致命一刀：补齐彻底打通模块挂载的 vfs_read 劫持 👇👇👇
+        VFS_READ_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern bool ksu_vfs_read_hook __read_mostly;
+            extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos_ptr);
+            if (unlikely(ksu_vfs_read_hook))
+                ksu_handle_vfs_read(&file, &buf, &count, &pos);
+        }
+        #endif"
+        patch_file "fs/read_write.c" "if (!(file->f_mode & FMODE_READ))" 0 "$VFS_READ_HOOK" "ksu_vfs_read_hook"
+        # 👆👆👆 致命一刀结束 👆👆👆
+
         READ_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -436,3 +449,4 @@ runs:
         # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
         touch .phantom_hooks_applied
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
+
