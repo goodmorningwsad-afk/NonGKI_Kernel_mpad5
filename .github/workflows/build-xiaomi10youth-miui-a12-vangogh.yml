@@ -167,13 +167,14 @@ jobs:
               
               echo "==== 1. 修复新版 SukiSU 在 4.19 内核下的编译水土不服 (event.c) ===="
               EVENT_FILE=$(find "$KSU_DIR" -type f -name "event.c" | head -n 1)
-              if [ -n "$EVENT_FILE" ]; then
+                            if [ -n "$EVENT_FILE" ]; then
                   echo "🩹 正在缝合 $EVENT_FILE"
-                  # 修复 4.19 下 strncpy_from_user_nofault 找不到的问题
-                  sed -i 's/strncpy_from_user_nofault/__strncpy_from_user_nofault/g' "$EVENT_FILE"
+                  # 修复 4.19 下 strncpy_from_user_nofault 找不到的问题 (加 \b 防止误伤 ksu_ 开头的函数)
+                  sed -i 's/\bstrncpy_from_user_nofault(/__strncpy_from_user_nofault(/g' "$EVENT_FILE"
                   # 修复 USER_ARG_NULL 类型不匹配报错，直接传 NULL 顺应新版参数类型
                   sed -i 's/USER_ARG_NULL, gfp/NULL, gfp/g' "$EVENT_FILE"
               fi
+
 
               echo "==== 2. 修复 adb_root.c 缺失 susfs 字符串处理函数 ===="
               ADB_ROOT=$(find "$KSU_DIR" -type f -name "adb_root.c" | head -n 1)
