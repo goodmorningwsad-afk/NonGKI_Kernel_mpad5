@@ -114,7 +114,7 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           
           if [ -f ".kernel_bugs_fixed" ]; then
-              echo "⏭️ 内核 Bug 已修复过，防重复跳过！"
+              echo "⏭️ 内核 Bug 已修复过，跳过！"
               exit 0
           fi
 
@@ -126,25 +126,24 @@ jobs:
           sed -i 's/boost_write_wrapper(/__attribute__((unused)) boost_write_wrapper(/g' kernel/sched/tune.c
           sed -i 's/prefer_idle_write_wrapper(/__attribute__((unused)) prefer_idle_write_wrapper(/g' kernel/sched/tune.c
           
-          echo "==== 3. 抹除 NTFS3 驱动中老编译器不识别的超前参数 ===="
+          echo "==== 3. 抹除 NTFS3 驱动超前参数 ===="
           [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wunused-but-set-variable//g' fs/ntfs3/Makefile
           [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wno-unused-but-set-variable//g' fs/ntfs3/Makefile
           
-          echo "==== 4. 物理补全 namei.c 缺失的变量声明 ===="
+          echo "==== 4. 物理补全 namei.c 变量声明 ===="
           grep -q "FIXED_UNDECLARED_VAR" fs/namei.c || sed -i '3168s/^/    int error = 0; \/* FIXED_UNDECLARED_VAR *\/ \n/' fs/namei.c
           
-          echo "==== 5. 拯救被摧毁的 namespace.c (纯软件层安全覆盖) ===="
+          echo "==== 5. 拯救 namespace.c ===="
           grep -q "LineageOS restored" fs/namespace.c || {
               curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/fs/namespace.c" -o fs/namespace.c
               echo "// LineageOS restored" >> fs/namespace.c
           }
-          
+
           echo "==== 6. 防止 LTO 爆内存，强制保留 ===="
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/milito_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/milito_defconfig
 
           touch .kernel_bugs_fixed
-          echo "✅ 内核基础 Bug 修复完成！"
 
       - name: 🩹 Fix SukiSU Bugs & Defconfig Options
         run: |
@@ -152,22 +151,19 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           
           if [ -f ".sukisu_bugs_fixed" ]; then
-              echo "⏭️ SukiSU Bug 已修复过，防重复跳过！"
+              echo "⏭️ SukiSU Bug 已修复过，跳过！"
               exit 0
           fi
 
           echo "==== 🎯 0. 精准锁定 SukiSU 源码大本营 ===="
           KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
           
-          if [ -z "$KSU_DIR" ]; then
-              echo "⚠️ 警告：未找到 SukiSU 源码目录！"
-          else
-              echo "✅ 成功锁定大本营：$KSU_DIR"
+          if [ -n "$KSU_DIR" ]; then
+              echo "✅ 锁定大本营：$KSU_DIR"
               
               echo "==== 1. 修复 event.c 4.19 兼容性 ===="
               EVENT_FILE=$(find "$KSU_DIR" -type f -name "event.c" | head -n 1)
               if [ -n "$EVENT_FILE" ]; then
-                  echo "🩹 正在缝合 $EVENT_FILE"
                   sed -i 's/\bstrncpy_from_user_nofault(/__strncpy_from_user_nofault(/g' "$EVENT_FILE"
                   sed -i 's/USER_ARG_NULL, gfp/NULL, gfp/g' "$EVENT_FILE"
               fi
@@ -175,25 +171,23 @@ jobs:
               echo "==== 2. 修复 adb_root.c 辅助函数注入 ===="
               ADB_ROOT=$(find "$KSU_DIR" -type f -name "adb_root.c" | head -n 1)
               if [ -n "$ADB_ROOT" ]; then
-                  echo "🩹 正在为 $ADB_ROOT 注入辅助函数..."
                   echo 'static inline bool susfs_starts_with(const char *str, const char *prefix) { return strncmp(str, prefix, strlen(prefix)) == 0; }' > /tmp/susfs_str_helpers.h
                   echo 'static inline bool susfs_ends_with(const char *str, const char *suffix) { int len = strlen(str); int slen = strlen(suffix); return (len >= slen) && (strcmp(str + len - slen, suffix) == 0); }' >> /tmp/susfs_str_helpers.h
                   sed -i '1i #include <linux/string.h>' "$ADB_ROOT"
                   sed -i '2r /tmp/susfs_str_helpers.h' "$ADB_ROOT"
               fi
-
-              echo "==== 3. 拒绝造假，寻找并接回被遗忘的拦截开关！ ===="
+              
+              echo "==== 3. 拒绝伪造！全盘搜索并找回 SukiSU 丢失的拦截大本营 ===="
               KSU_MAIN=$(find "$KSU_DIR" -type f -name "ksu.c" | head -n 1)
               if [ -n "$KSU_MAIN" ]; then
                   echo "🔍 启动雷达，全盘扫描核心拦截文件..."
                   # 精确搜寻包含 ksu_input_hook_key_false 定义的文件（通常是 core_hook.c）
-                  REAL_HOOK_FILE=$(find "$KSU_DIR" -type f -name "*.c" | xargs grep -l "ksu_input_hook_key_false" | grep -v "ksu\.c" | head -n 1)
+                  REAL_HOOK_FILE=$(find "$KSU_DIR" -type f -name "*.c" | xargs grep -l "ksu_input_hook_key_false" | grep -v "ksu\.c" | head -n 1 || true)
                   
                   if [ -n "$REAL_HOOK_FILE" ]; then
                       REL_PATH=${REAL_HOOK_FILE#$KSU_DIR/}
                       echo "✅ 找到了原厂核心拦截文件：$REL_PATH"
                       
-                      # 将这个失落的文件重新接回心脏，打通任督二脉！
                       if ! grep -q "$REL_PATH" "$KSU_MAIN"; then
                           echo "" >> "$KSU_MAIN"
                           echo "/* 物理溯源：强行接回 SukiSU 遗忘的原厂拦截开关大本营 */" >> "$KSU_MAIN"
@@ -203,174 +197,76 @@ jobs:
                           echo "⏭️ $KSU_MAIN 已经包含该文件，无需重复接入。"
                       fi
                   else
-                      echo "⚠️ 警告：雷达未能在 SukiSU 源码中找到任何包含静态键的 hook 文件！"
+                      echo "⚠️ 警告：雷达未能在 SukiSU 源码中找到任何包含静态键的 hook 文件！如果继续报错，说明上游已彻底摧毁拦截功能。"
                   fi
               fi
           fi
           
-          echo "==== 4. 屏蔽无用函数警告 ===="
+          echo "==== 4. 开启内核配置与防线 ===="
           grep -q "\-Wno-unused-function" fs/Makefile || echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
           grep -q "\-Wno-error" fs/Makefile || echo "ccflags-y += -Wno-error" >> fs/Makefile
-          
-          echo "==== 5. 开启 SukiSU 必须的 MANUAL_HOOK 与 USER_NS ===="
           grep -q "CONFIG_KSU_MANUAL_HOOK=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/milito_defconfig
           sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/g' arch/arm64/configs/milito_defconfig
-          grep -q "CONFIG_USER_NS=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_USER_NS=y" >> arch/arm64/configs/milito_defconfig
-
-          echo "==== 6. 强行拉起 SECCOMP 防线 (修复 mode 成员缺失报错) ===="
           sed -i 's/# CONFIG_SECCOMP is not set/CONFIG_SECCOMP=y/g' arch/arm64/configs/milito_defconfig
           sed -i 's/# CONFIG_SECCOMP_FILTER is not set/CONFIG_SECCOMP_FILTER=y/g' arch/arm64/configs/milito_defconfig
           grep -q "^CONFIG_SECCOMP=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP=y" >> arch/arm64/configs/milito_defconfig
           grep -q "^CONFIG_SECCOMP_FILTER=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP_FILTER=y" >> arch/arm64/configs/milito_defconfig
 
           touch .sukisu_bugs_fixed
-          echo "✅ SukiSU 专属 Bug 与内核防线配置已全部合闸！"
 
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
 
-      - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
+      - name: 🔎 战前雷达全盘扫描 (防盲人摸象)
         run: |
-          set -e
-          cd $GITHUB_WORKSPACE
-          echo "==== 正在收集打孔后的核心文件，准备验尸 ===="
-          mkdir -p patched_source_files/fs/devpts
-          mkdir -p patched_source_files/drivers/input
-          mkdir -p patched_source_files/security/selinux
-          mkdir -p patched_source_files/fs/proc
-          
-          [ -f device_kernel/fs/exec.c ] && cp device_kernel/fs/exec.c patched_source_files/fs/
-          [ -f device_kernel/fs/open.c ] && cp device_kernel/fs/open.c patched_source_files/fs/
-          [ -f device_kernel/fs/read_write.c ] && cp device_kernel/fs/read_write.c patched_source_files/fs/
-          [ -f device_kernel/fs/stat.c ] && cp device_kernel/fs/stat.c patched_source_files/fs/
-          [ -f device_kernel/fs/namespace.c ] && cp device_kernel/fs/namespace.c patched_source_files/fs/
-          [ -f device_kernel/fs/devpts/inode.c ] && cp device_kernel/fs/devpts/inode.c patched_source_files/fs/devpts/
-          [ -f device_kernel/drivers/input/input.c ] && cp device_kernel/drivers/input/input.c patched_source_files/drivers/input/
-          [ -f device_kernel/security/selinux/hooks.c ] && cp device_kernel/security/selinux/hooks.c patched_source_files/security/selinux/
-          [ -f device_kernel/fs/proc/cmdline.c ] && cp device_kernel/fs/proc/cmdline.c patched_source_files/fs/proc/
-          [ -f device_kernel/fs/susfs.c ] && cp device_kernel/fs/susfs.c patched_source_files/fs/
-          [ -f device_kernel/fs/dcache.c ] && cp device_kernel/fs/dcache.c patched_source_files/fs/
-          [ -f device_kernel/fs/readdir.c ] && cp device_kernel/fs/readdir.c patched_source_files/fs/
-          [ -f device_kernel/fs/namei.c ] && cp device_kernel/fs/namei.c patched_source_files/fs/
-          
-          cd patched_source_files
-          zip -r ../Patched_Source_Files.zip .
-      - name: 📦 上传打孔后源码验证包
+          cd $GITHUB_WORKSPACE/device_kernel
+          KSU_DIR=$(find . -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+          if [ -n "$KSU_DIR" ]; then
+              echo "==== SukiSU 目录文件全览 ===="
+              find "$KSU_DIR" -type f | sort > SukiSU_File_Tree.txt
+              cat SukiSU_File_Tree.txt
+              
+              echo "==== ksu.c 头文件包含详情 ===="
+              grep -n "#include" "$KSU_DIR/ksu.c" > ksu_includes.txt
+              cat ksu_includes.txt
+          else
+              echo "❌ 找不到 SukiSU 目录"
+          fi
+
+      - name: 📦 上传雷达扫描报告
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: Patched_Source_Files
-          path: Patched_Source_Files.zip
-
-      - name: 📤 提取官方 SukiSU 补丁脚本 (用于法医级审查)
-        run: |
-          set -e
-          cd $GITHUB_WORKSPACE
-          echo "==== 正在查抄官方补丁目录 ===="
-          mkdir -p Official_Patches
-          [ -d /tmp/Patches ] && cp -r /tmp/Patches/* Official_Patches/ || echo "无 /tmp/Patches 目录跳过"
-          [ -f device_kernel/backport_patches.sh ] && cp device_kernel/backport_patches.sh Official_Patches/
-          [ -f device_kernel/backport_selinux_patches.sh ] && cp device_kernel/backport_selinux_patches.sh Official_Patches/
-          cp device_kernel/*.patch Official_Patches/ 2>/dev/null || echo "无 .patch 文件跳过"
-          cd Official_Patches
-          zip -r ../Official_Patches.zip .
-      - name: 📦 上传官方补丁审查包
-        uses: actions/upload-artifact@v4
-        with:
-          name: Official_Patches
-          path: Official_Patches.zip
-
-      - name: 📤 提取 SuSFS 冲突原件 ( .rej 查抄)
-        run: |
-          set -e
-          cd $GITHUB_WORKSPACE
-          echo "==== 正在满世界抓捕 .rej 冲突文件 ===="
-          mkdir -p Rej_Files
-          find device_kernel -name "*.rej" -exec cp {} Rej_Files/ \;
-          cd Rej_Files
-          zip -r ../Rej_Files.zip . || echo "空包安全跳过"
-
-      - name: 📦 上传冲突审查包 (.rej)
-        uses: actions/upload-artifact@v4
-        with:
-          name: SuSFS_Rej_Files
-          path: Rej_Files.zip
-          if-no-files-found: ignore
-
-      - name: 🧰 Patch Kernel of Re:Kernel
-        uses: ./.github/workflows/patch-rekernel
-
-      - name: 🔒 Patch Kernel of Baseband Guard
-        uses: ./.github/workflows/patch-baseband-guard
-
-      - name: 🔧 Patch Hide Stuff
-        uses: ./.github/workflows/patch-hide-stuff
+          name: SukiSU_Radar_Scan
+          path: |
+            device_kernel/SukiSU_File_Tree.txt
+            device_kernel/ksu_includes.txt
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
-
-      - name: 🕵️‍♂️ 提取核心嫌疑源码 (fs/susfs.c 案发现场)
-        if: always()
-        run: |
-          echo "==== 正在提取法医级源码物证 ===="
-          # 在根目录创建一个专门放嫌疑代码的文件夹
-          mkdir -p $GITHUB_WORKSPACE/Suspect_Source
-          
-          # 1. 提取心脏源码
-          cp $GITHUB_WORKSPACE/device_kernel/fs/susfs.c $GITHUB_WORKSPACE/Suspect_Source/ || echo "❌ 找不到 fs/susfs.c 源码！"
-          
-          # 2. 提取相关的头文件 (防止伪装宏定义藏在这里面)
-          cp $GITHUB_WORKSPACE/device_kernel/include/linux/susfs.h $GITHUB_WORKSPACE/Suspect_Source/ || true
-          cp $GITHUB_WORKSPACE/device_kernel/include/linux/susfs_def.h $GITHUB_WORKSPACE/Suspect_Source/ || true
-          
-          # 打包压缩
-          cd $GITHUB_WORKSPACE/Suspect_Source
-          zip -r ../Suspect_Source.zip .
-          
-      - name: 📦 上传嫌疑源码包
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Suspect_Source_Files
-          # 🚨 路径绝对精准，直接从根目录抓取压缩包
-          path: Suspect_Source.zip
-
-      - name: 🕵️‍♂️ 提取 SukiSU 核心隐身源码 (终极全盘扫描版)
-        if: always()
-        run: |
-          echo "==== 正在全盘雷达扫描 SukiSU 隐身核心源码 ===="
-          mkdir -p $GITHUB_WORKSPACE/SukiSU_Suspects
-          
-          # 定位 SukiSU 大本营
-          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
-          
-          if [ -n "$KSU_DIR" ]; then
-              echo "✅ 成功锁定 SukiSU 大本营: $KSU_DIR"
-              
-              # 🚨 史诗级修正：用 find 命令无视层级，直接地毯式抓捕！
-              find "$KSU_DIR" -name "sucompat.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
-              find "$KSU_DIR" -name "sucompat.h" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
-              find "$KSU_DIR" -name "su_mount_ns.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
-              find "$KSU_DIR" -name "allowlist.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
-              find "$KSU_DIR" -name "syscall_handler.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
-              
-          else
-              echo "❌ 致命错误：未找到 SukiSU 源码目录！"
-          fi
-          
-          # 打包压缩 (加上 || true 防止空包时 Action 直接红灯)
-          cd $GITHUB_WORKSPACE/SukiSU_Suspects
-          zip -r ../SukiSU_Suspects.zip . || true
-          
-      - name: 📦 上传 SukiSU 嫌疑源码包
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: SukiSU_Suspect_Source
-          path: SukiSU_Suspects.zip
-          if-no-files-found: ignore
 
       - name: 🔩 Pack Process
         uses: ./.github/workflows/pack-process
 
       - name: ✏️ Upload Artifacts
         uses: ./.github/workflows/upload-files
+
+      - name: 🕵️‍♂️ 现场证据上传 (出错时强制执行)
+        if: always()
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/SukiSU_Suspects
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+          if [ -n "$KSU_DIR" ]; then
+              find "$KSU_DIR" -name "sucompat.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "sucompat.h" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "su_mount_ns.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "allowlist.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "syscall_handler.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              cd $GITHUB_WORKSPACE/SukiSU_Suspects && zip -r ../SukiSU_Evidence.zip . || true
+          fi
+      - name: 📦 上传物证包
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: SukiSU_Evidence
+          path: SukiSU_Evidence.zip
