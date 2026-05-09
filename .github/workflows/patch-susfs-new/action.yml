@@ -102,8 +102,8 @@ runs:
 
         echo "==== [手工缝合] 修复 LineageOS 专属的 .rej 冲突 ===="
         
-        # 🚨 提前清理主工作流中留下的 error=0 脏补丁，防止干扰
-        sed -i '/FIXED_UNDECLARED_VAR/d' fs/namei.c || true
+        # 🚨 提前清理主工作流中留下的 error=0 脏补丁，严谨判断文件存在，不使用 || true 掩盖错误
+        [ -f fs/namei.c ] && sed -i '/FIXED_UNDECLARED_VAR/d' fs/namei.c
         
         # 1. 针对 task_mmu.c 的头文件极客注入
         TASK_MMU_HOOK="
