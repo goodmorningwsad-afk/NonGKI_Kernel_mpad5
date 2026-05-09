@@ -181,26 +181,18 @@ jobs:
                   sed -i '1i #include <linux/string.h>' "$ADB_ROOT"
                   sed -i '2r /tmp/susfs_str_helpers.h' "$ADB_ROOT"
               fi
-
-              echo "==== 3. 修复 sucompat.c 上游漏写 #endif 的致命 Bug ===="
-              SUCOMPAT_FILE=$(find "$KSU_DIR" -type f -name "sucompat.c" | head -n 1)
-              if [ -n "$SUCOMPAT_FILE" ]; then
-                  echo "🩹 正在为 $SUCOMPAT_FILE 补充文件末尾缺失的 #endif..."
-                  echo "" >> "$SUCOMPAT_FILE"
-                  echo "#endif /* CONFIG_KSU_SUSFS 强制闭合 */" >> "$SUCOMPAT_FILE"
-              fi
           fi
           
-          echo "==== 4. 屏蔽无用函数警告 ===="
+          echo "==== 3. 屏蔽无用函数警告 ===="
           grep -q "\-Wno-unused-function" fs/Makefile || echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
           grep -q "\-Wno-error" fs/Makefile || echo "ccflags-y += -Wno-error" >> fs/Makefile
           
-          echo "==== 5. 开启 SukiSU 必须的 MANUAL_HOOK 与 USER_NS ===="
+          echo "==== 4. 开启 SukiSU 必须的 MANUAL_HOOK 与 USER_NS ===="
           grep -q "CONFIG_KSU_MANUAL_HOOK=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/milito_defconfig
           sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/g' arch/arm64/configs/milito_defconfig
           grep -q "CONFIG_USER_NS=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_USER_NS=y" >> arch/arm64/configs/milito_defconfig
 
-          echo "==== 6. 强行拉起 SECCOMP 防线 (修复 mode 成员缺失报错) ===="
+          echo "==== 5. 强行拉起 SECCOMP 防线 (修复 mode 成员缺失报错) ===="
           sed -i 's/# CONFIG_SECCOMP is not set/CONFIG_SECCOMP=y/g' arch/arm64/configs/milito_defconfig
           sed -i 's/# CONFIG_SECCOMP_FILTER is not set/CONFIG_SECCOMP_FILTER=y/g' arch/arm64/configs/milito_defconfig
           grep -q "^CONFIG_SECCOMP=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP=y" >> arch/arm64/configs/milito_defconfig
@@ -324,7 +316,7 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/SukiSU_Suspects
           
           # 定位 SukiSU 大本营
-          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
           
           if [ -n "$KSU_DIR" ]; then
               echo "✅ 成功锁定 SukiSU 大本营: $KSU_DIR"
