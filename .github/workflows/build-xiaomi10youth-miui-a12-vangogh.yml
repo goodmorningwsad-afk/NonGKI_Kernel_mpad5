@@ -302,6 +302,39 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
+      - name: 🕵️‍♂️ 悬案 1：提取编译现场物证 (绝不瞎猜)
+        if: always() # 保证编译报错中断后，取证代码依然强制执行
+        run: |
+          echo "==== 开始封锁现场，提取核心嫌疑文件 ===="
+          mkdir -p $GITHUB_WORKSPACE/crime_scene
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          # 嫌疑人 1：susfs.o 到底有没有被生出来？生出来的话长什么样？
+          find . -name "susfs.o" -exec cp {} $GITHUB_WORKSPACE/crime_scene/ \; || echo "根本没生成 susfs.o！" > $GITHUB_WORKSPACE/crime_scene/susfs_o_missing.txt
+          
+          # 嫌疑人 2：编译系统到底有没有吃进我们的配置？
+          cp .config $GITHUB_WORKSPACE/crime_scene/kernel_config.txt || true
+          cp include/generated/autoconf.h $GITHUB_WORKSPACE/crime_scene/autoconf_h.txt || true
+          
+          # 嫌疑人 3：fs/Makefile 到底有没有被正确写入 obj-y += susfs.o？
+          cp fs/Makefile $GITHUB_WORKSPACE/crime_scene/fs_Makefile.txt || true
+          
+          # 嫌疑人 4：被打过孔的 read_write.c 和 exec.c (看看那两个 bool 到底写进去没)
+          cp fs/read_write.c $GITHUB_WORKSPACE/crime_scene/ || true
+          cp fs/exec.c $GITHUB_WORKSPACE/crime_scene/ || true
+          
+          # 打包物证带离现场
+          cd $GITHUB_WORKSPACE/crime_scene
+          zip -r ../ultimate_crime_scene.zip .
+
+      - name: 📦 上传终极物证包
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ultimate_crime_scene
+          path: ultimate_crime_scene.zip
+
+
       - name: 🕵️‍♂️ 全局追捕 susfs_extra_works (法医级提取)
         if: always() # 保证即使编译报错中断，这个提取步骤也一定会执行
         run: |
