@@ -176,30 +176,9 @@ jobs:
                   sed -i '1i #include <linux/string.h>' "$ADB_ROOT"
                   sed -i '2r /tmp/susfs_str_helpers.h' "$ADB_ROOT"
               fi
-              
-              echo "==== 3. 原厂溯源！找回丢失的拦截大本营并亲自接回心脏！ ===="
-              KSU_MAIN="$KSU_DIR/ksu.c"
-              if [ -f "$KSU_MAIN" ]; then
-                  echo "🔍 启动雷达，全盘扫描真正的开关文件..."
-                  REAL_HOOK_FILE=$(grep -rlE "ksu_input_hook_key_false|ksu_vfs_read_hook" "$KSU_DIR" | grep "\.c$" | grep -v "ksu\.c" | head -n 1 || true)
-                  if [ -n "$REAL_HOOK_FILE" ]; then
-                      REL_PATH=${REAL_HOOK_FILE#$KSU_DIR/}
-                      echo "✅ 找到了原厂核心拦截文件：$REL_PATH"
-                      if ! grep -q "\"$REL_PATH\"" "$KSU_MAIN"; then
-                          echo "" >> "$KSU_MAIN"
-                          echo "/* 物理溯源：强行接回 SukiSU 遗忘的原厂拦截开关大本营 */" >> "$KSU_MAIN"
-                          echo "#include \"$REL_PATH\"" >> "$KSU_MAIN"
-                          echo "✅ 已将 ($REL_PATH) 重新接回 SukiSU 心脏，满血复活！"
-                      else
-                          echo "⏭️ $KSU_MAIN 已经包含该文件，无需重复接入。"
-                      fi
-                  else
-                      echo "⚠️ 警告：雷达未能在 SukiSU 源码中找到任何包含静态键的 hook 文件！"
-                  fi
-              fi
           fi
           
-          echo "==== 4. 开启内核配置与防线 ===="
+          echo "==== 3. 开启内核配置与防线 ===="
           grep -q "\-Wno-unused-function" fs/Makefile || echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
           grep -q "\-Wno-error" fs/Makefile || echo "ccflags-y += -Wno-error" >> fs/Makefile
           grep -q "CONFIG_KSU_MANUAL_HOOK=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/milito_defconfig
@@ -213,6 +192,36 @@ jobs:
 
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
+
+      - name: 🔎 终极硬核雷达：全局搜索与全盘提取源码 (满足你看原文件的需求)
+        if: always()
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          mkdir -p $GITHUB_WORKSPACE/Ultimate_Evidence
+          echo "==== 1. 全局地毯式搜索 susfs_extra_works ===="
+          grep -rnw . -e "susfs_extra_works" > $GITHUB_WORKSPACE/Ultimate_Evidence/search_susfs_extra_works.txt || echo "没找到" > $GITHUB_WORKSPACE/Ultimate_Evidence/search_susfs_extra_works.txt
+          echo "==== 2. 全局地毯式搜索静态键和 hook 变量 ===="
+          grep -rn "ksu_vfs_read_hook" . > $GITHUB_WORKSPACE/Ultimate_Evidence/search_vfs_read_hook.txt || true
+          grep -rn "ksu_input_hook_key" . > $GITHUB_WORKSPACE/Ultimate_Evidence/search_ksu_input_hook.txt || true
+          grep -rn "ksu_execveat_hook" . > $GITHUB_WORKSPACE/Ultimate_Evidence/search_execveat_hook.txt || true
+          echo "==== 3. 全局扫描所有 hook 相关文件 ===="
+          find . -name "*hook*.c" > $GITHUB_WORKSPACE/Ultimate_Evidence/all_hook_files.txt || true
+          echo "==== 4. 提取编译器眼中的真实 SukiSU 大本营源码 ===="
+          if [ -d "drivers/kernelsu" ]; then
+              cp -r drivers/kernelsu $GITHUB_WORKSPACE/Ultimate_Evidence/
+          fi
+          echo "==== 5. 提取 fs/ 目录下核心文件 ===="
+          mkdir -p $GITHUB_WORKSPACE/Ultimate_Evidence/fs_patched
+          cp fs/read_write.c fs/exec.c fs/open.c fs/stat.c fs/namespace.c fs/susfs.c fs/Makefile fs/Kconfig $GITHUB_WORKSPACE/Ultimate_Evidence/fs_patched/ 2>/dev/null || true
+          cd $GITHUB_WORKSPACE/Ultimate_Evidence
+          zip -r ../Ultimate_Evidence.zip .
+
+      - name: 📦 上传终极硬核物证包
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Ultimate_Evidence
+          path: Ultimate_Evidence.zip
 
       - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
         run: |
@@ -338,3 +347,4 @@ jobs:
 
       - name: ✏️ Upload Artifacts
         uses: ./.github/workflows/upload-files
+
