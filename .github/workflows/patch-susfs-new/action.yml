@@ -55,7 +55,7 @@ runs:
 
         echo "✅ SuSFS 物理开关与 APEX 满血挂载防线全数合闸！"
         
-        echo "==== 1. 物理缝合最新版 SuSFS 隐身大动脉 ===="
+        echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
         set +e
         PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" 2>/dev/null | head -n 1)
         set -e
@@ -71,7 +71,8 @@ runs:
             fi
         fi
 
-        # 因为新补丁本身非常健康，只保留正常的依赖编译
+        # 🚨 解决 susfs_extra_works 报错的强行打包指令
+        sed -i 's/obj-$(CONFIG_KSU_SUSFS) += susfs.o/obj-y += susfs.o/g' fs/Makefile
         grep -q "susfs.o" fs/Makefile || echo 'obj-y += susfs.o' >> fs/Makefile
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
@@ -156,11 +157,22 @@ runs:
         #endif"
         patch_file "fs/namei.c" "static int may_o_create(const struct path *dir, struct dentry *dentry, umode_t mode)" 2 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
 
-        echo "==== [新版 SukiSU 专属打孔] 升级静态键 (Static Key) 拦截 ===="
+        echo "==== [回归原生纯净打孔] 捍卫模块拦截 ===="
 
-        # 🚨 为新版静态键添加必要的内核底层库依赖
+        # 🚨 解决 static_key 报错：亲自下场为内核焊造静态键
         grep -q "<linux/jump_label.h>" drivers/input/input.c || sed -i '1i #include <linux/jump_label.h>' drivers/input/input.c || true
+        grep -q "ksu_input_hook_key_false" drivers/input/input.c || {
+            echo "" >> drivers/input/input.c
+            echo "DEFINE_STATIC_KEY_FALSE(ksu_input_hook_key_false);" >> drivers/input/input.c
+            echo "EXPORT_SYMBOL(ksu_input_hook_key_false);" >> drivers/input/input.c
+        }
+
         grep -q "<linux/jump_label.h>" fs/read_write.c || sed -i '1i #include <linux/jump_label.h>' fs/read_write.c || true
+        grep -q "ksu_init_rc_hook_key_false" fs/read_write.c || {
+            echo "" >> fs/read_write.c
+            echo "DEFINE_STATIC_KEY_FALSE(ksu_init_rc_hook_key_false);" >> fs/read_write.c
+            echo "EXPORT_SYMBOL(ksu_init_rc_hook_key_false);" >> fs/read_write.c
+        }
         
         EXEC_HOOK="
         #ifdef CONFIG_KSU
@@ -194,16 +206,8 @@ runs:
         #endif"
         patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
 
-        DEVPTS_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern void ksu_handle_devpts(struct inode*);
-            ksu_handle_devpts(dentry->d_inode);
-        }
-        #endif"
-        patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
+        # (这里是原有的 DEVPTS_HOOK，导致你报错 ksu_handle_devpts，已被我拔除！)
 
-        # 🚨 真正基于物证升级的 input 拦截静态键
         INPUT_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -226,7 +230,6 @@ runs:
         #endif"
         patch_file "fs/read_write.c" "if (!(file->f_mode & FMODE_READ))" 0 "$VFS_READ_HOOK" "ksu_vfs_read_hook"
 
-        # 🚨 真正基于物证升级的 init_rc 拦截静态键
         READ_HOOK="
         #ifdef CONFIG_KSU
         {
