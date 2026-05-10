@@ -302,6 +302,39 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
+      - name: 🕵️‍♂️ 全局追捕 susfs_extra_works (法医级提取)
+        if: always() # 保证即使编译报错中断，这个提取步骤也一定会执行
+        run: |
+          echo "==== 开始全盘雷达搜索 susfs_extra_works ===="
+          mkdir -p $GITHUB_WORKSPACE/susfs_evidence
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          # 1. 记录所有出现 susfs_extra_works 的文件和具体行号（生成案卷清单）
+          grep -rnw . -e "susfs_extra_works" > $GITHUB_WORKSPACE/susfs_evidence/search_results.txt || echo "整个内核里压根没找到 susfs_extra_works！" > $GITHUB_WORKSPACE/susfs_evidence/search_results.txt
+          
+          # 2. 顺藤摸瓜：把所有提到了这个名字的 .c 或 .h 源文件，全部连锅端复制出来
+          grep -rlw . -e "susfs_extra_works" | while read -r file; do
+              # 保持原有的目录结构复制，防止不同文件夹下的同名文件互相覆盖
+              mkdir -p "$GITHUB_WORKSPACE/susfs_evidence/$(dirname "$file")"
+              cp "$file" "$GITHUB_WORKSPACE/susfs_evidence/$file"
+          done
+          
+          # 3. 顺便把 SuSFS 的心脏文件也提取出来对照，看看到底是不是它没定义
+          cp fs/susfs.c $GITHUB_WORKSPACE/susfs_evidence/ 2>/dev/null || echo "fs/susfs.c 竟然不存在？" >> $GITHUB_WORKSPACE/susfs_evidence/search_results.txt
+          find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" -exec cp {} $GITHUB_WORKSPACE/susfs_evidence/ \; || true
+          
+          echo "==== 提取完成，正在打包物证 ===="
+          cd $GITHUB_WORKSPACE/susfs_evidence
+          zip -r ../susfs_extra_works_evidence.zip .
+
+      - name: 📦 上传 susfs_extra_works 物证包
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: susfs_extra_works_evidence
+          path: susfs_extra_works_evidence.zip
+
+
       - name: 🕵️‍♂️ 提取核心嫌疑源码 (fs/susfs.c 案发现场)
         if: always()
         run: |
