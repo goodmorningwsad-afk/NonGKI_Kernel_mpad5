@@ -177,19 +177,25 @@ jobs:
                   sed -i '2r /tmp/susfs_str_helpers.h' "$ADB_ROOT"
               fi
               
-              echo "==== 3. 补全 SukiSU 缺失的全局拦截开关 ===="
-              KSU_MAIN=$(find "$KSU_DIR" -type f -name "ksu.c" | head -n 1)
-              if [ -n "$KSU_MAIN" ]; then
-                  echo "🩹 正在为 $KSU_MAIN 焊死拦截开关..."
-                  echo "" >> "$KSU_MAIN"
-                  echo "#include <linux/jump_label.h>" >> "$KSU_MAIN"
-                  echo "bool ksu_vfs_read_hook __read_mostly = true;" >> "$KSU_MAIN"
-                  echo "bool ksu_execveat_hook __read_mostly = true;" >> "$KSU_MAIN"
-                  echo "bool ksu_input_hook __read_mostly = true;" >> "$KSU_MAIN"
-                  echo "bool ksu_init_rc_hook __read_mostly = true;" >> "$KSU_MAIN"
-                  echo "DEFINE_STATIC_KEY_FALSE(ksu_input_hook_key_false);" >> "$KSU_MAIN"
-                  echo "DEFINE_STATIC_KEY_FALSE(ksu_init_rc_hook_key_false);" >> "$KSU_MAIN"
-                  echo "void ksu_handle_devpts(struct inode *inode) {}" >> "$KSU_MAIN"
+              echo "==== 3. 原厂溯源！找回丢失的拦截大本营并亲自接回心脏！ ===="
+              KSU_MAIN="$KSU_DIR/ksu.c"
+              if [ -f "$KSU_MAIN" ]; then
+                  echo "🔍 启动雷达，全盘扫描真正的开关文件..."
+                  REAL_HOOK_FILE=$(grep -rlE "ksu_input_hook_key_false|ksu_vfs_read_hook" "$KSU_DIR" | grep "\.c$" | grep -v "ksu\.c" | head -n 1 || true)
+                  if [ -n "$REAL_HOOK_FILE" ]; then
+                      REL_PATH=${REAL_HOOK_FILE#$KSU_DIR/}
+                      echo "✅ 找到了原厂核心拦截文件：$REL_PATH"
+                      if ! grep -q "\"$REL_PATH\"" "$KSU_MAIN"; then
+                          echo "" >> "$KSU_MAIN"
+                          echo "/* 物理溯源：强行接回 SukiSU 遗忘的原厂拦截开关大本营 */" >> "$KSU_MAIN"
+                          echo "#include \"$REL_PATH\"" >> "$KSU_MAIN"
+                          echo "✅ 已将 ($REL_PATH) 重新接回 SukiSU 心脏，满血复活！"
+                      else
+                          echo "⏭️ $KSU_MAIN 已经包含该文件，无需重复接入。"
+                      fi
+                  else
+                      echo "⚠️ 警告：雷达未能在 SukiSU 源码中找到任何包含静态键的 hook 文件！"
+                  fi
               fi
           fi
           
@@ -309,7 +315,7 @@ jobs:
         run: |
           echo "==== 正在全盘雷达扫描 SukiSU 隐身核心源码 ===="
           mkdir -p $GITHUB_WORKSPACE/SukiSU_Suspects
-          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
           if [ -n "$KSU_DIR" ]; then
               find "$KSU_DIR" -name "sucompat.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
               find "$KSU_DIR" -name "sucompat.h" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
