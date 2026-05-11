@@ -190,6 +190,16 @@ jobs:
 
           touch .sukisu_bugs_fixed
 
+      - name: 📥 强制截胡：下载你指定的最新版 SuSFS 2.1.0 补丁
+        run: |
+          echo "==== 1. 正在销毁云端自带的所有旧版毒瘤补丁 ===="
+          find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" -type f -exec rm -f {} \;
+          
+          echo "==== 2. 正在强拉你指定的满血版补丁 ===="
+          wget "https://raw.githubusercontent.com/JackA1ltman/NonGKI_Kernel_Build_2nd/9ed26b0d3f438c17a5fedf4fa488902cfdd5a4f6/Patches/Patch/susfs_patch_to_4.19.patch" -O $GITHUB_WORKSPACE/susfs_patch_to_4.19.patch
+          
+          echo "✅ 新补丁下载完成！"
+
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
 
