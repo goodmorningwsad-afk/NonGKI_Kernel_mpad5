@@ -302,6 +302,34 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
+      - name: 🕵️‍♂️ 提取 SukiSU 配置文件与源码物证
+        if: always() # 保证编译失败也会执行
+        run: |
+          echo "==== 开始提取 SukiSU 编译配置物证 ===="
+          mkdir -p $GITHUB_WORKSPACE/ksu_evidence
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          # 1. 提取内核最终生成的完整配置文件 (看看我们加的开关到底在不在)
+          cp .config $GITHUB_WORKSPACE/ksu_evidence/kernel_config.txt || echo ".config 不存在" > $GITHUB_WORKSPACE/ksu_evidence/kernel_config.txt
+          
+          # 2. 提取 SukiSU 的编译图纸 (看看它编译时到底需要哪些 CONFIG)
+          cp KernelSU/kernel/Makefile $GITHUB_WORKSPACE/ksu_evidence/ksu_Makefile.txt || true
+          
+          # 3. 提取包含那两个 bool 变量的案发现场源码 (看看变量周围到底包了什么 #ifdef)
+          cp KernelSU/kernel/runtime/ksud.c $GITHUB_WORKSPACE/ksu_evidence/ || true
+          
+          # 打包物证
+          cd $GITHUB_WORKSPACE/ksu_evidence
+          zip -r ../ksu_evidence.zip .
+
+      - name: 📦 上传 SukiSU 物证包
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ksu_evidence
+          path: ksu_evidence.zip
+
+
       - name: 🕵️‍♂️ 悬案 1：提取编译现场物证 (绝不瞎猜)
         if: always() # 保证编译报错中断后，取证代码依然强制执行
         run: |
