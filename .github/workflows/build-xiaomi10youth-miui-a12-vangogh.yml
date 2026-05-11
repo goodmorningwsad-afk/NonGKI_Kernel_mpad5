@@ -167,15 +167,6 @@ jobs:
                   sed -i 's/\bstrncpy_from_user_nofault(/__strncpy_from_user_nofault(/g' "$EVENT_FILE"
                   sed -i 's/USER_ARG_NULL, gfp/NULL, gfp/g' "$EVENT_FILE"
               fi
-
-              echo "==== 2. 修复 adb_root.c 辅助函数注入 ===="
-              ADB_ROOT=$(find "$KSU_DIR" -type f -name "adb_root.c" | head -n 1)
-              if [ -n "$ADB_ROOT" ]; then
-                  echo 'static inline bool susfs_starts_with(const char *str, const char *prefix) { return strncmp(str, prefix, strlen(prefix)) == 0; }' > /tmp/susfs_str_helpers.h
-                  echo 'static inline bool susfs_ends_with(const char *str, const char *suffix) { int len = strlen(str); int slen = strlen(suffix); return (len >= slen) && (strcmp(str + len - slen, suffix) == 0); }' >> /tmp/susfs_str_helpers.h
-                  sed -i '1i #include <linux/string.h>' "$ADB_ROOT"
-                  sed -i '2r /tmp/susfs_str_helpers.h' "$ADB_ROOT"
-              fi
           fi
           
           echo "==== 3. 开启内核配置与防线 ===="
