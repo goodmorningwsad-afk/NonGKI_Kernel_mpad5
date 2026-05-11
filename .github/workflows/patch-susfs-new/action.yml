@@ -112,7 +112,11 @@ runs:
         }
 
         echo "==== [手工缝合] 修复 LineageOS 专属的 .rej 冲突 ===="
-        sed -i '/FIXED_UNDECLARED_VAR/d' fs/namei.c || true
+        sed -i '/FIXED_UNDECLARED_VAR/d' fs/namei.c
+        
+        # 👇 加入这一行，抢救 fs/open.c 的头文件缺失
+        grep -q "linux/susfs_def.h" fs/open.c || sed -i '1i #include <linux/susfs_def.h>' fs/open.c
+
         
         TASK_MMU_HOOK="
         /* FIX_TASK_MMU_REJ */
