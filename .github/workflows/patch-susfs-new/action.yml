@@ -71,9 +71,12 @@ runs:
             fi
         fi
 
-        # 🚨 解决 susfs_extra_works 报错的强行打包指令
+        # 🚨 保留 susfs_extra_works 的核心宏注入，防止其失效
         sed -i 's/obj-$(CONFIG_KSU_SUSFS) += susfs.o/obj-y += susfs.o/g' fs/Makefile
         grep -q "susfs.o" fs/Makefile || echo 'obj-y += susfs.o' >> fs/Makefile
+        grep -q "DCONFIG_KSU_SUSFS" fs/Makefile || {
+            echo 'ccflags-y += -DCONFIG_KSU_SUSFS=1 -DCONFIG_KSU_SUSFS_SUS_PATH=1 -DCONFIG_KSU_SUSFS_SUS_MOUNT=1 -DCONFIG_KSU_SUSFS_SUS_KSTAT=1' >> fs/Makefile
+        }
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
@@ -157,9 +160,9 @@ runs:
         #endif"
         patch_file "fs/namei.c" "static int may_o_create(const struct path *dir, struct dentry *dentry, umode_t mode)" 2 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
 
-        echo "==== [回归原生纯净打孔] 捍卫模块拦截 ===="
-
-        # 🚨 解决 static_key 报错：亲自下场为内核焊造静态键
+        echo "==== [新版 SukiSU 专属打孔] 静态键制造厂 ===="
+        
+        # 仅保留 SukiSU 明确索要的 input 和 init_rc 静态键，其他的一律不塞！
         grep -q "<linux/jump_label.h>" drivers/input/input.c || sed -i '1i #include <linux/jump_label.h>' drivers/input/input.c || true
         grep -q "ksu_input_hook_key_false" drivers/input/input.c || {
             echo "" >> drivers/input/input.c
@@ -173,20 +176,6 @@ runs:
             echo "DEFINE_STATIC_KEY_FALSE(ksu_init_rc_hook_key_false);" >> fs/read_write.c
             echo "EXPORT_SYMBOL(ksu_init_rc_hook_key_false);" >> fs/read_write.c
         }
-        
-        EXEC_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern bool ksu_execveat_hook __read_mostly;
-            extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-            extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-            if (unlikely(ksu_execveat_hook))
-                ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
-            else
-                ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
-        }
-        #endif"
-        patch_file "fs/exec.c" "return __do_execve_file(fd, filename, argv, envp, flags, NULL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
         
         OPEN_HOOK="
         #ifdef CONFIG_KSU
@@ -206,8 +195,6 @@ runs:
         #endif"
         patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
 
-        # (这里是原有的 DEVPTS_HOOK，导致你报错 ksu_handle_devpts，已被我拔除！)
-
         INPUT_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -218,17 +205,6 @@ runs:
         }
         #endif"
         patch_file "drivers/input/input.c" "if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)" 0 "$INPUT_HOOK" "ksu_handle_input_handle_event"
-
-        VFS_READ_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern bool ksu_vfs_read_hook __read_mostly;
-            extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos_ptr);
-            if (unlikely(ksu_vfs_read_hook))
-                ksu_handle_vfs_read(&file, &buf, &count, &pos);
-        }
-        #endif"
-        patch_file "fs/read_write.c" "if (!(file->f_mode & FMODE_READ))" 0 "$VFS_READ_HOOK" "ksu_vfs_read_hook"
 
         READ_HOOK="
         #ifdef CONFIG_KSU
