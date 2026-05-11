@@ -9,11 +9,8 @@ runs:
       run: |
         cd $GITHUB_WORKSPACE/device_kernel
         
-        # 🛡️ 终极全局防重复锁
-        if [ -f ".phantom_hooks_applied" ]; then
-            echo "⏭️ 检测到幻影打孔外挂已成功运行过，触发全局防重复机制，安全跳过！"
-            exit 0
-        fi
+        # 💥 必须首先删除防重复锁！打破假象，确保急救代码 100% 真实注入！
+        rm -f .phantom_hooks_applied
         
         echo "==== 0. 唤醒 SuSFS 与文件系统大动脉开关 ===="
         DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
@@ -71,12 +68,21 @@ runs:
             fi
         fi
 
-        # 🚨 保留 susfs_extra_works 的核心宏注入，防止其失效
+        # 🚨 终极抢救 1：粉碎 Kconfig 拦截，强制使用 obj-y 编译 susfs.o
         sed -i 's/obj-$(CONFIG_KSU_SUSFS) += susfs.o/obj-y += susfs.o/g' fs/Makefile
-        grep -q "susfs.o" fs/Makefile || echo 'obj-y += susfs.o' >> fs/Makefile
+        grep -q "obj-y += susfs.o" fs/Makefile || echo 'obj-y += susfs.o' >> fs/Makefile
         grep -q "DCONFIG_KSU_SUSFS" fs/Makefile || {
             echo 'ccflags-y += -DCONFIG_KSU_SUSFS=1 -DCONFIG_KSU_SUSFS_SUS_PATH=1 -DCONFIG_KSU_SUSFS_SUS_MOUNT=1 -DCONFIG_KSU_SUSFS_SUS_KSTAT=1' >> fs/Makefile
         }
+        
+        # 🚨 终极抢救 2：解决 susfs_extra_works 未定义报错
+        # 亲自下场盖上 EXPORT_SYMBOL 公章，确保内核全境可见，不被优化掉
+        if [ -f "fs/susfs.c" ]; then
+            grep -q "EXPORT_SYMBOL(susfs_extra_works);" fs/susfs.c || {
+                echo "#include <linux/export.h>" >> fs/susfs.c
+                echo "EXPORT_SYMBOL(susfs_extra_works);" >> fs/susfs.c
+            }
+        fi
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
@@ -160,22 +166,54 @@ runs:
         #endif"
         patch_file "fs/namei.c" "static int may_o_create(const struct path *dir, struct dentry *dentry, umode_t mode)" 2 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
 
-        echo "==== [新版 SukiSU 专属打孔] 静态键制造厂 ===="
+        echo "==== [回归原生纯净打孔] 捍卫模块拦截 ===="
         
-        # 仅保留 SukiSU 明确索要的 input 和 init_rc 静态键，其他的一律不塞！
+        # 🚨 终极抢救 3：把 SukiSU 漏造的变量，直接在系统源码里造出来填坑！
         grep -q "<linux/jump_label.h>" drivers/input/input.c || sed -i '1i #include <linux/jump_label.h>' drivers/input/input.c || true
+        grep -q "<linux/jump_label.h>" fs/read_write.c || sed -i '1i #include <linux/jump_label.h>' fs/read_write.c || true
+        
+        # 补充遗失的静态键
         grep -q "ksu_input_hook_key_false" drivers/input/input.c || {
-            echo "" >> drivers/input/input.c
             echo "DEFINE_STATIC_KEY_FALSE(ksu_input_hook_key_false);" >> drivers/input/input.c
             echo "EXPORT_SYMBOL(ksu_input_hook_key_false);" >> drivers/input/input.c
         }
-
-        grep -q "<linux/jump_label.h>" fs/read_write.c || sed -i '1i #include <linux/jump_label.h>' fs/read_write.c || true
         grep -q "ksu_init_rc_hook_key_false" fs/read_write.c || {
-            echo "" >> fs/read_write.c
             echo "DEFINE_STATIC_KEY_FALSE(ksu_init_rc_hook_key_false);" >> fs/read_write.c
             echo "EXPORT_SYMBOL(ksu_init_rc_hook_key_false);" >> fs/read_write.c
         }
+        
+        # 补充遗失的 bool 变量
+        grep -q "ksu_vfs_read_hook_defined" fs/read_write.c || {
+            echo "/* ksu_vfs_read_hook_defined */" >> fs/read_write.c
+            echo "bool ksu_vfs_read_hook __read_mostly = true;" >> fs/read_write.c
+            echo "EXPORT_SYMBOL(ksu_vfs_read_hook);" >> fs/read_write.c
+        }
+        grep -q "ksu_execveat_hook_defined" fs/exec.c || {
+            echo "/* ksu_execveat_hook_defined */" >> fs/exec.c
+            echo "bool ksu_execveat_hook __read_mostly = true;" >> fs/exec.c
+            echo "EXPORT_SYMBOL(ksu_execveat_hook);" >> fs/exec.c
+        }
+
+        # 补充废弃但仍在旧版钩子中索要的 devpts 伪装
+        grep -q "ksu_handle_devpts" fs/devpts/inode.c || {
+            echo "void __attribute__((weak)) ksu_handle_devpts(struct inode* inode) {}" >> fs/devpts/inode.c
+            echo "EXPORT_SYMBOL(ksu_handle_devpts);" >> fs/devpts/inode.c
+        }
+
+        # 👇 下面是你之前确认过的所有核心防线，一字不差地原样还原 👇
+        EXEC_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern bool ksu_execveat_hook __read_mostly;
+            extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
+            extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
+            if (unlikely(ksu_execveat_hook))
+                ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
+            else
+                ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
+        }
+        #endif"
+        patch_file "fs/exec.c" "return __do_execve_file(fd, filename, argv, envp, flags, NULL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
         
         OPEN_HOOK="
         #ifdef CONFIG_KSU
@@ -195,6 +233,15 @@ runs:
         #endif"
         patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
 
+        DEVPTS_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern void ksu_handle_devpts(struct inode*);
+            ksu_handle_devpts(dentry->d_inode);
+        }
+        #endif"
+        patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
+
         INPUT_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -205,6 +252,17 @@ runs:
         }
         #endif"
         patch_file "drivers/input/input.c" "if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)" 0 "$INPUT_HOOK" "ksu_handle_input_handle_event"
+
+        VFS_READ_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern bool ksu_vfs_read_hook __read_mostly;
+            extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos_ptr);
+            if (unlikely(ksu_vfs_read_hook))
+                ksu_handle_vfs_read(&file, &buf, &count, &pos);
+        }
+        #endif"
+        patch_file "fs/read_write.c" "if (!(file->f_mode & FMODE_READ))" 0 "$VFS_READ_HOOK" "ksu_vfs_read_hook"
 
         READ_HOOK="
         #ifdef CONFIG_KSU
@@ -390,6 +448,6 @@ runs:
         
         sed -i 's/-dirty//g' scripts/setlocalversion
         
-        # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
+        # 🛡️ 重新打上防重复锁
         touch .phantom_hooks_applied
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
