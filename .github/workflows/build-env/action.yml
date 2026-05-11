@@ -59,6 +59,23 @@ runs:
               false
           fi
 
+      - name: Free Disk Space (Ubuntu)
+        if: env.FREE_MORE_SPACE == 'true' && env.SYSTEM_VERSION == 'newer' || env.SYSTEM_VERSION == 'older'
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: true
+
+          # all of these default to true, but feel free to set to
+          # "false" if necessary for your workflow
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
       - name: Remove useless tools
         if: env.SYSTEM_VERSION == 'newer' || env.SYSTEM_VERSION == 'older'
         shell: bash
@@ -477,6 +494,12 @@ runs:
                 ${{ env.CURLX }} "${{ env.CLANG_SOURCE }}" antman
                 chmod +x antman
                 bash antman -S
+            elif [[ "${{ env.CLANG_SOURCE }}" == *"android.googlesource.com"* ]]; then
+                git clone "${{ env.CLANG_SOURCE }}" -b "${{ env.CLANG_BRANCH }}" clang-custom --depth=1
+                SUBDIR=$(find clang-custom -maxdepth 1 -type d -name 'clang-r*' | head -n 1)
+                if [ -n "$SUBDIR" ]; then
+                 mv "$SUBDIR"/* clang-custom/
+                fi    
             else
                 echo ">>>>>>>>>>Clang Status<<<<<<<<<<"
                 echo ">                              <"
