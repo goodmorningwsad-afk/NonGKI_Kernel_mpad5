@@ -9,7 +9,6 @@ runs:
       run: |
         cd $GITHUB_WORKSPACE/device_kernel
         
-        # 💥 必须首先删除防重复锁！打破假象，确保急救代码 100% 真实注入！
         rm -f .phantom_hooks_applied
         
         echo "==== 0. 唤醒 SuSFS 与文件系统大动脉开关 ===="
@@ -29,7 +28,6 @@ runs:
         echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$DEFCONFIG_FILE"
         
         echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
-        
         echo "CONFIG_SQUASHFS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_FILE_DIRECT=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_DECOMP_MULTI_PERCPU=y" >> "$DEFCONFIG_FILE"
@@ -37,12 +35,10 @@ runs:
         echo "CONFIG_SQUASHFS_LZ4=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_LZO=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_XZ=y" >> "$DEFCONFIG_FILE"
-        
         echo "CONFIG_EROFS_FS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_EROFS_FS_ZIP=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_EROFS_FS_ZIP_LZ4=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_LZ4_DECOMPRESS=y" >> "$DEFCONFIG_FILE"
-
         echo "CONFIG_TMPFS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_TMPFS_XATTR=y" >> "$DEFCONFIG_FILE"
@@ -50,8 +46,6 @@ runs:
         grep -q "erofs" fs/Kconfig || sed -i '/source "fs\/ext4\/Kconfig"/a source "fs/erofs/Kconfig"' fs/Kconfig
         grep -q "erofs" fs/Makefile || echo 'obj-$(CONFIG_EROFS_FS) += erofs/' >> fs/Makefile
 
-        echo "✅ SuSFS 物理开关与 APEX 满血挂载防线全数合闸！"
-        
         echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
         set +e
         PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" 2>/dev/null | head -n 1)
@@ -62,26 +56,71 @@ runs:
             exit 1 
         else
             if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
-                echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
+                echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，跳过 patch 阶段！"
             else
                 patch -p1 -N -f < "$PATCH_FILE" || echo "⚠️ 补丁产生 .rej 拒绝文件，保留全尸继续！"
             fi
         fi
 
-        # 🚨 终极抢救 1：粉碎 Kconfig 拦截，强制使用 obj-y 编译 susfs.o
         sed -i 's/obj-$(CONFIG_KSU_SUSFS) += susfs.o/obj-y += susfs.o/g' fs/Makefile
         grep -q "obj-y += susfs.o" fs/Makefile || echo 'obj-y += susfs.o' >> fs/Makefile
         grep -q "DCONFIG_KSU_SUSFS" fs/Makefile || {
             echo 'ccflags-y += -DCONFIG_KSU_SUSFS=1 -DCONFIG_KSU_SUSFS_SUS_PATH=1 -DCONFIG_KSU_SUSFS_SUS_MOUNT=1 -DCONFIG_KSU_SUSFS_SUS_KSTAT=1' >> fs/Makefile
         }
         
-        # 🚨 终极抢救 2：解决 susfs_extra_works 未定义报错
-        # 亲自下场盖上 EXPORT_SYMBOL 公章，确保内核全境可见，不被优化掉
         if [ -f "fs/susfs.c" ]; then
             grep -q "EXPORT_SYMBOL(susfs_extra_works);" fs/susfs.c || {
                 echo "#include <linux/export.h>" >> fs/susfs.c
                 echo "EXPORT_SYMBOL(susfs_extra_works);" >> fs/susfs.c
             }
+        fi
+
+        echo "==== [兼容修复] 清除 SukiSU 源码中重复的辅助函数 ===="
+        KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+        if [ -n "$KSU_DIR" ]; then
+            ADB_ROOT=$(find "$KSU_DIR" -type f -name "adb_root.c" | head -n 1)
+            if [ -n "$ADB_ROOT" ]; then
+                sed -i 's/static inline bool susfs_starts_with/\/\/ static inline bool susfs_starts_with/g' "$ADB_ROOT"
+                sed -i 's/static inline bool susfs_ends_with/\/\/ static inline bool susfs_ends_with/g' "$ADB_ROOT"
+            fi
+        fi
+
+        echo "==== [手工缝合] 修复 v2.1.0 补丁冲突 Hunk ===="
+        grep -q "linux/susfs_def.h" fs/proc/task_mmu.c || sed -i '1i #include <linux/susfs_def.h>' fs/proc/task_mmu.c
+        grep -q "linux/susfs_def.h" fs/proc_namespace.c || sed -i '1i #include <linux/susfs_def.h>' fs/proc_namespace.c
+        grep -q "linux/susfs_def.h" fs/open.c || sed -i '1i #include <linux/susfs_def.h>' fs/open.c
+        grep -q "susfs_hide_sus_mnts_for_non_su_procs" fs/proc_namespace.c || sed -i '2i extern bool susfs_hide_sus_mnts_for_non_su_procs;\nextern bool susfs_is_current_ksu_domain(void);' fs/proc_namespace.c
+
+        if ! grep -q "susfs_get_non_sus_mnt_id_from_mnt" fs/namespace.c; then
+            cat << 'EOF' >> fs/namespace.c
+
+        #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+        int susfs_get_non_sus_mnt_id_from_mnt(struct mount *orig_mnt) {
+            struct mount *mnt = orig_mnt;
+            int mnt_id;
+            lock_mount_hash();
+            for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
+            mnt_id = mnt->mnt_id;
+            unlock_mount_hash();
+            return mnt_id;
+        }
+
+        struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt) {
+            struct mount *mnt = real_mount(vfsmnt);
+            lock_mount_hash();
+            for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
+            mntget(&mnt->mnt);
+            if (!mnt->mnt.mnt_root || IS_ERR(mnt->mnt.mnt_root)) {
+                mntput(&mnt->mnt);
+                unlock_mount_hash();
+                return vfsmnt;
+            }
+            dget(mnt->mnt.mnt_root);
+            unlock_mount_hash();
+            return &mnt->mnt;
+        }
+        #endif
+        EOF
         fi
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
@@ -92,91 +131,21 @@ runs:
             local insert_code="$4"
             local identifier="$5"
             
-            if grep -q "$identifier" "$file"; then
-                echo "⚠️ $file 已包含 $identifier，防重复跳过。"
-                return 0
-            fi
-            if ! grep -Fq "$search_str" "$file"; then
-                echo "❌ 致命错误: $file 中找不到特征字符串 '$search_str'！"
-                exit 1 
-            fi
+            if grep -q "$identifier" "$file"; then return 0; fi
+            if ! grep -Fq "$search_str" "$file"; then exit 1; fi
             awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
             index($0, search) && !done {
                 if (offset == 0) { print code; print; }
                 else { print; count = offset; while(count > 0 && getline > 0) { print; count--; } print code; }
-                done = 1
-                next
-            }
-            { print }
-            ' "$file" > tmp_file && mv tmp_file "$file"
+                done = 1; next
+            } { print }' "$file" > tmp_file && mv tmp_file "$file"
         }
 
-        echo "==== [手工缝合] 修复 LineageOS 专属的 .rej 冲突 ===="
-        sed -i '/FIXED_UNDECLARED_VAR/d' fs/namei.c
+        echo "==== [回归原生纯净打孔] 恢复那消失的 100 行 KSU 拦截器 ===="
         
-        # 👇 加入这一行，抢救 fs/open.c 的头文件缺失
-        grep -q "linux/susfs_def.h" fs/open.c || sed -i '1i #include <linux/susfs_def.h>' fs/open.c
-
-        
-        TASK_MMU_HOOK="
-        /* FIX_TASK_MMU_REJ */
-        #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP)
-        #include <linux/susfs_def.h>
-        #endif"
-        patch_file "fs/proc/task_mmu.c" "#include <asm/elf.h>" 0 "$TASK_MMU_HOOK" "FIX_TASK_MMU_REJ"
-
-        MOUNT_H_HOOK="
-        /* FIX_MOUNT_H_REJ */
-        #ifdef CONFIG_KSU_SUSFS
-            u64 susfs_mnt_id_backup;
-        #endif"
-        patch_file "include/linux/mount.h" "void *data;" 0 "$MOUNT_H_HOOK" "FIX_MOUNT_H_REJ"
-
-        PROC_NS_HOOK="
-        /* FIX_PROC_NS_REJ */
-        #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-        #include <linux/susfs_def.h>
-        extern bool susfs_hide_sus_mnts_for_non_su_procs;
-        extern bool susfs_is_current_ksu_domain(void);
-        #endif"
-        patch_file "fs/proc_namespace.c" "#include \"internal.h\"" 0 "$PROC_NS_HOOK" "FIX_PROC_NS_REJ"
-
-        STAT_TOP_HOOK="
-        /* FIX_STAT_REJ */
-        #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-        #include <linux/susfs_def.h>
-        extern void susfs_sus_ino_for_generic_fillattr(unsigned long ino, struct kstat *stat);
-        #endif"
-        patch_file "fs/stat.c" "#include <linux/compat.h>" 0 "$STAT_TOP_HOOK" "FIX_STAT_REJ"
-
-        NAMEI_HOOK_1="
-        /* FIX_NAMEI_1_REJ */
-        #ifdef CONFIG_KSU_SUSFS_SUS_PATH
-            if (unlikely(inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
-                return -ENOENT;
-            }
-        #endif"
-        patch_file "fs/namei.c" "if ((!sysctl_protected_fifos && S_ISFIFO(inode->i_mode)) ||" 0 "$NAMEI_HOOK_1" "FIX_NAMEI_1_REJ"
-
-        NAMEI_HOOK_2="
-        /* FIX_NAMEI_2_REJ */
-        	int error = security_path_mknod(dir, dentry, mode, 0);
-        #ifdef CONFIG_KSU_SUSFS_SUS_PATH
-        	if (dentry->d_inode && unlikely(dentry->d_inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
-        		int err_p = inode_permission2(dir->mnt, dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
-        		if (err_p) return err_p;
-        		return -ENOENT;
-        	}
-        #endif"
-        patch_file "fs/namei.c" "static int may_o_create(const struct path *dir, struct dentry *dentry, umode_t mode)" 2 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
-
-        echo "==== [回归原生纯净打孔] 捍卫模块拦截 ===="
-        
-        # 🚨 终极抢救 3：把 SukiSU 漏造的变量，直接在系统源码里造出来填坑！
         grep -q "<linux/jump_label.h>" drivers/input/input.c || sed -i '1i #include <linux/jump_label.h>' drivers/input/input.c || true
         grep -q "<linux/jump_label.h>" fs/read_write.c || sed -i '1i #include <linux/jump_label.h>' fs/read_write.c || true
         
-        # 补充遗失的静态键
         grep -q "ksu_input_hook_key_false" drivers/input/input.c || {
             echo "DEFINE_STATIC_KEY_FALSE(ksu_input_hook_key_false);" >> drivers/input/input.c
             echo "EXPORT_SYMBOL(ksu_input_hook_key_false);" >> drivers/input/input.c
@@ -185,8 +154,6 @@ runs:
             echo "DEFINE_STATIC_KEY_FALSE(ksu_init_rc_hook_key_false);" >> fs/read_write.c
             echo "EXPORT_SYMBOL(ksu_init_rc_hook_key_false);" >> fs/read_write.c
         }
-        
-        # 补充遗失的 bool 变量
         grep -q "ksu_vfs_read_hook_defined" fs/read_write.c || {
             echo "/* ksu_vfs_read_hook_defined */" >> fs/read_write.c
             echo "bool ksu_vfs_read_hook __read_mostly = true;" >> fs/read_write.c
@@ -197,14 +164,11 @@ runs:
             echo "bool ksu_execveat_hook __read_mostly = true;" >> fs/exec.c
             echo "EXPORT_SYMBOL(ksu_execveat_hook);" >> fs/exec.c
         }
-
-        # 补充废弃但仍在旧版钩子中索要的 devpts 伪装
         grep -q "ksu_handle_devpts" fs/devpts/inode.c || {
             echo "void __attribute__((weak)) ksu_handle_devpts(struct inode* inode) {}" >> fs/devpts/inode.c
             echo "EXPORT_SYMBOL(ksu_handle_devpts);" >> fs/devpts/inode.c
         }
 
-        # 👇 下面是你之前确认过的所有核心防线，一字不差地原样还原 👇
         EXEC_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -373,7 +337,7 @@ runs:
         #endif"
         patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
         
-        echo "==== [擦屁股行动] 修复 LineageOS 官方 Bug ===="
+        echo "==== [擦屁股行动] 修复 LineageOS 原生编译 Bug ===="
         
         CPUSET_HOOK_1="
         #ifdef CONFIG_CPUSET_ASSIST
@@ -399,11 +363,6 @@ runs:
         #define prefer_idle_write_wrapper prefer_idle_write
         #endif"
         patch_file "kernel/sched/tune.c" "static struct cftype files[] = {" 0 "$TUNE_HOOK" "STUNE_ASSIST_WRAPPER_FIX"
-        sed -i 's/-dirty//g' scripts/setlocalversion
-        
-        echo "🩹 正在缝合 drivers/mmc/host/sdhci.c ..."
-        sed -i 's|//\* void sdhci_set_uhs_signaling|#if 0\nvoid sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c 
-        sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\n#endif|g' drivers/mmc/host/sdhci.c 
         sed -i 's/-dirty//g' scripts/setlocalversion
         
         echo "🩹 正在缝合 drivers/mmc/core/core.c ..."
@@ -441,7 +400,6 @@ runs:
         echo "bool is_ksu_transition(const void *old_tsec, const void *new_tsec) { return false; }" >> security/selinux/hooks.c
         echo "void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}" >> drivers/mmc/host/sdhci-pltfm.c
         
-        # 12. 修复 MODPOST 打包阶段 KO 模块缺失 ion_alloc_dmabuf 的 Bug
         echo "🩹 正在为 MODPOST 注入 ion_alloc_dmabuf 弱引用替身..."
         cat << 'EOF' >> mm/madvise.c
 
@@ -452,6 +410,5 @@ runs:
         
         sed -i 's/-dirty//g' scripts/setlocalversion
         
-        # 🛡️ 重新打上防重复锁
         touch .phantom_hooks_applied
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
