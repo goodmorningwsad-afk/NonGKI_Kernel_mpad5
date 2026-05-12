@@ -9,6 +9,7 @@ runs:
       run: |
         cd $GITHUB_WORKSPACE/device_kernel
         
+        # 💥 清理防重复锁，确保强制执行
         rm -f .phantom_hooks_applied
         
         echo "==== 0. 唤醒 SuSFS 与文件系统大动脉开关 ===="
@@ -85,11 +86,60 @@ runs:
             fi
         fi
 
-        echo "==== [手工缝合] 修复 v2.1.0 补丁冲突 Hunk ===="
-        grep -q "linux/susfs_def.h" fs/proc/task_mmu.c || sed -i '1i #include <linux/susfs_def.h>' fs/proc/task_mmu.c
-        grep -q "linux/susfs_def.h" fs/proc_namespace.c || sed -i '1i #include <linux/susfs_def.h>' fs/proc_namespace.c
+        echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
+        patch_file() {
+            local file="$1"
+            local search_str="$2"
+            local offset="$3"
+            local insert_code="$4"
+            local identifier="$5"
+            
+            if grep -q "$identifier" "$file"; then return 0; fi
+            if ! grep -Fq "$search_str" "$file"; then exit 1; fi
+            awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
+            index($0, search) && !done {
+                if (offset == 0) { print code; print; }
+                else { print; count = offset; while(count > 0 && getline > 0) { print; count--; } print code; }
+                done = 1; next
+            } { print }' "$file" > tmp_file && mv tmp_file "$file"
+        }
+
+        echo "==== [手工缝合] 修复 LineageOS 专属的 .rej 冲突 ===="
+        
+        # 补上缺失的头文件
         grep -q "linux/susfs_def.h" fs/open.c || sed -i '1i #include <linux/susfs_def.h>' fs/open.c
-        grep -q "susfs_hide_sus_mnts_for_non_su_procs" fs/proc_namespace.c || sed -i '2i extern bool susfs_hide_sus_mnts_for_non_su_procs;\nextern bool susfs_is_current_ksu_domain(void);' fs/proc_namespace.c
+
+        # 逐字还原你之前确认过的头文件防线！
+        TASK_MMU_HOOK="
+        /* FIX_TASK_MMU_REJ */
+        #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP)
+        #include <linux/susfs_def.h>
+        #endif"
+        patch_file "fs/proc/task_mmu.c" "#include <asm/elf.h>" 0 "$TASK_MMU_HOOK" "FIX_TASK_MMU_REJ"
+
+        MOUNT_H_HOOK="
+        /* FIX_MOUNT_H_REJ */
+        #ifdef CONFIG_KSU_SUSFS
+            u64 susfs_mnt_id_backup;
+        #endif"
+        patch_file "include/linux/mount.h" "void *data;" 0 "$MOUNT_H_HOOK" "FIX_MOUNT_H_REJ"
+
+        PROC_NS_HOOK="
+        /* FIX_PROC_NS_REJ */
+        #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+        #include <linux/susfs_def.h>
+        extern bool susfs_hide_sus_mnts_for_non_su_procs;
+        extern bool susfs_is_current_ksu_domain(void);
+        #endif"
+        patch_file "fs/proc_namespace.c" "#include \"internal.h\"" 0 "$PROC_NS_HOOK" "FIX_PROC_NS_REJ"
+
+        STAT_TOP_HOOK="
+        /* FIX_STAT_REJ */
+        #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+        #include <linux/susfs_def.h>
+        extern void susfs_sus_ino_for_generic_fillattr(unsigned long ino, struct kstat *stat);
+        #endif"
+        patch_file "fs/stat.c" "#include <linux/compat.h>" 0 "$STAT_TOP_HOOK" "FIX_STAT_REJ"
 
         if ! grep -q "susfs_get_non_sus_mnt_id_from_mnt" fs/namespace.c; then
             cat << 'EOF' >> fs/namespace.c
@@ -122,24 +172,6 @@ runs:
         #endif
         EOF
         fi
-
-        echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
-        patch_file() {
-            local file="$1"
-            local search_str="$2"
-            local offset="$3"
-            local insert_code="$4"
-            local identifier="$5"
-            
-            if grep -q "$identifier" "$file"; then return 0; fi
-            if ! grep -Fq "$search_str" "$file"; then exit 1; fi
-            awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
-            index($0, search) && !done {
-                if (offset == 0) { print code; print; }
-                else { print; count = offset; while(count > 0 && getline > 0) { print; count--; } print code; }
-                done = 1; next
-            } { print }' "$file" > tmp_file && mv tmp_file "$file"
-        }
 
         echo "==== [回归原生纯净打孔] 恢复那消失的 100 行 KSU 拦截器 ===="
         
