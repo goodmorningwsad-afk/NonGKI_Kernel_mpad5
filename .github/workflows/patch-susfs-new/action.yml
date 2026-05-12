@@ -9,7 +9,6 @@ runs:
       run: |
         cd $GITHUB_WORKSPACE/device_kernel
         
-        # 🛡️ 终极全局防重复锁
         if [ -f ".phantom_hooks_applied" ]; then
             echo "⏭️ 检测到幻影打孔外挂已成功运行过，触发全局防重复机制，安全跳过！"
             exit 0
@@ -32,7 +31,6 @@ runs:
         echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$DEFCONFIG_FILE"
         
         echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
-        
         echo "CONFIG_SQUASHFS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_FILE_DIRECT=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_DECOMP_MULTI_PERCPU=y" >> "$DEFCONFIG_FILE"
@@ -40,12 +38,10 @@ runs:
         echo "CONFIG_SQUASHFS_LZ4=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_LZO=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_XZ=y" >> "$DEFCONFIG_FILE"
-        
         echo "CONFIG_EROFS_FS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_EROFS_FS_ZIP=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_EROFS_FS_ZIP_LZ4=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_LZ4_DECOMPRESS=y" >> "$DEFCONFIG_FILE"
-
         echo "CONFIG_TMPFS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_TMPFS_XATTR=y" >> "$DEFCONFIG_FILE"
@@ -53,9 +49,7 @@ runs:
         grep -q "erofs" fs/Kconfig || sed -i '/source "fs\/ext4\/Kconfig"/a source "fs/erofs/Kconfig"' fs/Kconfig
         grep -q "erofs" fs/Makefile || echo 'obj-$(CONFIG_EROFS_FS) += erofs/' >> fs/Makefile
 
-        echo "✅ SuSFS 物理开关与 APEX 满血挂载防线全数合闸！"
-        
-        echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
+        echo "==== 1. 物理缝合 SuSFS 隐身大动脉 ===="
         set +e
         PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" 2>/dev/null | head -n 1)
         set -e
@@ -71,7 +65,6 @@ runs:
             fi
         fi
 
-        # 🚨 强制将 susfs.o 加入编译，找回 susfs_extra_works
         grep -q "susfs.o" fs/Makefile || echo 'obj-y += susfs.o' >> fs/Makefile
 
         echo "==== [兼容修复] 清除 SukiSU 源码中重复的辅助函数 ===="
@@ -115,6 +108,14 @@ runs:
         
         grep -q "linux/susfs_def.h" fs/open.c || sed -i '1i #include <linux/susfs_def.h>' fs/open.c
         grep -q "linux/susfs_def.h" fs/proc/task_mmu.c || sed -i '1i #include <linux/susfs_def.h>' fs/proc/task_mmu.c
+
+        # 🚨 已严格加回 TASK_MMU_HOOK 
+        TASK_MMU_HOOK="
+        /* FIX_TASK_MMU_REJ */
+        #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP)
+        #include <linux/susfs_def.h>
+        #endif"
+        patch_file "fs/proc/task_mmu.c" "#include <asm/elf.h>" 0 "$TASK_MMU_HOOK" "FIX_TASK_MMU_REJ"
 
         MOUNT_H_HOOK="
         /* FIX_MOUNT_H_REJ */
@@ -169,6 +170,42 @@ runs:
             return &mnt->mnt;
         }
         #endif
+        EOF
+        fi
+
+        # 🚨 已严格加回丢失的 path_umount
+        if ! grep -q "path_umount" fs/namespace.c; then
+            cat << 'EOF' >> fs/namespace.c
+
+        static int can_umount(const struct path *path, int flags)
+        {
+            struct mount *mnt = real_mount(path->mnt);
+            if (flags & ~(MNT_FORCE | MNT_DETACH | MNT_EXPIRE | UMOUNT_NOFOLLOW))
+                return -EINVAL;
+            if (!may_mount())
+                return -EPERM;
+            if (path->dentry != path->mnt->mnt_root)
+                return -EINVAL;
+            if (!check_mnt(mnt))
+                return -EINVAL;
+            if (mnt->mnt.mnt_flags & MNT_LOCKED) /* Check optimistically */
+                return -EINVAL;
+            if (flags & MNT_FORCE && !capable(CAP_SYS_ADMIN))
+                return -EPERM;
+            return 0;
+        }
+
+        int path_umount(struct path *path, int flags)
+        {
+            struct mount *mnt = real_mount(path->mnt);
+            int ret;
+            ret = can_umount(path, flags);
+            if (!ret)
+                ret = do_umount(mnt, flags);
+            dput(path->dentry);
+            mntput_no_expire(mnt);
+            return ret;
+        }
         EOF
         fi
 
@@ -247,41 +284,6 @@ runs:
         }
         #endif"
         patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
-
-        if ! grep -q "path_umount" fs/namespace.c; then
-            cat << 'EOF' >> fs/namespace.c
-
-        static int can_umount(const struct path *path, int flags)
-        {
-            struct mount *mnt = real_mount(path->mnt);
-            if (flags & ~(MNT_FORCE | MNT_DETACH | MNT_EXPIRE | UMOUNT_NOFOLLOW))
-                return -EINVAL;
-            if (!may_mount())
-                return -EPERM;
-            if (path->dentry != path->mnt->mnt_root)
-                return -EINVAL;
-            if (!check_mnt(mnt))
-                return -EINVAL;
-            if (mnt->mnt.mnt_flags & MNT_LOCKED) /* Check optimistically */
-                return -EINVAL;
-            if (flags & MNT_FORCE && !capable(CAP_SYS_ADMIN))
-                return -EPERM;
-            return 0;
-        }
-
-        int path_umount(struct path *path, int flags)
-        {
-            struct mount *mnt = real_mount(path->mnt);
-            int ret;
-            ret = can_umount(path, flags);
-            if (!ret)
-                ret = do_umount(mnt, flags);
-            dput(path->dentry);
-            mntput_no_expire(mnt);
-            return ret;
-        }
-        EOF
-        fi
 
         HOOKS_PATCH_1="
         #ifdef CONFIG_KSU
@@ -408,6 +410,5 @@ runs:
         
         sed -i 's/-dirty//g' scripts/setlocalversion
         
-        # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
         touch .phantom_hooks_applied
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
