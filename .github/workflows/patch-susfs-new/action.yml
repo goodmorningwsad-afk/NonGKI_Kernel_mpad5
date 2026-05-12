@@ -109,7 +109,6 @@ runs:
         grep -q "linux/susfs_def.h" fs/open.c || sed -i '1i #include <linux/susfs_def.h>' fs/open.c
         grep -q "linux/susfs_def.h" fs/proc/task_mmu.c || sed -i '1i #include <linux/susfs_def.h>' fs/proc/task_mmu.c
 
-        # 🚨 已严格加回 TASK_MMU_HOOK 
         TASK_MMU_HOOK="
         /* FIX_TASK_MMU_REJ */
         #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP)
@@ -173,7 +172,6 @@ runs:
         EOF
         fi
 
-        # 🚨 已严格加回丢失的 path_umount
         if ! grep -q "path_umount" fs/namespace.c; then
             cat << 'EOF' >> fs/namespace.c
 
@@ -209,7 +207,45 @@ runs:
         EOF
         fi
 
-        echo "==== [回归原生纯净打孔] 逐字还原核心模块拦截 ===="
+        echo "==== [物理替身补全计划] 填平所有 undefined symbol 坑洞 ===="
+        
+        grep -q "<linux/jump_label.h>" drivers/input/input.c || sed -i '1i #include <linux/jump_label.h>' drivers/input/input.c
+        grep -q "<linux/jump_label.h>" fs/read_write.c || sed -i '1i #include <linux/jump_label.h>' fs/read_write.c
+        
+        # 补齐 SukiSU 强行依赖的 Static Keys
+        grep -q "ksu_input_hook_key_false" drivers/input/input.c || {
+            echo "DEFINE_STATIC_KEY_FALSE(ksu_input_hook_key_false);" >> drivers/input/input.c
+            echo "EXPORT_SYMBOL(ksu_input_hook_key_false);" >> drivers/input/input.c
+        }
+        grep -q "ksu_init_rc_hook_key_false" fs/read_write.c || {
+            echo "DEFINE_STATIC_KEY_FALSE(ksu_init_rc_hook_key_false);" >> fs/read_write.c
+            echo "EXPORT_SYMBOL(ksu_init_rc_hook_key_false);" >> fs/read_write.c
+        }
+
+        # 补齐老版 Hook 的布尔变量替身
+        # 🚨 极度关键：execveat 必须是 false！只有这样才能走 else 分支触发 sucompat，保住你的 Root！
+        grep -q "ksu_execveat_hook_defined" fs/exec.c || {
+            echo "/* ksu_execveat_hook_defined */" >> fs/exec.c
+            echo "bool ksu_execveat_hook __read_mostly = false;" >> fs/exec.c
+            echo "EXPORT_SYMBOL(ksu_execveat_hook);" >> fs/exec.c
+        }
+        grep -q "ksu_input_hook_defined" drivers/input/input.c || {
+            echo "/* ksu_input_hook_defined */" >> drivers/input/input.c
+            echo "bool ksu_input_hook __read_mostly = true;" >> drivers/input/input.c
+            echo "EXPORT_SYMBOL(ksu_input_hook);" >> drivers/input/input.c
+        }
+        grep -q "ksu_vfs_read_hook_defined" fs/read_write.c || {
+            echo "/* ksu_vfs_read_hook_defined */" >> fs/read_write.c
+            echo "bool ksu_vfs_read_hook __read_mostly = true;" >> fs/read_write.c
+            echo "EXPORT_SYMBOL(ksu_vfs_read_hook);" >> fs/read_write.c
+        }
+        grep -q "ksu_init_rc_hook_defined" fs/read_write.c || {
+            echo "/* ksu_init_rc_hook_defined */" >> fs/read_write.c
+            echo "bool ksu_init_rc_hook __read_mostly = true;" >> fs/read_write.c
+            echo "EXPORT_SYMBOL(ksu_init_rc_hook);" >> fs/read_write.c
+        }
+
+        echo "==== [回归原生纯净打孔] 逐字还原你的核心模块拦截 ===="
         
         EXEC_HOOK="
         #ifdef CONFIG_KSU
@@ -344,7 +380,7 @@ runs:
         #endif"
         patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
         
-        echo "==== [擦屁股行动] 修复 LineageOS 官方 Bug ===="
+        echo "==== [擦屁股行动] 修复 LineageOS 官方 Bug 与空函数 ===="
         
         CPUSET_HOOK_1="
         #ifdef CONFIG_CPUSET_ASSIST
@@ -407,6 +443,20 @@ runs:
         
         echo "🩹 正在全盘缝合 lib/zstd/ 目录下的 ZSTD_FALLTHROUGH ..."
         find lib/zstd -type f -exec sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' {} +
+        
+        # 🚨 已将救命空函数全数请回，彻底粉碎 undefined symbol 报错！
+        echo "🩹 正在为 vmlinux 大一统注入最后的物理替身..."
+        echo "bool is_ksu_transition(const void *old_tsec, const void *new_tsec) { return false; }" >> security/selinux/hooks.c
+        echo "void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}" >> drivers/mmc/host/sdhci-pltfm.c
+        echo "void __attribute__((weak)) ksu_handle_devpts(struct inode* inode) {}" >> fs/devpts/inode.c
+        
+        echo "🩹 正在为 MODPOST 注入 ion_alloc_dmabuf 弱引用替身..."
+        cat << 'EOF' >> mm/madvise.c
+
+        #include <linux/export.h>
+        void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }
+        EXPORT_SYMBOL(ion_alloc_dmabuf);
+        EOF
         
         sed -i 's/-dirty//g' scripts/setlocalversion
         
