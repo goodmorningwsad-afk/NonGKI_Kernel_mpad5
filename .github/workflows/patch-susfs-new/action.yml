@@ -112,7 +112,6 @@ runs:
         }
 
         echo "==== [手工缝合] 修复 LineageOS 专属与 v2.1.0 的补丁遗漏 ===="
-        sed -i '/FIXED_UNDECLARED_VAR/d' fs/namei.c || true
         
         grep -q "linux/susfs_def.h" fs/open.c || sed -i '1i #include <linux/susfs_def.h>' fs/open.c
         grep -q "linux/susfs_def.h" fs/proc/task_mmu.c || sed -i '1i #include <linux/susfs_def.h>' fs/proc/task_mmu.c
