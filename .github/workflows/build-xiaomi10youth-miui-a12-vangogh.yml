@@ -436,23 +436,7 @@ jobs:
           path: susfs_extra_works_evidence.zip
 
 
-      - name: 🕵️‍♂️ 提取核心嫌疑源码 (fs/susfs.c 案发现场)
-        if: always()
-        run: |
-          echo "==== 正在提取法医级源码物证 ===="
-          mkdir -p $GITHUB_WORKSPACE/Suspect_Source
-          cp $GITHUB_WORKSPACE/device_kernel/fs/susfs.c $GITHUB_WORKSPACE/Suspect_Source/ || echo "❌ 找不到 fs/susfs.c 源码！"
-          cp $GITHUB_WORKSPACE/device_kernel/include/linux/susfs.h $GITHUB_WORKSPACE/Suspect_Source/ || true
-          cp $GITHUB_WORKSPACE/device_kernel/include/linux/susfs_def.h $GITHUB_WORKSPACE/Suspect_Source/ || true
-          cd $GITHUB_WORKSPACE/Suspect_Source
-          zip -r ../Suspect_Source.zip .
-      - name: 📦 上传嫌疑源码包
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Suspect_Source_Files
-          path: Suspect_Source.zip
-
+    
       - name: 🕵️‍♂️ 提取 SukiSU 核心隐身源码 (抓捕 ksu.c 真身)
         if: always()
         run: |
