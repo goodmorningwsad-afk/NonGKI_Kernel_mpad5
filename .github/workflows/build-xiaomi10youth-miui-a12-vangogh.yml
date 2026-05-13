@@ -304,39 +304,42 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
-      - name: 🕵️‍♂️ 终极查水表：提取原始 Defconfig 与最终 .config (绝不瞎猜)
-        if: always() # 无论前面报错多惨烈，这一步必须死磕到底
+      - name: 🕵️‍♂️ 查水表：全盘搜捕失踪的符号真身
+        if: always()
         run: |
-          echo "==== 开始封锁现场，查抄内核配置大底座 ===="
-          mkdir -p $GITHUB_WORKSPACE/Defconfig_Evidence
+          echo "==== 正在全盘搜捕 ksu_handle_setresuid 和 ksu_init_rc_hook ===="
+          mkdir -p $GITHUB_WORKSPACE/Missing_Symbols_Evidence
           cd $GITHUB_WORKSPACE/device_kernel
           
-          # 嫌疑人 1：提取你源码自带的、最原始的 defconfig (查它出厂时到底带没带 SuSFS 基因)
-          if [ -f "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" ]; then
-              cp "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" $GITHUB_WORKSPACE/Defconfig_Evidence/origin_defconfig.txt
-              echo "✅ 原始 defconfig 已提取"
-          else
-              echo "❌ 找不到原始 defconfig" > $GITHUB_WORKSPACE/Defconfig_Evidence/missing_origin.txt
-          fi
+          # 锁定 SukiSU 大本营
+          KSU_DIR=$(find . -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
           
-          # 嫌疑人 2：提取系统跑完 make 配置后，最终决定生死的 .config (查它最终到底有没有开启这个宏)
-          if [ -f ".config" ]; then
-              cp .config $GITHUB_WORKSPACE/Defconfig_Evidence/final_dot_config.txt
-              echo "✅ 最终 .config 已提取"
+          if [ -n "$KSU_DIR" ]; then
+              echo "✅ 锁定大本营: $KSU_DIR"
+              
+              # 嫌疑人 1：搜捕 ksu_handle_setresuid
+              echo ">> 搜捕 ksu_handle_setresuid..."
+              grep -rnw "$KSU_DIR" -e "ksu_handle_setresuid" > $GITHUB_WORKSPACE/Missing_Symbols_Evidence/search_setresuid.txt || echo "❌ SukiSU源码里彻底搜不到 ksu_handle_setresuid" > $GITHUB_WORKSPACE/Missing_Symbols_Evidence/search_setresuid.txt
+              
+              # 嫌疑人 2：搜捕 ksu_init_rc_hook
+              echo ">> 搜捕 ksu_init_rc_hook..."
+              grep -rnw "$KSU_DIR" -e "ksu_init_rc_hook" > $GITHUB_WORKSPACE/Missing_Symbols_Evidence/search_init_rc.txt || echo "❌ SukiSU源码里彻底搜不到 ksu_init_rc_hook" > $GITHUB_WORKSPACE/Missing_Symbols_Evidence/search_init_rc.txt
           else
-              echo "❌ 找不到生成的 .config" > $GITHUB_WORKSPACE/Defconfig_Evidence/missing_dot_config.txt
+              echo "❌ 找不到 SukiSU 目录！" > $GITHUB_WORKSPACE/Missing_Symbols_Evidence/error.txt
           fi
           
           # 打包带离现场
-          cd $GITHUB_WORKSPACE/Defconfig_Evidence
-          zip -r ../Defconfig_Evidence.zip .
+          cd $GITHUB_WORKSPACE/Missing_Symbols_Evidence
+          zip -r ../Missing_Symbols_Evidence.zip . || true
 
-      - name: 📦 上传配置底座物证包
+      - name: 📦 上传符号真身搜捕报告
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Defconfig_Evidence
-          path: Defconfig_Evidence.zip
+          name: Missing_Symbols_Evidence
+          path: Missing_Symbols_Evidence.zip
+          if-no-files-found: ignore
+
 
 
       - name: 🕵️‍♂️ 提取 SukiSU 配置文件与源码物证
