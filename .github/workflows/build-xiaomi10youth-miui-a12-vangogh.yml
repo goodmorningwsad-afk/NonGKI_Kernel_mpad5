@@ -451,28 +451,28 @@ jobs:
           name: Suspect_Source_Files
           path: Suspect_Source.zip
 
-      - name: 🕵️‍♂️ 提取 SukiSU 核心隐身源码 (终极全盘扫描版)
+      - name: 🕵️‍♂️ 提取 SukiSU 核心隐身源码 (绝对路径定向抓捕版)
         if: always()
         run: |
-          echo "==== 正在全盘雷达扫描 SukiSU 隐身核心源码 ===="
+          echo "==== 正在精确提取 SukiSU 案发现场真身 ===="
           mkdir -p $GITHUB_WORKSPACE/SukiSU_Suspects
-          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
-          if [ -n "$KSU_DIR" ]; then
-              find "$KSU_DIR" -name "sucompat.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
-              find "$KSU_DIR" -name "sucompat.h" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
-              find "$KSU_DIR" -name "su_mount_ns.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
-              find "$KSU_DIR" -name "allowlist.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
-              find "$KSU_DIR" -name "syscall_handler.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
-          fi
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          # 直接根据报错日志暴露的真实坐标，定点抓捕！
+          cp drivers/kernelsu/feature/sucompat.c $GITHUB_WORKSPACE/SukiSU_Suspects/ || echo "没抓到 sucompat.c"
+          cp drivers/kernelsu/sulog/event.c $GITHUB_WORKSPACE/SukiSU_Suspects/ || echo "没抓到 event.c"
+          
           cd $GITHUB_WORKSPACE/SukiSU_Suspects
-          zip -r ../SukiSU_Suspects.zip . || true
-      - name: 📦 上传 SukiSU 嫌疑源码包
+          zip -r ../SukiSU_Suspects.zip . || echo "打包失败：文件依然没有复制成功"
+
+      - name: 📦 上传 SukiSU 定向嫌疑源码包
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: SukiSU_Suspect_Source
           path: SukiSU_Suspects.zip
           if-no-files-found: ignore
+
 
       - name: 🔩 Pack Process
         uses: ./.github/workflows/pack-process
