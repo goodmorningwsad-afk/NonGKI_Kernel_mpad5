@@ -323,6 +323,7 @@ runs:
         EOF
 
         sed -i 's/-dirty//g' scripts/setlocalversion
+        sed -i 's/CONFIG_KSU_SUSFS=y/# CONFIG_KSU_SUSFS is not set/g' "$DEFCONFIG_FILE"
 
         touch .phantom_hooks_applied
         echo "✅ 纯净 SukiSU 打孔完毕，已完全剥离 SuSFS！"
