@@ -15,11 +15,13 @@ runs:
             exit 0
         fi
         
-        echo "==== 0. 基础文件系统依赖 (保留 SquashFS/EROFS 支持) ===="
+        echo "==== 0. 唤醒基础文件系统与物理隔离 SuSFS ===="
         DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
         sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' "$DEFCONFIG_FILE"
         
-        # 🔪 已彻底移除所有 CONFIG_KSU_SUSFS_*
+        # 🚨 终极绝杀：强行阉割原配置自带的 SuSFS 基因
+        sed -i 's/CONFIG_KSU_SUSFS=y/# CONFIG_KSU_SUSFS is not set/g' "$DEFCONFIG_FILE"
+        echo "# CONFIG_KSU_SUSFS is not set" >> "$DEFCONFIG_FILE"
         
         echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS=y" >> "$DEFCONFIG_FILE"
@@ -74,10 +76,26 @@ runs:
             echo "EXPORT_SYMBOL(ksu_init_rc_hook_key_false);" >> fs/read_write.c
         }
 
-        grep -q "ksu_execveat_hook" fs/exec.c || echo 'bool ksu_execveat_hook __read_mostly = false;' >> fs/exec.c
-        grep -q "ksu_input_hook" drivers/input/input.c || echo 'bool ksu_input_hook __read_mostly = true;' >> drivers/input/input.c
-        grep -q "ksu_vfs_read_hook" fs/read_write.c || echo 'bool ksu_vfs_read_hook __read_mostly = true;' >> fs/read_write.c
-        grep -q "ksu_init_rc_hook" fs/read_write.c || echo 'bool ksu_init_rc_hook __read_mostly = true;' >> fs/read_write.c
+        grep -q "ksu_execveat_hook_defined" fs/exec.c || {
+            echo "/* ksu_execveat_hook_defined */" >> fs/exec.c
+            echo "bool ksu_execveat_hook __read_mostly = false;" >> fs/exec.c
+            echo "EXPORT_SYMBOL(ksu_execveat_hook);" >> fs/exec.c
+        }
+        grep -q "ksu_input_hook_defined" drivers/input/input.c || {
+            echo "/* ksu_input_hook_defined */" >> drivers/input/input.c
+            echo "bool ksu_input_hook __read_mostly = true;" >> drivers/input/input.c
+            echo "EXPORT_SYMBOL(ksu_input_hook);" >> drivers/input/input.c
+        }
+        grep -q "ksu_vfs_read_hook_defined" fs/read_write.c || {
+            echo "/* ksu_vfs_read_hook_defined */" >> fs/read_write.c
+            echo "bool ksu_vfs_read_hook __read_mostly = true;" >> fs/read_write.c
+            echo "EXPORT_SYMBOL(ksu_vfs_read_hook);" >> fs/read_write.c
+        }
+        grep -q "ksu_init_rc_hook_defined" fs/read_write.c || {
+            echo "/* ksu_init_rc_hook_defined */" >> fs/read_write.c
+            echo "bool ksu_init_rc_hook __read_mostly = true;" >> fs/read_write.c
+            echo "EXPORT_SYMBOL(ksu_init_rc_hook);" >> fs/read_write.c
+        }
 
         echo "==== 3. [回归原生纯净打孔] 逐字还原 SukiSU 核心拦截器 ===="
         
@@ -249,11 +267,16 @@ runs:
         #endif"
         patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
 
-        echo "==== 4. [源码纠偏] 修复 SukiSU sucompat.c 权限泄露漏洞 ===="
-        SUCOMPAT_FILE=$(find $GITHUB_WORKSPACE -type f -name "sucompat.c" | head -n 1)
-        if [ -n "$SUCOMPAT_FILE" ]; then
-            sed -i '/int ksu_handle_faccessat/,/ksu_strncpy_from_user_nofault/ s/ksu_strncpy_from_user_nofault/if (!ksu_is_allow_uid_for_current(current_uid().val)) return 0;\n\n\tksu_strncpy_from_user_nofault/' "$SUCOMPAT_FILE"
-            sed -i '/int ksu_handle_stat(int \*dfd, const char __user \*\*filename_user/,/ksu_strncpy_from_user_nofault/ s/ksu_strncpy_from_user_nofault/if (!ksu_is_allow_uid_for_current(current_uid().val)) return 0;\n\n\tksu_strncpy_from_user_nofault/' "$SUCOMPAT_FILE"
+        echo "==== 4. [定向排雷] 修复主流程文件导致的 event.c 结构体参数被毁 ===="
+        KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+        if [ -n "$KSU_DIR" ]; then
+            EVENT_FILE=$(find "$KSU_DIR" -type f -name "event.c" | head -n 1)
+            if [ -n "$EVENT_FILE" ]; then
+                echo "🩹 正在为 $EVENT_FILE 恢复被主工作流误杀的 USER_ARG_NULL..."
+                # 精准把 NULL, NULL 变回 NULL, USER_ARG_NULL
+                sed -i 's/KSU_SULOG_EVENT_IOCTL_GRANT_ROOT, NULL, NULL, gfp/KSU_SULOG_EVENT_IOCTL_GRANT_ROOT, NULL, USER_ARG_NULL, gfp/g' "$EVENT_FILE"
+                echo "✅ event.c 参数恢复完成！"
+            fi
         fi
 
         echo "==== 5. [擦屁股行动] 修复 LineageOS 官方 Bug ===="
@@ -323,7 +346,6 @@ runs:
         EOF
 
         sed -i 's/-dirty//g' scripts/setlocalversion
-        sed -i 's/CONFIG_KSU_SUSFS=y/# CONFIG_KSU_SUSFS is not set/g' "$DEFCONFIG_FILE"
 
         touch .phantom_hooks_applied
-        echo "✅ 纯净 SukiSU 打孔完毕，已完全剥离 SuSFS！"
+        echo "✅ 纯净 SukiSU 打孔与修补完毕，绝杀所有崩溃！"
