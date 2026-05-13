@@ -305,6 +305,41 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
+      - name: 🕵️‍♂️ 终极查水表：提取原始 Defconfig 与最终 .config (绝不瞎猜)
+        if: always() # 无论前面报错多惨烈，这一步必须死磕到底
+        run: |
+          echo "==== 开始封锁现场，查抄内核配置大底座 ===="
+          mkdir -p $GITHUB_WORKSPACE/Defconfig_Evidence
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          # 嫌疑人 1：提取你源码自带的、最原始的 defconfig (查它出厂时到底带没带 SuSFS 基因)
+          if [ -f "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" ]; then
+              cp "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" $GITHUB_WORKSPACE/Defconfig_Evidence/origin_defconfig.txt
+              echo "✅ 原始 defconfig 已提取"
+          else
+              echo "❌ 找不到原始 defconfig" > $GITHUB_WORKSPACE/Defconfig_Evidence/missing_origin.txt
+          fi
+          
+          # 嫌疑人 2：提取系统跑完 make 配置后，最终决定生死的 .config (查它最终到底有没有开启这个宏)
+          if [ -f ".config" ]; then
+              cp .config $GITHUB_WORKSPACE/Defconfig_Evidence/final_dot_config.txt
+              echo "✅ 最终 .config 已提取"
+          else
+              echo "❌ 找不到生成的 .config" > $GITHUB_WORKSPACE/Defconfig_Evidence/missing_dot_config.txt
+          fi
+          
+          # 打包带离现场
+          cd $GITHUB_WORKSPACE/Defconfig_Evidence
+          zip -r ../Defconfig_Evidence.zip .
+
+      - name: 📦 上传配置底座物证包
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Defconfig_Evidence
+          path: Defconfig_Evidence.zip
+
+
       - name: 🕵️‍♂️ 提取 SukiSU 配置文件与源码物证
         if: always() # 保证编译失败也会执行
         run: |
