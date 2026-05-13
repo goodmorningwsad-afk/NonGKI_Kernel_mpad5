@@ -19,7 +19,7 @@ runs:
         DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
         sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' "$DEFCONFIG_FILE"
         
-        # 🚨 终极绝杀：强行阉割原配置自带的 SuSFS 基因，确保隔离纯净
+        # 🚨 强行阉割原配置自带的 SuSFS 基因，确保隔离纯净
         sed -i 's/CONFIG_KSU_SUSFS=y/# CONFIG_KSU_SUSFS is not set/g' "$DEFCONFIG_FILE"
         echo "# CONFIG_KSU_SUSFS is not set" >> "$DEFCONFIG_FILE"
         
@@ -75,8 +75,6 @@ runs:
             echo "DEFINE_STATIC_KEY_FALSE(ksu_init_rc_hook_key_false);" >> fs/read_write.c
             echo "EXPORT_SYMBOL(ksu_init_rc_hook_key_false);" >> fs/read_write.c
         }
-
-        # 🚨 物理切除：已撤销 4 个多余的 bool 变量注入，专治 Duplicate Symbol 冲突！
 
         echo "==== 3. [回归原生纯净打孔] 逐字还原 SukiSU 核心拦截器 ===="
         
@@ -178,16 +176,8 @@ runs:
         #endif"
         patch_file "fs/read_write.c" "if (!(file->f_mode & FMODE_READ))" 0 "$VFS_READ_HOOK" "ksu_vfs_read_hook"
 
-        READ_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern bool ksu_init_rc_hook __read_mostly;
-            extern void ksu_handle_sys_read(unsigned int fd);
-            if (unlikely(ksu_init_rc_hook))
-                ksu_handle_sys_read(fd);
-        }
-        #endif"
-        patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
+        # 🚨 [精确切除]：已在此处完全移除了引发未定义符号的 READ_HOOK (ksu_handle_sys_read)
+        # 🚨 [精确切除]：已在此处完全移除了引发未定义符号的 SYS_HOOK (ksu_handle_setresuid)
 
         HOOKS_PATCH_1="
         #ifdef CONFIG_KSU
@@ -229,15 +219,6 @@ runs:
         #endif"
         patch_file "security/selinux/hooks.c" "new_tsec = bprm->cred->security;" 0 "$HOOKS_PATCH_3" "is_ksu_transition"
 
-        SYS_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid);
-            ksu_handle_setresuid(ruid, euid, suid);
-        }
-        #endif"
-        patch_file "kernel/sys.c" "ksuid = make_kuid(ns, suid);" 1 "$SYS_HOOK" "ksu_handle_setresuid"
-
         REBOOT_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -247,6 +228,7 @@ runs:
         }
         #endif"
         patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
+
 
         echo "==== 4. [定向排雷] 修复主流程文件导致的 event.c 结构体参数被毁 ===="
         KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
@@ -317,8 +299,7 @@ runs:
         echo "==== 6. [救命空函数替身] 满足链接器大一统 ===="
         echo "bool is_ksu_transition(const void *old_tsec, const void *new_tsec) { return false; }" >> security/selinux/hooks.c
         echo "void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}" >> drivers/mmc/host/sdhci-pltfm.c
-        # 🚨 物理切除：ksu_handle_devpts 的弱符号替身已删除！
-
+        
         cat << 'EOF' >> mm/madvise.c
         #include <linux/export.h>
         void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }
@@ -328,4 +309,4 @@ runs:
         sed -i 's/-dirty//g' scripts/setlocalversion
 
         touch .phantom_hooks_applied
-        echo "✅ 纯净 SukiSU 打孔与修补完毕，等待测试结果！"
+        echo "✅ 精准切除完毕！多余符号全部退散，静待 KO 诞生！"
