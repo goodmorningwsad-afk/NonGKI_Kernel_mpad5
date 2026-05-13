@@ -165,7 +165,6 @@ jobs:
               EVENT_FILE=$(find "$KSU_DIR" -type f -name "event.c" | head -n 1)
               if [ -n "$EVENT_FILE" ]; then
                   sed -i 's/\bstrncpy_from_user_nofault(/__strncpy_from_user_nofault(/g' "$EVENT_FILE"
-                  sed -i 's/USER_ARG_NULL, gfp/NULL, gfp/g' "$EVENT_FILE"
               fi
           fi
           
