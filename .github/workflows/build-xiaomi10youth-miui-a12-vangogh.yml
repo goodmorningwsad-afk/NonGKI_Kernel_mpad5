@@ -180,6 +180,13 @@ jobs:
 
           touch .sukisu_bugs_fixed
 
+          echo "==== [防假阳性] 强行开启非 GKI 符号表寻址 ===="
+          sed -i 's/# CONFIG_KALLSYMS is not set/CONFIG_KALLSYMS=y/g' arch/arm64/configs/milito_defconfig
+          sed -i 's/# CONFIG_KALLSYMS_ALL is not set/CONFIG_KALLSYMS_ALL=y/g' arch/arm64/configs/milito_defconfig
+          grep -q "^CONFIG_KALLSYMS=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/milito_defconfig
+          grep -q "^CONFIG_KALLSYMS_ALL=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/milito_defconfig
+          
+
       - name: 📥 强制截胡：下载你指定的最新版 SuSFS 2.1.0 补丁
         run: |
           echo "==== 1. 正在销毁云端自带的所有旧版毒瘤补丁 ===="
@@ -304,41 +311,17 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
-      - name: 🕵️‍♂️ 查水表：全盘搜捕失踪的符号真身
-        if: always()
+      - name: 🕵️‍♂️ 查水表：提取验证内核开关是否真正生效
         run: |
-          echo "==== 正在全盘搜捕 ksu_handle_setresuid 和 ksu_init_rc_hook ===="
-          mkdir -p $GITHUB_WORKSPACE/Missing_Symbols_Evidence
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          # 锁定 SukiSU 大本营
-          KSU_DIR=$(find . -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
-          
-          if [ -n "$KSU_DIR" ]; then
-              echo "✅ 锁定大本营: $KSU_DIR"
-              
-              # 嫌疑人 1：搜捕 ksu_handle_setresuid
-              echo ">> 搜捕 ksu_handle_setresuid..."
-              grep -rnw "$KSU_DIR" -e "ksu_handle_setresuid" > $GITHUB_WORKSPACE/Missing_Symbols_Evidence/search_setresuid.txt || echo "❌ SukiSU源码里彻底搜不到 ksu_handle_setresuid" > $GITHUB_WORKSPACE/Missing_Symbols_Evidence/search_setresuid.txt
-              
-              # 嫌疑人 2：搜捕 ksu_init_rc_hook
-              echo ">> 搜捕 ksu_init_rc_hook..."
-              grep -rnw "$KSU_DIR" -e "ksu_init_rc_hook" > $GITHUB_WORKSPACE/Missing_Symbols_Evidence/search_init_rc.txt || echo "❌ SukiSU源码里彻底搜不到 ksu_init_rc_hook" > $GITHUB_WORKSPACE/Missing_Symbols_Evidence/search_init_rc.txt
+          echo "==== 提取 .config 中的真实编译状态 ===="
+          cd $GITHUB_WORKSPACE/device_kernel/out
+          if [ -f ".config" ]; then
+              grep "CONFIG_KALLSYMS" .config || echo "❌ 彻底没找到 CONFIG_KALLSYMS"
+              grep "CONFIG_KSU" .config || echo "❌ 彻底没找到 CONFIG_KSU"
           else
-              echo "❌ 找不到 SukiSU 目录！" > $GITHUB_WORKSPACE/Missing_Symbols_Evidence/error.txt
+              echo "❌ 连 .config 都没生成！"
           fi
           
-          # 打包带离现场
-          cd $GITHUB_WORKSPACE/Missing_Symbols_Evidence
-          zip -r ../Missing_Symbols_Evidence.zip . || true
-
-      - name: 📦 上传符号真身搜捕报告
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Missing_Symbols_Evidence
-          path: Missing_Symbols_Evidence.zip
-          if-no-files-found: ignore
 
 
 
