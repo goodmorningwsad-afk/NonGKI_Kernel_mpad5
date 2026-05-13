@@ -1,29 +1,38 @@
-name: "SukiSU Phantom Hooks (Isolated)"
-description: "Inject Phantom Hooks for SukiSU ONLY, stripping out SuSFS to isolate bugs."
+name: "SukiSU & SuSFS Phantom Hooks"
+description: "Apply SuSFS 4.19 core patch and inject Phantom Hooks for SukiSU"
 
 runs:
   using: "composite"
   steps:
-    - name: 🪄 Apply Phantom SukiSU Hooks (Isolated)
+    - name: 🪄 Apply SuSFS 4.19 Patch & Phantom SukiSU Hooks
       shell: bash
       run: |
         cd $GITHUB_WORKSPACE/device_kernel
         
-        # 🛡️ 物理防重复锁
+        # 🛡️ 终极全局防重复锁
         if [ -f ".phantom_hooks_applied" ]; then
-            echo "⏭️ 检测到外挂已应用，跳过。"
+            echo "⏭️ 检测到幻影打孔外挂已成功运行过，触发全局防重复机制，安全跳过！"
             exit 0
         fi
         
-        echo "==== 0. 唤醒基础文件系统与物理隔离 SuSFS ===="
+        echo "==== 0. 唤醒 SuSFS 与文件系统大动脉开关 ===="
         DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+        
         sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' "$DEFCONFIG_FILE"
         
-        # 🚨 终极绝杀：强行阉割原配置自带的 SuSFS 基因
-        sed -i 's/CONFIG_KSU_SUSFS=y/# CONFIG_KSU_SUSFS is not set/g' "$DEFCONFIG_FILE"
-        echo "# CONFIG_KSU_SUSFS is not set" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$DEFCONFIG_FILE"
         
         echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
+        
         echo "CONFIG_SQUASHFS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_FILE_DIRECT=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_DECOMP_MULTI_PERCPU=y" >> "$DEFCONFIG_FILE"
@@ -31,18 +40,34 @@ runs:
         echo "CONFIG_SQUASHFS_LZ4=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_LZO=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_XZ=y" >> "$DEFCONFIG_FILE"
+        
         echo "CONFIG_EROFS_FS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_EROFS_FS_ZIP=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_EROFS_FS_ZIP_LZ4=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_LZ4_DECOMPRESS=y" >> "$DEFCONFIG_FILE"
-        echo "CONFIG_TMPFS=y" >> "$DEFCONFIG_FILE"
-        echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$DEFCONFIG_FILE"
-        echo "CONFIG_TMPFS_XATTR=y" >> "$DEFCONFIG_FILE"
         
         grep -q "erofs" fs/Kconfig || sed -i '/source "fs\/ext4\/Kconfig"/a source "fs/erofs/Kconfig"' fs/Kconfig
         grep -q "erofs" fs/Makefile || echo 'obj-$(CONFIG_EROFS_FS) += erofs/' >> fs/Makefile
 
-        echo "==== 1. 载入极客缝合函数 ===="
+        echo "✅ SuSFS 物理开关与 APEX 满血挂载防线全数合闸！"
+        
+        echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
+        set +e
+        PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" 2>/dev/null | head -n 1)
+        set -e
+        
+        if [ -z "$PATCH_FILE" ]; then
+            echo "❌ 致命错误：找不到 susfs_patch_to_4.19.patch！"
+            exit 1 
+        else
+            if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
+                echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
+            else
+                patch -p1 -N -f < "$PATCH_FILE" || echo "⚠️ 补丁产生 .rej 拒绝文件，保留全尸继续！"
+            fi
+        fi
+
+        echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
             local file="$1"
             local search_str="$2"
@@ -50,20 +75,90 @@ runs:
             local insert_code="$4"
             local identifier="$5"
             
-            if grep -q "$identifier" "$file"; then return 0; fi
-            if ! grep -Fq "$search_str" "$file"; then 
-                echo "❌ 严重错误: $file 中找不到特征字符串 '$search_str'"
+            if grep -q "$identifier" "$file"; then
+                echo "⚠️ $file 已包含 $identifier，防重复跳过。"
+                return 0
+            fi
+            if ! grep -Fq "$search_str" "$file"; then
+                echo "❌ 致命错误: $file 中找不到特征字符串 '$search_str'！"
                 exit 1 
             fi
             awk -v search="$search_str" -v offset="$offset" -v code="$insert_code" '
             index($0, search) && !done {
                 if (offset == 0) { print code; print; }
                 else { print; count = offset; while(count > 0 && getline > 0) { print; count--; } print code; }
-                done = 1; next
-            } { print }' "$file" > tmp_file && mv tmp_file "$file"
+                done = 1
+                next
+            }
+            { print }
+            ' "$file" > tmp_file && mv tmp_file "$file"
         }
 
-        echo "==== 2. [补全 SukiSU 依赖防线] 注入变量与静态键替身 ===="
+        echo "==== [手工缝合] 修复 LineageOS 专属的 .rej 冲突 ===="
+        
+        # 🚨 提前清理主工作流中留下的 error=0 脏补丁，防止干扰
+        sed -i '/FIXED_UNDECLARED_VAR/d' fs/namei.c || true
+        
+        # 1. 针对 task_mmu.c 的头文件极客注入
+        TASK_MMU_HOOK="
+        /* FIX_TASK_MMU_REJ */
+        #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP)
+        #include <linux/susfs_def.h>
+        #endif"
+        patch_file "fs/proc/task_mmu.c" "#include <asm/elf.h>" 0 "$TASK_MMU_HOOK" "FIX_TASK_MMU_REJ"
+
+        # 2. 补全 mount.h 缺失的挂载 ID 备份
+        MOUNT_H_HOOK="
+        /* FIX_MOUNT_H_REJ */
+        #ifdef CONFIG_KSU_SUSFS
+            u64 susfs_mnt_id_backup;
+        #endif"
+        patch_file "include/linux/mount.h" "void *data;" 0 "$MOUNT_H_HOOK" "FIX_MOUNT_H_REJ"
+
+        # 3. 补全 proc_namespace.c 的隐藏开关
+        PROC_NS_HOOK="
+        /* FIX_PROC_NS_REJ */
+        #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+        #include <linux/susfs_def.h>
+        extern bool susfs_hide_sus_mnts_for_non_su_procs;
+        extern bool susfs_is_current_ksu_domain(void);
+        #endif"
+        patch_file "fs/proc_namespace.c" "#include \"internal.h\"" 0 "$PROC_NS_HOOK" "FIX_PROC_NS_REJ"
+
+        # 4. 补全 stat.c 的属性拦截头文件
+        STAT_TOP_HOOK="
+        /* FIX_STAT_REJ */
+        #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+        #include <linux/susfs_def.h>
+        extern void susfs_sus_ino_for_generic_fillattr(unsigned long ino, struct kstat *stat);
+        #endif"
+        patch_file "fs/stat.c" "#include <linux/compat.h>" 0 "$STAT_TOP_HOOK" "FIX_STAT_REJ"
+
+        # 5. 补全 namei.c 的核心路径隐藏防线一
+        NAMEI_HOOK_1="
+        /* FIX_NAMEI_1_REJ */
+        #ifdef CONFIG_KSU_SUSFS_SUS_PATH
+            if (unlikely(inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
+                return -ENOENT;
+            }
+        #endif"
+        patch_file "fs/namei.c" "if ((!sysctl_protected_fifos && S_ISFIFO(inode->i_mode)) ||" 0 "$NAMEI_HOOK_1" "FIX_NAMEI_1_REJ"
+
+        # 6. 补全 namei.c 的核心路径隐藏防线二 
+        # 🚨 史诗级修复：用 offset 2 跨过大门，一并复活被清创手术误杀的 security_path_mknod！
+        NAMEI_HOOK_2="
+        /* FIX_NAMEI_2_REJ */
+        	int error = security_path_mknod(dir, dentry, mode, 0);
+        #ifdef CONFIG_KSU_SUSFS_SUS_PATH
+        	if (dentry->d_inode && unlikely(dentry->d_inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
+        		int err_p = inode_permission2(dir->mnt, dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
+        		if (err_p) return err_p;
+        		return -ENOENT;
+        	}
+        #endif"
+        patch_file "fs/namei.c" "static int may_o_create(const struct path *dir, struct dentry *dentry, umode_t mode)" 2 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
+
+        echo "==== [补全 SukiSU 依赖防线] 注入静态键替身 ===="
         grep -q "<linux/jump_label.h>" drivers/input/input.c || sed -i '1i #include <linux/jump_label.h>' drivers/input/input.c
         grep -q "<linux/jump_label.h>" fs/read_write.c || sed -i '1i #include <linux/jump_label.h>' fs/read_write.c
         
@@ -75,30 +170,63 @@ runs:
             echo "DEFINE_STATIC_KEY_FALSE(ksu_init_rc_hook_key_false);" >> fs/read_write.c
             echo "EXPORT_SYMBOL(ksu_init_rc_hook_key_false);" >> fs/read_write.c
         }
+        # 🚨 物理切除：已撤销多余的 bool 变量注入，解决 Duplicate Symbol 冲突！
 
-        grep -q "ksu_execveat_hook_defined" fs/exec.c || {
-            echo "/* ksu_execveat_hook_defined */" >> fs/exec.c
-            echo "bool ksu_execveat_hook __read_mostly = false;" >> fs/exec.c
-            echo "EXPORT_SYMBOL(ksu_execveat_hook);" >> fs/exec.c
-        }
-        grep -q "ksu_input_hook_defined" drivers/input/input.c || {
-            echo "/* ksu_input_hook_defined */" >> drivers/input/input.c
-            echo "bool ksu_input_hook __read_mostly = true;" >> drivers/input/input.c
-            echo "EXPORT_SYMBOL(ksu_input_hook);" >> drivers/input/input.c
-        }
-        grep -q "ksu_vfs_read_hook_defined" fs/read_write.c || {
-            echo "/* ksu_vfs_read_hook_defined */" >> fs/read_write.c
-            echo "bool ksu_vfs_read_hook __read_mostly = true;" >> fs/read_write.c
-            echo "EXPORT_SYMBOL(ksu_vfs_read_hook);" >> fs/read_write.c
-        }
-        grep -q "ksu_init_rc_hook_defined" fs/read_write.c || {
-            echo "/* ksu_init_rc_hook_defined */" >> fs/read_write.c
-            echo "bool ksu_init_rc_hook __read_mostly = true;" >> fs/read_write.c
-            echo "EXPORT_SYMBOL(ksu_init_rc_hook);" >> fs/read_write.c
-        }
-
-        echo "==== 3. [回归原生纯净打孔] 逐字还原 SukiSU 核心拦截器 ===="
+        echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         
+        EXEC_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern bool ksu_execveat_hook __read_mostly;
+            extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
+            extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
+            if (unlikely(ksu_execveat_hook))
+                ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
+            else
+                ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
+        }
+        #endif"
+        patch_file "fs/exec.c" "return __do_execve_file(fd, filename, argv, envp, flags, NULL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
+        OPEN_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
+            ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
+        }
+        #endif"
+        patch_file "fs/open.c" "if (mode & ~S_IRWXO)" 0 "$OPEN_HOOK" "ksu_handle_faccessat"
+
+        STAT_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
+            ksu_handle_stat(&dfd, &filename, &flags);
+        }
+        #endif"
+        patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
+
+        DEVPTS_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern void ksu_handle_devpts(struct inode*);
+            ksu_handle_devpts(dentry->d_inode);
+        }
+        #endif"
+        patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
+
+        echo "==== [原生底盘区] ===="
+        
+        INPUT_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern bool ksu_input_hook __read_mostly;
+            extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
+            if (unlikely(ksu_input_hook))
+                ksu_handle_input_handle_event(&type, &code, &value);
+        }
+        #endif"
+        patch_file "drivers/input/input.c" "if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)" 0 "$INPUT_HOOK" "ksu_handle_input_handle_event"
+
         if ! grep -q "path_umount" fs/namespace.c; then
             cat << 'EOF' >> fs/namespace.c
 
@@ -134,80 +262,6 @@ runs:
         EOF
         fi
 
-        EXEC_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern bool ksu_execveat_hook __read_mostly;
-            extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-            extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-            if (unlikely(ksu_execveat_hook))
-                ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
-            else
-                ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
-        }
-        #endif"
-        patch_file "fs/exec.c" "return __do_execve_file(fd, filename, argv, envp, flags, NULL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
-
-        OPEN_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
-            ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
-        }
-        #endif"
-        patch_file "fs/open.c" "if (mode & ~S_IRWXO)" 0 "$OPEN_HOOK" "ksu_handle_faccessat"
-
-        STAT_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
-            ksu_handle_stat(&dfd, &filename, &flags);
-        }
-        #endif"
-        patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
-
-        DEVPTS_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern void ksu_handle_devpts(struct inode*);
-            ksu_handle_devpts(dentry->d_inode);
-        }
-        #endif"
-        patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
-
-        INPUT_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern bool ksu_input_hook __read_mostly;
-            extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
-            if (unlikely(ksu_input_hook))
-                ksu_handle_input_handle_event(&type, &code, &value);
-        }
-        #endif"
-        patch_file "drivers/input/input.c" "if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)" 0 "$INPUT_HOOK" "ksu_handle_input_handle_event"
-
-        VFS_READ_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern bool ksu_vfs_read_hook __read_mostly;
-            extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos_ptr);
-            if (unlikely(ksu_vfs_read_hook))
-                ksu_handle_vfs_read(&file, &buf, &count, &pos);
-        }
-        #endif"
-        patch_file "fs/read_write.c" "if (!(file->f_mode & FMODE_READ))" 0 "$VFS_READ_HOOK" "ksu_vfs_read_hook"
-
-        READ_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern bool ksu_init_rc_hook __read_mostly;
-            extern void ksu_handle_sys_read(unsigned int fd);
-            if (unlikely(ksu_init_rc_hook))
-                ksu_handle_sys_read(fd);
-        }
-        #endif"
-        patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
-
         HOOKS_PATCH_1="
         #ifdef CONFIG_KSU
         /* KSU_SELINUX_BYPASS_UNIVERSAL_1 */
@@ -222,7 +276,7 @@ runs:
         }
         #endif"
         patch_file "security/selinux/hooks.c" "if (!nnp && !nosuid)" 0 "$HOOKS_PATCH_1" "KSU_SELINUX_BYPASS_UNIVERSAL_1"
-
+        
         HOOKS_PATCH_2="
         #ifdef CONFIG_KSU
         /* KSU_SELINUX_BYPASS_UNIVERSAL_2 */
@@ -237,7 +291,7 @@ runs:
         }
         #endif"
         patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH_2" "KSU_SELINUX_BYPASS_UNIVERSAL_2"
-
+        
         HOOKS_PATCH_3="
         #ifdef CONFIG_KSU
         {
@@ -248,6 +302,7 @@ runs:
         #endif"
         patch_file "security/selinux/hooks.c" "new_tsec = bprm->cred->security;" 0 "$HOOKS_PATCH_3" "is_ksu_transition"
 
+        # 🚨 致命修正：回归正统的 ksu_handle_setresuid 🚨
         SYS_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -267,34 +322,54 @@ runs:
         #endif"
         patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
 
-        echo "==== 4. [定向排雷] 修复主流程文件导致的 event.c 结构体参数被毁 ===="
-        KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
-        if [ -n "$KSU_DIR" ]; then
-            EVENT_FILE=$(find "$KSU_DIR" -type f -name "event.c" | head -n 1)
-            if [ -n "$EVENT_FILE" ]; then
-                echo "🩹 正在为 $EVENT_FILE 恢复被主工作流误杀的 USER_ARG_NULL..."
-                # 精准把 NULL, NULL 变回 NULL, USER_ARG_NULL
-                sed -i 's/KSU_SULOG_EVENT_IOCTL_GRANT_ROOT, NULL, NULL, gfp/KSU_SULOG_EVENT_IOCTL_GRANT_ROOT, NULL, USER_ARG_NULL, gfp/g' "$EVENT_FILE"
-                echo "✅ event.c 参数恢复完成！"
-            fi
-        fi
+        READ_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern bool ksu_init_rc_hook __read_mostly;
+            extern void ksu_handle_sys_read(unsigned int fd);
+            if (unlikely(ksu_init_rc_hook))
+                ksu_handle_sys_read(fd);
+        }
+        #endif"
+        patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
 
-        echo "==== 5. [擦屁股行动] 修复 LineageOS 官方 Bug ===="
+        echo "==== [源码纠偏] 修复 SukiSU sucompat.c 权限泄露漏洞 ===="
+        SUCOMPAT_FILE=$(find $GITHUB_WORKSPACE -type f -name "sucompat.c" | head -n 1)
+        if [ -n "$SUCOMPAT_FILE" ]; then
+            echo "🩹 正在为 $SUCOMPAT_FILE 注入权限拦截大坝..."
+            
+            # 在 faccessat 函数中注入权限判断
+            sed -i '/int ksu_handle_faccessat/,/ksu_strncpy_from_user_nofault/ s/ksu_strncpy_from_user_nofault/if (!ksu_is_allow_uid_for_current(current_uid().val)) return 0;\n\n\tksu_strncpy_from_user_nofault/' "$SUCOMPAT_FILE"
+            
+            # 在 4.19 版的 ksu_handle_stat 函数中注入权限判断
+            sed -i '/int ksu_handle_stat(int \*dfd, const char __user \*\*filename_user/,/ksu_strncpy_from_user_nofault/ s/ksu_strncpy_from_user_nofault/if (!ksu_is_allow_uid_for_current(current_uid().val)) return 0;\n\n\tksu_strncpy_from_user_nofault/' "$SUCOMPAT_FILE"
+            
+            echo "✅ 漏洞修复完毕！检测软件再也无法通过 sh 借尸还魂了！"
+        else
+            echo "❌ 找不到 sucompat.c，纠偏失败！"
+            exit 1
+        fi
+        
+        echo "==== [擦屁股行动] 修复 LineageOS 官方 Bug (极客精准追踪版) ===="
+        
+        # 1. 修复 cpuset.c 变量越界未定义 Bug
         CPUSET_HOOK_1="
         #ifdef CONFIG_CPUSET_ASSIST
         /* CPUSET_ASSIST_FIX_START */"
         patch_file "kernel/cgroup/cpuset.c" "static ssize_t cpuset_write_resmask_assist(struct kernfs_open_file *of," 0 "$CPUSET_HOOK_1" "CPUSET_ASSIST_FIX_START"
-
+        
         CPUSET_HOOK_2="
         /* CPUSET_ASSIST_FIX_END */
         #endif"
         patch_file "kernel/cgroup/cpuset.c" "static ssize_t cpuset_write_resmask_wrapper(struct kernfs_open_file *of," 0 "$CPUSET_HOOK_2" "CPUSET_ASSIST_FIX_END"
-
+        
+        # 2. 修复 module-plts.c 找不到指令集的 Bug
         INSN_HOOK="
         /* MODULE_PLTS_INSN_FIX */
         #include <asm/insn.h>"
         patch_file "arch/arm64/kernel/module-plts.c" "#include <linux/sort.h>" 0 "$INSN_HOOK" "MODULE_PLTS_INSN_FIX"
-
+        
+        # 3. 修复 tune.c 结构体未定义 wrapper 的官方残疾 Bug
         TUNE_HOOK="
         /* STUNE_ASSIST_WRAPPER_FIX */
         #ifndef CONFIG_STUNE_ASSIST
@@ -305,22 +380,30 @@ runs:
         #endif"
         patch_file "kernel/sched/tune.c" "static struct cftype files[] = {" 0 "$TUNE_HOOK" "STUNE_ASSIST_WRAPPER_FIX"
         sed -i 's/-dirty//g' scripts/setlocalversion
-
-        sed -i 's|//\* void sdhci_set_uhs_signaling|#if 0\nvoid sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c
-        sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\n#endif|g' drivers/mmc/host/sdhci.c
+        
+        # 4. 修复 sdhci.c 官方注释错误
+        echo "🩹 正在缝合 drivers/mmc/host/sdhci.c ..."
+        sed -i 's|//\* void sdhci_set_uhs_signaling|#if 0\nvoid sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c 
+        sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\n#endif|g' drivers/mmc/host/sdhci.c 
         sed -i 's/-dirty//g' scripts/setlocalversion
-
+        
+        # 5. 修复 core.c 缺失 mmc_card_doing_bkops 宏的官方残疾 Bug
+        echo "🩹 正在缝合 drivers/mmc/core/core.c ..."
         MMC_BKOPS_HOOK="
         /* MMC_BKOPS_FIX */
         #ifndef mmc_card_doing_bkops
         #define mmc_card_doing_bkops(c) (0)
         #endif"
         patch_file "drivers/mmc/core/core.c" "static bool mmc_is_valid_state_for_clk_scaling(struct mmc_host *host)" 0 "$MMC_BKOPS_HOOK" "MMC_BKOPS_FIX"
-
-        sed -i 's/#if CONFIG_LITTLE_CPU_MASK/#if 0/g' kernel/cpu.c
-        sed -i 's/#if CONFIG_BIG_CPU_MASK/#if 0/g' kernel/cpu.c
-        sed -i 's/#if CONFIG_PRIME_CPU_MASK/#if 0/g' kernel/cpu.c
-
+        
+        # 6. 修复 kernel/cpu.c 宏定义值为字符串导致的预处理崩溃
+        echo "🩹 正在缝合 kernel/cpu.c ..."
+        sed -i 's/#if CONFIG_LITTLE_CPU_MASK/#if 0/g' kernel/cpu.c 
+        sed -i 's/#if CONFIG_BIG_CPU_MASK/#if 0/g' kernel/cpu.c 
+        sed -i 's/#if CONFIG_PRIME_CPU_MASK/#if 0/g' kernel/cpu.c 
+        
+        # 7. 修复 lz4_decompress.c 导出未定义符号的致命错误
+        echo "🩹 正在缝合 lib/lz4/lz4_decompress.c ..."
         sed -i 's/EXPORT_SYMBOL(LZ4_decompress_safe_partial);/\/\/ EXPORT_SYMBOL(LZ4_decompress_safe_partial);/g' lib/lz4/lz4_decompress.c
         sed -i 's/EXPORT_SYMBOL(LZ4_setStreamDecode);/\/\/ EXPORT_SYMBOL(LZ4_setStreamDecode);/g' lib/lz4/lz4_decompress.c
         sed -i 's/EXPORT_SYMBOL(LZ4_decompress_safe_continue);/\/\/ EXPORT_SYMBOL(LZ4_decompress_safe_continue);/g' lib/lz4/lz4_decompress.c
@@ -328,24 +411,36 @@ runs:
         sed -i 's/EXPORT_SYMBOL(LZ4_decompress_safe_usingDict);/\/\/ EXPORT_SYMBOL(LZ4_decompress_safe_usingDict);/g' lib/lz4/lz4_decompress.c
         sed -i 's/EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/\/\/ EXPORT_SYMBOL(LZ4_decompress_fast_usingDict);/g' lib/lz4/lz4_decompress.c
 
+        # 8. 修复 tcp_ipv6.c 和 tcp_ipv4.c 的 static 声明冲突
+        echo "🩹 正在缝合 net/ipv6/tcp_ipv6.c 和 net/ipv4/tcp_ipv4.c ..."
         perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\nstatic\n#endif\nconst struct tcp_request_sock_ops/const struct tcp_request_sock_ops/g' net/ipv4/tcp_ipv4.c
         perl -0777 -pi -e 's/#ifndef CONFIG_MPTCP\nstatic\n#endif\nconst struct tcp_request_sock_ops/const struct tcp_request_sock_ops/g' net/ipv6/tcp_ipv6.c
 
+        # 9. 修复 zstd 压缩库不支持 fallthrough 关键字导致的暴毙
+        echo "🩹 正在缝合 lib/zstd/common/bitstream.h ..."
         sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' lib/zstd/common/bitstream.h
+        
+        # 10. 全盘清剿 zstd 目录下的 fallthrough 穿越者 Bug
+        echo "🩹 正在全盘缝合 lib/zstd/ 目录下的 ZSTD_FALLTHROUGH ..."
         find lib/zstd -type f -exec sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' {} +
-
-        echo "==== 6. [救命空函数替身] 满足链接器大一统 ===="
+        
+        # 11. 终结链接器 (ld.lld) 的最后 3 个幽灵符号报错
+        echo "🩹 正在为 vmlinux 大一统注入最后的物理替身..."
+        
         echo "bool is_ksu_transition(const void *old_tsec, const void *new_tsec) { return false; }" >> security/selinux/hooks.c
         echo "void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}" >> drivers/mmc/host/sdhci-pltfm.c
-        echo "void __attribute__((weak)) ksu_handle_devpts(struct inode* inode) {}" >> fs/devpts/inode.c
-
+        
+        # 12. 修复 MODPOST 打包阶段 KO 模块缺失 ion_alloc_dmabuf 的 Bug
+        echo "🩹 正在为 MODPOST 注入 ion_alloc_dmabuf 弱引用替身..."
         cat << 'EOF' >> mm/madvise.c
+
         #include <linux/export.h>
         void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }
         EXPORT_SYMBOL(ion_alloc_dmabuf);
         EOF
-
+        
         sed -i 's/-dirty//g' scripts/setlocalversion
-
+        
+        # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
         touch .phantom_hooks_applied
-        echo "✅ 纯净 SukiSU 打孔与修补完毕，绝杀所有崩溃！"
+        echo "✅ 修复所有链接符号，全境畅通，起飞！"
