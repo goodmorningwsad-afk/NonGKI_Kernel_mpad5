@@ -99,6 +99,22 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 🕵️‍♂️ 终极查水表：提取内核 Kprobes 基因
+        run: |
+          echo "==== 🧬 提取内核 Kprobes 基因 ===="
+          # 强制使用绝对路径，如果已经在里面就保持不动
+          cd $GITHUB_WORKSPACE/device_kernel 2>/dev/null || true
+          
+          echo "==== 1. 查架构是否原生支持 ===="
+          grep -rn "HAVE_KPROBES" arch/arm64/Kconfig | head -n 5 || echo "❌ 架构不支持 KPROBES"
+          
+          echo "==== 2. 查 defconfig 里的总闸 ===="
+          grep -E "CONFIG_KPROBES|CONFIG_KRETPROBES" arch/arm64/configs/milito_defconfig || echo "❌ defconfig 里没开 KPROBES"
+          
+          echo "==== 3. 查源码物理文件 ===="
+          ls kernel/kprobes.c 2>/dev/null || echo "❌ 连 kernel/kprobes.c 源码都没有！"
+
+
       - name: 🚑 提取案发现场物证 (打孔崩溃时强制触发)
         if: failure()
         uses: actions/upload-artifact@v4
@@ -180,17 +196,6 @@ jobs:
                   exit 1
               fi
 
-              echo "==== 🧬 提取内核 Kprobes 基因 ===="
-               cd device_kernel
-             # 1. 查架构是否原生支持
-              grep -rn "HAVE_KPROBES" arch/arm64/Kconfig || echo "❌ 架构不支持 KPROBES"
-
-            # 2. 查你的 defconfig 里到底开没开这个总闸
-             grep -E "CONFIG_KPROBES|CONFIG_KRETPROBES" arch/arm64/configs/milito_defconfig || echo "❌ 没开 KPROBES"
-
-            # 3. 查内核源码里有没有 Kprobes 的核心实体文件
-           ls kernel/kprobes.c 2>/dev/null || echo "❌ 连 kprobes.c 源码都没有！"
- 
               
               echo "==== 1. 修复 event.c 4.19 兼容性 ===="
               EVENT_FILE=$(find "$KSU_DIR" -type f -name "event.c" | head -n 1)
