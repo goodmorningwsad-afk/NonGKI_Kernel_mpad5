@@ -224,6 +224,29 @@ jobs:
           
           echo "✅ 新补丁下载完成！"
 
+      - name: 🕵️‍♂️ 侦察行动：全盘打印 SukiSU 源码文件清单与入口扫描
+        run: |
+          echo "==== 1. 开始拉网式排查 SukiSU 源码目录 ===="
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+          
+          if [ -n "$KSU_DIR" ]; then
+              echo "✅ 锁定大本营：$KSU_DIR"
+              
+              echo -e "\n==== 2. SukiSU 核心源文件清单 (.c, .h, Makefile, Kconfig) ===="
+              # 列出所有关键源文件，过滤掉无用的杂项，按目录排序方便肉眼逐个排查
+              find "$KSU_DIR" -type f \( -name "*.c" -o -name "*.h" -o -name "Makefile" -o -name "Kconfig" \) | sed "s|$KSU_DIR/||g" | sort
+              
+              echo -e "\n==== 3. 剥去伪装：强行抓捕真·内核入口点 ===="
+              # 不看名字，只看底层逻辑！全局搜索谁调用了内核的初始化宏
+              echo "正在扫描 initcall / module_init 家族..."
+              grep -rnE "module_init|core_initcall|postcore_initcall|arch_initcall|subsys_initcall|fs_initcall|device_initcall|late_initcall" "$KSU_DIR" || echo "未发现标准初始化宏"
+              
+          else
+              echo "❌ 没找到 SukiSU 源码目录！"
+              exit 1
+          fi
+
+
 
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
