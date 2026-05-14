@@ -185,7 +185,12 @@ jobs:
           sed -i 's/# CONFIG_KALLSYMS_ALL is not set/CONFIG_KALLSYMS_ALL=y/g' arch/arm64/configs/milito_defconfig
           grep -q "^CONFIG_KALLSYMS=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/milito_defconfig
           grep -q "^CONFIG_KALLSYMS_ALL=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/milito_defconfig
-          
+                    echo "==== [强制入核] 开启 KSU 主开关与新版所需的动态追踪设施 ===="
+          for CONF in CONFIG_KSU CONFIG_KPROBES CONFIG_HAVE_KPROBES CONFIG_KPROBE_EVENTS CONFIG_OVERLAY_FS; do
+              sed -i "s/# ${CONF} is not set/${CONF}=y/g" arch/arm64/configs/milito_defconfig
+              grep -q "^${CONF}=y" arch/arm64/configs/milito_defconfig || echo "${CONF}=y" >> arch/arm64/configs/milito_defconfig
+          done
+
 
       - name: 📥 强制截胡：下载你指定的最新版 SuSFS 2.1.0 补丁
         run: |
