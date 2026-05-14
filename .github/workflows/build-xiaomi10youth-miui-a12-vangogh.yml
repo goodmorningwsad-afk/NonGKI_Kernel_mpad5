@@ -200,28 +200,42 @@ jobs:
           grep -q "^CONFIG_SECCOMP_FILTER=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP_FILTER=y" >> arch/arm64/configs/milito_defconfig
 
           touch .sukisu_bugs_fixed
-                    echo "==== 🚀 终极物理电焊 (In-tree Welding) ===="
-          # 1. 智能寻址：动态锁定 SukiSU 真实的 Makefile 和 Kconfig 层级
-          KSU_MAKEFILE=$(find "$KSU_DIR" -maxdepth 2 -name "Makefile" | head -n 1)
-          KSU_KCONFIG=$(find "$KSU_DIR" -maxdepth 2 -name "Kconfig" | head -n 1)
           
-          if [ -n "$KSU_KCONFIG" ] && [ -n "$KSU_MAKEFILE" ]; then
-              # 提取相对 device_kernel 的路径
-              REL_KCONFIG=${KSU_KCONFIG#$GITHUB_WORKSPACE/device_kernel/}
-              REL_DIR=$(dirname "${KSU_MAKEFILE#$GITHUB_WORKSPACE/device_kernel/}")
-              
-              echo "✅ 雷达锁定真实目录: $REL_DIR"
-              echo "✅ 雷达锁定 Kconfig: $REL_KCONFIG"
-              
-              # 2. 暴力焊入主内核 drivers/Kconfig
-              grep -q "$REL_KCONFIG" drivers/Kconfig || sed -i "\$a source \"$REL_KCONFIG\"" drivers/Kconfig
-              echo "🔥 Kconfig 强制注册完成！"
-              
-              # 3. 暴力焊入主内核 drivers/Makefile
-              grep -q "$REL_DIR" drivers/Makefile || echo "obj-\$(CONFIG_KSU) += $REL_DIR/" >> drivers/Makefile
-              echo "🔥 Makefile 强制注册完成！"
+          echo "==== 🚀 终极物理搬迁与电焊 (In-tree Welding V2) ===="
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          # 1. 强制物理搬家：将外面的 SukiSU 连锅端进 drivers/ 目录
+          KSU_ROOT=$(find . -maxdepth 1 -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) | head -n 1)
+          if [ -n "$KSU_ROOT" ]; then
+              echo "🚚 发现野生 SukiSU 基地 $KSU_ROOT，强制搬迁至 drivers/kernelsu !"
+              rm -rf drivers/kernelsu 2>/dev/null || true
+              mv "$KSU_ROOT" drivers/kernelsu
           else
-              echo "❌ 致命错误：未能锁定真实的 Kconfig 或 Makefile，物理电焊失败！"
+              echo "✅ SukiSU 已经在深层目录或已搬迁完毕。"
+          fi
+
+          # 2. 暴力焊入主内核 drivers/Kconfig (Kconfig 路径相对于内核根目录)
+          # 注意：根据之前的尸检，真实的 Kconfig 在 kernel/ 子目录下
+          if [ -f "drivers/kernelsu/kernel/Kconfig" ]; then
+              grep -q "drivers/kernelsu/kernel/Kconfig" drivers/Kconfig || sed -i '$a source "drivers/kernelsu/kernel/Kconfig"' drivers/Kconfig
+              echo "🔥 Kconfig 强制注册完成！"
+          elif [ -f "drivers/kernelsu/Kconfig" ]; then
+              grep -q "drivers/kernelsu/Kconfig" drivers/Kconfig || sed -i '$a source "drivers/kernelsu/Kconfig"' drivers/Kconfig
+              echo "🔥 Kconfig (根目录备用版) 强制注册完成！"
+          else
+              echo "❌ 致命错误：找不到 SukiSU 的 Kconfig！"
+              exit 1
+          fi
+          
+          # 3. 暴力焊入主内核 drivers/Makefile (Makefile 路径相对于 drivers/ 目录)
+          if [ -f "drivers/kernelsu/kernel/Makefile" ]; then
+              grep -q "kernelsu/kernel/" drivers/Makefile || echo "obj-\$(CONFIG_KSU) += kernelsu/kernel/" >> drivers/Makefile
+              echo "🔥 Makefile 强制注册完成！"
+          elif [ -f "drivers/kernelsu/Makefile" ]; then
+              grep -q "kernelsu/" drivers/Makefile || echo "obj-\$(CONFIG_KSU) += kernelsu/" >> drivers/Makefile
+              echo "🔥 Makefile (根目录备用版) 强制注册完成！"
+          else
+              echo "❌ 致命错误：找不到 SukiSU 的 Makefile！"
               exit 1
           fi
 
@@ -241,7 +255,8 @@ jobs:
           echo "# CONFIG_KPM is not set" >> $DEFCONFIG
           echo "# CONFIG_KSU_SUSFS is not set" >> $DEFCONFIG
           
-          echo "✅ 编译链条物理打通！准备迎接真正的编译洗礼！"
+          echo "✅ 基地已转移，编译链条已物理打通！冲！"
+
 
 
           echo "==== [防假阳性] 强行开启非 GKI 符号表寻址 ===="
