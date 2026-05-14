@@ -131,79 +131,36 @@ runs:
         EOF
         fi
 
-        # 🚨 [法医级修正]：Linux 4.19 专属的 EXEC 拦截锚点
-        EXEC_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern bool ksu_execveat_hook __read_mostly;
-            extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-            extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-            if (unlikely(ksu_execveat_hook))
-                ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
-            else
-                ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
-        }
-        #endif"
-        patch_file "fs/exec.c" "if (IS_ERR(filename))" 0 "$EXEC_HOOK" "ksu_execveat_hook"
+               # 🚨 [法医级修正]：Linux 4.19 专属的 EXEC 拦截锚点 (sed 强狙 do_execveat 第一行)
+        echo "💉 正在打孔 fs/exec.c..."
+        sed -i '/int do_execveat(int fd/,/^{/b hook; b; :hook /^{/!b; a\
+        \    extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\n    ksu_handle_execveat(\&fd, \&filename, \&argv, \&envp, \&flags);' fs/exec.c
 
-        OPEN_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
-            ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
-        }
-        #endif"
-        patch_file "fs/open.c" "if (mode & ~S_IRWXO)" 0 "$OPEN_HOOK" "ksu_handle_faccessat"
+        # 🚨 [法医级修正]：Linux 4.19 专属的 vfs_read 拦截锚点 (sed 强狙 vfs_read 第一行)
+        echo "💉 正在打孔 fs/read_write.c..."
+        sed -i '/ssize_t vfs_read(struct file \*file/,/^{/b hook; b; :hook /^{/!b; a\
+        \    extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos);\n    ksu_handle_vfs_read(\&file, \&buf, \&count, \&pos);' fs/read_write.c
 
-        STAT_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
-            ksu_handle_stat(&dfd, &filename, &flags);
-        }
-        #endif"
-        patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
+        # 🚨 [法医级修正]：STAT 拦截锚点 (sed 强狙 vfs_statx 第一行)
+        echo "💉 正在打孔 fs/stat.c..."
+        sed -i '/int vfs_statx(int dfd/,/^{/b hook; b; :hook /^{/!b; a\
+        \    extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\n    ksu_handle_stat(\&dfd, \&filename, \&flags);' fs/stat.c
 
-        DEVPTS_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern void ksu_handle_devpts(struct inode*);
-            ksu_handle_devpts(dentry->d_inode);
-        }
-        #endif"
-        patch_file "fs/devpts/inode.c" "if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)" 0 "$DEVPTS_HOOK" "ksu_handle_devpts"
+        # 🚨 [法医级修正]：OPEN 拦截锚点 (sed 强狙 do_faccessat 第一行)
+        echo "💉 正在打孔 fs/open.c..."
+        sed -i '/long do_faccessat(int dfd/,/^{/b hook; b; :hook /^{/!b; a\
+        \    extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n    ksu_handle_faccessat(\&dfd, \&filename, \&mode, NULL);' fs/open.c
 
+        # 🚨 [法医级修正]：INPUT 拦截锚点 (保留原来的 patch_file 逻辑，因为 input.c 的特征较好找)
         INPUT_HOOK="
         #ifdef CONFIG_KSU
         {
-            extern bool ksu_input_hook __read_mostly;
             extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
-            if (unlikely(ksu_input_hook))
-                ksu_handle_input_handle_event(&type, &code, &value);
+            ksu_handle_input_handle_event(&type, &code, &value);
         }
         #endif"
         patch_file "drivers/input/input.c" "if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)" 0 "$INPUT_HOOK" "ksu_handle_input_handle_event"
 
-        # 🚨 [法医级修正]：利用 awk 智能雷达，确保打孔绝对命中 vfs_read 心脏！
-        VFS_READ_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern bool ksu_vfs_read_hook __read_mostly;
-            extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos_ptr);
-            if (unlikely(ksu_vfs_read_hook))
-                ksu_handle_vfs_read(&file, &buf, &count, &pos);
-        }
-        #endif"
-        awk -v code="$VFS_READ_HOOK" '
-        /ssize_t vfs_read\(/ { in_vfs_read = 1 }
-        in_vfs_read && /if \(!\(file->f_mode & FMODE_READ\)\)/ && !done {
-            print code
-            print
-            done = 1
-            next
-        }
-        { print }
-        ' fs/read_write.c > tmp_file && mv tmp_file fs/read_write.c
 
         HOOKS_PATCH_1="
         #ifdef CONFIG_KSU
