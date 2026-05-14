@@ -69,8 +69,6 @@ runs:
             ' "$file" > tmp_file && mv tmp_file "$file"
         }
 
-        # 🚨 [按照指令]：彻底去除了 "修复 LineageOS 专属的 .rej 冲突" (SuSFS 专属依赖挂载补丁)
-
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         
         EXEC_HOOK="
@@ -86,6 +84,7 @@ runs:
         }
         #endif"
         patch_file "fs/exec.c" "return __do_execve_file(fd, filename, argv, envp, flags, NULL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
+        
         OPEN_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -201,15 +200,6 @@ runs:
         #endif"
         patch_file "security/selinux/hooks.c" "new_tsec = bprm->cred->security;" 0 "$HOOKS_PATCH_3" "is_ksu_transition"
 
-        SYS_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid);
-            ksu_handle_setresuid(ruid, euid, suid);
-        }
-        #endif"
-        patch_file "kernel/sys.c" "ksuid = make_kuid(ns, suid);" 1 "$SYS_HOOK" "ksu_handle_setresuid"
-
         REBOOT_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -220,19 +210,8 @@ runs:
         #endif"
         patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
 
-        READ_HOOK="
-        #ifdef CONFIG_KSU
-        {
-            extern bool ksu_init_rc_hook __read_mostly;
-            extern void ksu_handle_sys_read(unsigned int fd);
-            if (unlikely(ksu_init_rc_hook))
-                ksu_handle_sys_read(fd);
-        }
-        #endif"
-        patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
+        # 🚨 [按照指令严格清创]：引发 undefined symbol 的 ksu_handle_sys_read(READ_HOOK) 和 ksu_handle_setresuid(SYS_HOOK) 已被物理删除！
 
-        # 🚨 [按照指令]：彻底去除了导致 "long len = if(...) return 0" 暴毙的源码纠偏步骤！
-        
         echo "==== [擦屁股行动] 修复 LineageOS 官方 Bug (极客精准追踪版) ===="
         
         CPUSET_HOOK_1="
