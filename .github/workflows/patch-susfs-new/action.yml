@@ -42,8 +42,6 @@ runs:
 
         echo "✅ APEX 满血挂载防线全数合闸 (SuSFS 已剥离)！"
         
-        # 🚨 按照指令：已彻底拔除 1. 物理缝合 SuSFS 3000行隐身大动脉 (patch -p1)！
-        
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
             local file="$1"
@@ -71,8 +69,8 @@ runs:
             ' "$file" > tmp_file && mv tmp_file "$file"
         }
 
-        # 🚨 按照指令：已彻底拔除 [手工缝合] 修复 LineageOS 专属的 .rej 冲突 (这些是给 SuSFS 擦屁股的，无 SuSFS 则必定报错)！
-        
+        # 🚨 [按照指令]：彻底去除了 "修复 LineageOS 专属的 .rej 冲突" (SuSFS 专属依赖挂载补丁)
+
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         
         EXEC_HOOK="
@@ -233,20 +231,7 @@ runs:
         #endif"
         patch_file "fs/read_write.c" "if (f.file) {" 0 "$READ_HOOK" "ksu_handle_sys_read"
 
-        echo "==== [源码纠偏] 修复 SukiSU sucompat.c 权限泄露漏洞 ===="
-        SUCOMPAT_FILE=$(find $GITHUB_WORKSPACE -type f -name "sucompat.c" | head -n 1)
-        if [ -n "$SUCOMPAT_FILE" ]; then
-            echo "🩹 正在为 $SUCOMPAT_FILE 注入权限拦截大坝..."
-            
-            sed -i '/int ksu_handle_faccessat/,/ksu_strncpy_from_user_nofault/ s/ksu_strncpy_from_user_nofault/if (!ksu_is_allow_uid_for_current(current_uid().val)) return 0;\n\n\tksu_strncpy_from_user_nofault/' "$SUCOMPAT_FILE"
-            
-            sed -i '/int ksu_handle_stat(int \*dfd, const char __user \*\*filename_user/,/ksu_strncpy_from_user_nofault/ s/ksu_strncpy_from_user_nofault/if (!ksu_is_allow_uid_for_current(current_uid().val)) return 0;\n\n\tksu_strncpy_from_user_nofault/' "$SUCOMPAT_FILE"
-            
-            echo "✅ 漏洞修复完毕！检测软件再也无法通过 sh 借尸还魂了！"
-        else
-            echo "❌ 找不到 sucompat.c，纠偏失败！"
-            exit 1
-        fi
+        # 🚨 [按照指令]：彻底去除了导致 "long len = if(...) return 0" 暴毙的源码纠偏步骤！
         
         echo "==== [擦屁股行动] 修复 LineageOS 官方 Bug (极客精准追踪版) ===="
         
