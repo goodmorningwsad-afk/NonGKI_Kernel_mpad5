@@ -200,6 +200,49 @@ jobs:
           grep -q "^CONFIG_SECCOMP_FILTER=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP_FILTER=y" >> arch/arm64/configs/milito_defconfig
 
           touch .sukisu_bugs_fixed
+                    echo "==== 🚀 终极物理电焊 (In-tree Welding) ===="
+          # 1. 智能寻址：动态锁定 SukiSU 真实的 Makefile 和 Kconfig 层级
+          KSU_MAKEFILE=$(find "$KSU_DIR" -maxdepth 2 -name "Makefile" | head -n 1)
+          KSU_KCONFIG=$(find "$KSU_DIR" -maxdepth 2 -name "Kconfig" | head -n 1)
+          
+          if [ -n "$KSU_KCONFIG" ] && [ -n "$KSU_MAKEFILE" ]; then
+              # 提取相对 device_kernel 的路径
+              REL_KCONFIG=${KSU_KCONFIG#$GITHUB_WORKSPACE/device_kernel/}
+              REL_DIR=$(dirname "${KSU_MAKEFILE#$GITHUB_WORKSPACE/device_kernel/}")
+              
+              echo "✅ 雷达锁定真实目录: $REL_DIR"
+              echo "✅ 雷达锁定 Kconfig: $REL_KCONFIG"
+              
+              # 2. 暴力焊入主内核 drivers/Kconfig
+              grep -q "$REL_KCONFIG" drivers/Kconfig || sed -i "\$a source \"$REL_KCONFIG\"" drivers/Kconfig
+              echo "🔥 Kconfig 强制注册完成！"
+              
+              # 3. 暴力焊入主内核 drivers/Makefile
+              grep -q "$REL_DIR" drivers/Makefile || echo "obj-\$(CONFIG_KSU) += $REL_DIR/" >> drivers/Makefile
+              echo "🔥 Makefile 强制注册完成！"
+          else
+              echo "❌ 致命错误：未能锁定真实的 Kconfig 或 Makefile，物理电焊失败！"
+              exit 1
+          fi
+
+          echo "==== 🛠️ 暴力篡改 Defconfig (断绝后患) ===="
+          DEFCONFIG="arch/arm64/configs/milito_defconfig"
+          
+          # 强制开启 KSU 和 Manual Hook
+          sed -i 's/.*CONFIG_KSU=.*/CONFIG_KSU=y/g' $DEFCONFIG
+          grep -q "^CONFIG_KSU=y" $DEFCONFIG || echo "CONFIG_KSU=y" >> $DEFCONFIG
+          
+          sed -i 's/.*CONFIG_KSU_MANUAL_HOOK=.*/CONFIG_KSU_MANUAL_HOOK=y/g' $DEFCONFIG
+          grep -q "^CONFIG_KSU_MANUAL_HOOK=y" $DEFCONFIG || echo "CONFIG_KSU_MANUAL_HOOK=y" >> $DEFCONFIG
+          
+          # 强制关闭 KPM 和 SUSFS 毒瘤
+          sed -i 's/.*CONFIG_KPM.*/# CONFIG_KPM is not set/g' $DEFCONFIG
+          sed -i 's/.*CONFIG_KSU_SUSFS.*/# CONFIG_KSU_SUSFS is not set/g' $DEFCONFIG
+          echo "# CONFIG_KPM is not set" >> $DEFCONFIG
+          echo "# CONFIG_KSU_SUSFS is not set" >> $DEFCONFIG
+          
+          echo "✅ 编译链条物理打通！准备迎接真正的编译洗礼！"
+
 
           echo "==== [防假阳性] 强行开启非 GKI 符号表寻址 ===="
           sed -i 's/# CONFIG_KALLSYMS is not set/CONFIG_KALLSYMS=y/g' arch/arm64/configs/milito_defconfig
