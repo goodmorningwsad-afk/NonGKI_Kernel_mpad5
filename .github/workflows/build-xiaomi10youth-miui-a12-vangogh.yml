@@ -308,6 +308,41 @@ jobs:
       - name: 🔧 Patch Hide Stuff
         uses: ./.github/workflows/patch-hide-stuff
 
+      - name: 🕵️‍♂️ 查水表：抓捕驱动握手现场
+        if: always()
+        run: |
+          echo "==== 正在勘探驱动握手现场 ===="
+          mkdir -p $GITHUB_WORKSPACE/Handshake_Evidence
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          # 1. 查肉身：SukiSU 到底被下载到了哪里？有没有正确放进 drivers/kernelsu？
+          echo "==== 目录分布 ====" > $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
+          find . -maxdepth 3 -type d \( -iname "*kernelsu*" -o -iname "*sukisu*" \) -not -path "*/out/*" -not -path "*/.git/*" >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
+          
+          # 2. 查构建握手：drivers/Makefile 里面有没有加 KSU？
+          echo -e "\n==== Makefile 握手状态 ====" >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
+          grep -i "ksu" drivers/Makefile >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt || echo "❌ Makefile 中没有 KSU 握手记录" >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
+          
+          # 3. 查配置握手：drivers/Kconfig 里面有没有加 KSU？
+          echo -e "\n==== Kconfig 握手状态 ====" >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
+          grep -i "ksu" drivers/Kconfig >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt || echo "❌ Kconfig 中没有 KSU 握手记录" >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
+          
+          # 把内核的大门文件直接复印带走
+          cp drivers/Makefile $GITHUB_WORKSPACE/Handshake_Evidence/drivers_Makefile.txt || true
+          cp drivers/Kconfig $GITHUB_WORKSPACE/Handshake_Evidence/drivers_Kconfig.txt || true
+          
+          cd $GITHUB_WORKSPACE/Handshake_Evidence
+          zip -r ../Handshake_Evidence.zip .
+
+      - name: 📦 上传握手物证包
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Handshake_Evidence
+          path: Handshake_Evidence.zip
+          if-no-files-found: ignore
+
+
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
