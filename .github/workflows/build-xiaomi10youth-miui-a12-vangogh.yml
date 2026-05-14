@@ -161,11 +161,25 @@ jobs:
           if [ -n "$KSU_DIR" ]; then
               echo "✅ 锁定大本营：$KSU_DIR"
 
-                        echo "==== 🎯 0.5 暴力篡改 SukiSU Makefile (强制 Manual Hook) ===="
-              sed -i '1i\CONFIG_KSU_MANUAL_HOOK := y' "$KSU_DIR/Makefile"
-              sed -i '1i\CONFIG_KPM := n' "$KSU_DIR/Makefile"
-              sed -i '1i\CONFIG_KSU_SUSFS := n' "$KSU_DIR/Makefile"
-              echo "✅ Makefile 篡改完成！强制切断 KPM 动态寻址"
+            echo "==== 🎯 0.5 暴力篡改 SukiSU Makefile (强制 Manual Hook) ===="
+              
+              # 智能雷达：优先找 kernel/ 子目录下的 Makefile，如果没有再找根目录的
+              KSU_MAKEFILE=$(find "$KSU_DIR" -type f -path "*/kernel/Makefile" | head -n 1)
+              if [ -z "$KSU_MAKEFILE" ]; then
+                  KSU_MAKEFILE=$(find "$KSU_DIR" -maxdepth 1 -type f -name "Makefile" | head -n 1)
+              fi
+              
+              if [ -n "$KSU_MAKEFILE" ]; then
+                  echo "✅ 锁定真·Makefile: $KSU_MAKEFILE"
+                  sed -i '1i\CONFIG_KSU_MANUAL_HOOK := y' "$KSU_MAKEFILE"
+                  sed -i '1i\CONFIG_KPM := n' "$KSU_MAKEFILE"
+                  sed -i '1i\CONFIG_KSU_SUSFS := n' "$KSU_MAKEFILE"
+                  echo "✅ Makefile 篡改完成！强制切断 KPM 动态寻址"
+              else
+                  echo "❌ 致命错误：翻遍了 $KSU_DIR 竟然找不到 Makefile！"
+                  exit 1
+              fi
+
 
               
               echo "==== 1. 修复 event.c 4.19 兼容性 ===="
