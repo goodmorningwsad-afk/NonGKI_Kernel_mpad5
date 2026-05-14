@@ -160,6 +160,13 @@ jobs:
           
           if [ -n "$KSU_DIR" ]; then
               echo "✅ 锁定大本营：$KSU_DIR"
+
+                        echo "==== 🎯 0.5 暴力篡改 SukiSU Makefile (强制 Manual Hook) ===="
+              sed -i '1i\CONFIG_KSU_MANUAL_HOOK := y' "$KSU_DIR/Makefile"
+              sed -i '1i\CONFIG_KPM := n' "$KSU_DIR/Makefile"
+              sed -i '1i\CONFIG_KSU_SUSFS := n' "$KSU_DIR/Makefile"
+              echo "✅ Makefile 篡改完成！强制切断 KPM 动态寻址"
+
               
               echo "==== 1. 修复 event.c 4.19 兼容性 ===="
               EVENT_FILE=$(find "$KSU_DIR" -type f -name "event.c" | head -n 1)
@@ -185,8 +192,8 @@ jobs:
           sed -i 's/# CONFIG_KALLSYMS_ALL is not set/CONFIG_KALLSYMS_ALL=y/g' arch/arm64/configs/milito_defconfig
           grep -q "^CONFIG_KALLSYMS=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/milito_defconfig
           grep -q "^CONFIG_KALLSYMS_ALL=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/milito_defconfig
-                    echo "==== [强制入核] 开启 KSU 主开关与新版所需的动态追踪设施 ===="
-          for CONF in CONFIG_KSU CONFIG_KPROBES CONFIG_HAVE_KPROBES CONFIG_KPROBE_EVENTS CONFIG_OVERLAY_FS; do
+                    echo "==== [强制入核] 开启 KSU 主开关 (纯净内置模式) ===="
+               for CONF in CONFIG_KSU CONFIG_OVERLAY_FS; do
               sed -i "s/# ${CONF} is not set/${CONF}=y/g" arch/arm64/configs/milito_defconfig
               grep -q "^${CONF}=y" arch/arm64/configs/milito_defconfig || echo "${CONF}=y" >> arch/arm64/configs/milito_defconfig
           done
