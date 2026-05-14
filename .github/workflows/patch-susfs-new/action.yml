@@ -131,26 +131,22 @@ runs:
         EOF
         fi
 
-        # 🚨 [法医级修正]：避开 C90 变量声明陷阱，利用安全锚点进行打孔
+        # 🚨 [绝杀修正]：拆除所有 CONFIG_KSU 保护壳，强制暴露给编译器！
         
         echo "💉 正在打孔 fs/exec.c..."
         EXEC_HOOK="
-        #ifdef CONFIG_KSU
         {
             extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
             ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
-        }
-        #endif"
+        }"
         patch_file "fs/exec.c" "if (IS_ERR(filename))" 0 "$EXEC_HOOK" "ksu_handle_execveat"
 
         echo "💉 正在打孔 fs/read_write.c..."
         VFS_READ_HOOK="
-        #ifdef CONFIG_KSU
         {
             extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos_ptr);
             ksu_handle_vfs_read(&file, &buf, &count, &pos);
-        }
-        #endif"
+        }"
         awk -v code="$VFS_READ_HOOK" '
         /ssize_t vfs_read\(/ { in_vfs_read = 1 }
         in_vfs_read && /if \(!\(file->f_mode & FMODE_READ\)\)/ && !done {
@@ -164,37 +160,30 @@ runs:
 
         echo "💉 正在打孔 fs/stat.c..."
         STAT_HOOK="
-        #ifdef CONFIG_KSU
         {
             extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
             ksu_handle_stat(&dfd, &filename, &flags);
-        }
-        #endif"
+        }"
         patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
 
         echo "💉 正在打孔 fs/open.c..."
         OPEN_HOOK="
-        #ifdef CONFIG_KSU
         {
             extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
             ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
-        }
-        #endif"
+        }"
         patch_file "fs/open.c" "if (mode & ~S_IRWXO)" 0 "$OPEN_HOOK" "ksu_handle_faccessat"
 
         echo "💉 正在打孔 drivers/input/input.c..."
         INPUT_HOOK="
-        #ifdef CONFIG_KSU
         {
             extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
             ksu_handle_input_handle_event(&type, &code, &value);
-        }
-        #endif"
+        }"
         patch_file "drivers/input/input.c" "if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)" 0 "$INPUT_HOOK" "ksu_handle_input_handle_event"
-
-
+        
+        # SELinux 和 Reboot 同样拆除保护壳
         HOOKS_PATCH_1="
-        #ifdef CONFIG_KSU
         /* KSU_SELINUX_BYPASS_UNIVERSAL_1 */
         {
             static u32 ksu_sid;
@@ -204,12 +193,10 @@ runs:
             if(new_tsec->sid == ksu_sid){
                 return 0;
             }
-        }
-        #endif"
+        }"
         patch_file "security/selinux/hooks.c" "if (!nnp && !nosuid)" 0 "$HOOKS_PATCH_1" "KSU_SELINUX_BYPASS_UNIVERSAL_1"
 
         HOOKS_PATCH_2="
-        #ifdef CONFIG_KSU
         /* KSU_SELINUX_BYPASS_UNIVERSAL_2 */
         {
             static u32 ksu_sid;
@@ -219,18 +206,15 @@ runs:
             if(new_tsec->sid == ksu_sid){
                 return 0;
             }
-        }
-        #endif"
+        }"
         patch_file "security/selinux/hooks.c" "return 0; /* No change in credentials */" 1 "$HOOKS_PATCH_2" "KSU_SELINUX_BYPASS_UNIVERSAL_2"
 
         REBOOT_HOOK="
-        #ifdef CONFIG_KSU
         {
             extern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);
             if (ksu_handle_sys_reboot(magic1, magic2, cmd, &arg) == 0)
                 return 0;
-        }
-        #endif"
+        }"
         patch_file "kernel/reboot.c" "if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))" 0 "$REBOOT_HOOK" "ksu_handle_sys_reboot"
 
         echo "==== 5. [保留] 修复 LineageOS 官方 Bug ===="
