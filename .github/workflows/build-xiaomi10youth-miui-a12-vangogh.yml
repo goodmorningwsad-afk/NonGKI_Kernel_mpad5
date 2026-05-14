@@ -351,6 +351,49 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
+      - name: 🕵️‍♂️ 深度查水表：提取最新 SukiSU 握手机制真身
+        if: always()
+        run: |
+          echo "==== 开始全网搜捕 SukiSU 的最新握手代码 ===="
+          mkdir -p $GITHUB_WORKSPACE/Handshake_V3
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          # 定位 SukiSU 大本营
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+          
+          if [ -n "$KSU_DIR" ]; then
+              echo "✅ 锁定大本营：$KSU_DIR"
+              
+              # 1. 抓捕所有 hook (挂载/握手) 相关的源码目录 (最新版通常把挂载逻辑独立放在 hook 文件夹)
+              [ -d "$KSU_DIR/hook" ] && cp -r "$KSU_DIR/hook" $GITHUB_WORKSPACE/Handshake_V3/hook_dir || echo "无 hook 目录"
+              
+              # 2. 抓捕核心初始化与权限兼容代码
+              cp "$KSU_DIR/ksu.c" $GITHUB_WORKSPACE/Handshake_V3/ || true
+              cp "$KSU_DIR/kernel_includes.h" $GITHUB_WORKSPACE/Handshake_V3/ || true
+              cp "$KSU_DIR/feature/sucompat.c" $GITHUB_WORKSPACE/Handshake_V3/ || true
+              cp "$KSU_DIR/feature/sucompat.h" $GITHUB_WORKSPACE/Handshake_V3/ || true
+              cp "$KSU_DIR/runtime/ksud.c" $GITHUB_WORKSPACE/Handshake_V3/ || true
+              
+              # 3. 搜索所有使用了 kprobe 或 tracepoint 或 kallsyms 的文件 (查明它到底在靠什么动态寻址)
+              grep -rnE "kprobe|tracepoint|kallsyms|security_hook_heads" "$KSU_DIR" > $GITHUB_WORKSPACE/Handshake_V3/dynamic_hook_search.txt || true
+          fi
+          
+          # 4. 把内核端被我们打过孔的“接头点”也抓出来对照
+          cp fs/exec.c $GITHUB_WORKSPACE/Handshake_V3/kernel_exec.c || true
+          cp fs/read_write.c $GITHUB_WORKSPACE/Handshake_V3/kernel_read_write.c || true
+          cp security/selinux/hooks.c $GITHUB_WORKSPACE/Handshake_V3/kernel_selinux_hooks.c || true
+          
+          cd $GITHUB_WORKSPACE/Handshake_V3
+          zip -r ../Handshake_V3.zip .
+
+      - name: 📦 上传最新握手机制物证包
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Handshake_V3
+          path: Handshake_V3.zip
+
+
       - name: 🕵️‍♂️ 查水表：提取验证内核开关是否真正生效
         run: |
           echo "==== 提取 .config 中的真实编译状态 ===="
