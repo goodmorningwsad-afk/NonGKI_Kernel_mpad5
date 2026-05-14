@@ -131,27 +131,58 @@ runs:
         EOF
         fi
 
-               # 🚨 [法医级修正]：Linux 4.19 专属的 EXEC 拦截锚点 (sed 强狙 do_execveat 第一行)
+        # 🚨 [法医级修正]：避开 C90 变量声明陷阱，利用安全锚点进行打孔
+        
         echo "💉 正在打孔 fs/exec.c..."
-        sed -i '/int do_execveat(int fd/,/^{/b hook; b; :hook /^{/!b; a\
-        \    extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\n    ksu_handle_execveat(\&fd, \&filename, \&argv, \&envp, \&flags);' fs/exec.c
+        EXEC_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
+            ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
+        }
+        #endif"
+        patch_file "fs/exec.c" "if (IS_ERR(filename))" 0 "$EXEC_HOOK" "ksu_handle_execveat"
 
-        # 🚨 [法医级修正]：Linux 4.19 专属的 vfs_read 拦截锚点 (sed 强狙 vfs_read 第一行)
         echo "💉 正在打孔 fs/read_write.c..."
-        sed -i '/ssize_t vfs_read(struct file \*file/,/^{/b hook; b; :hook /^{/!b; a\
-        \    extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos);\n    ksu_handle_vfs_read(\&file, \&buf, \&count, \&pos);' fs/read_write.c
+        VFS_READ_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos_ptr);
+            ksu_handle_vfs_read(&file, &buf, &count, &pos);
+        }
+        #endif"
+        awk -v code="$VFS_READ_HOOK" '
+        /ssize_t vfs_read\(/ { in_vfs_read = 1 }
+        in_vfs_read && /if \(!\(file->f_mode & FMODE_READ\)\)/ && !done {
+            print code
+            print
+            done = 1
+            next
+        }
+        { print }
+        ' fs/read_write.c > tmp_file && mv tmp_file fs/read_write.c
 
-        # 🚨 [法医级修正]：STAT 拦截锚点 (sed 强狙 vfs_statx 第一行)
         echo "💉 正在打孔 fs/stat.c..."
-        sed -i '/int vfs_statx(int dfd/,/^{/b hook; b; :hook /^{/!b; a\
-        \    extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\n    ksu_handle_stat(\&dfd, \&filename, \&flags);' fs/stat.c
+        STAT_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
+            ksu_handle_stat(&dfd, &filename, &flags);
+        }
+        #endif"
+        patch_file "fs/stat.c" "if ((flags & ~(AT_SYMLINK_NOFOLLOW" 0 "$STAT_HOOK" "ksu_handle_stat"
 
-        # 🚨 [法医级修正]：OPEN 拦截锚点 (sed 强狙 do_faccessat 第一行)
         echo "💉 正在打孔 fs/open.c..."
-        sed -i '/long do_faccessat(int dfd/,/^{/b hook; b; :hook /^{/!b; a\
-        \    extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n    ksu_handle_faccessat(\&dfd, \&filename, \&mode, NULL);' fs/open.c
+        OPEN_HOOK="
+        #ifdef CONFIG_KSU
+        {
+            extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
+            ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
+        }
+        #endif"
+        patch_file "fs/open.c" "if (mode & ~S_IRWXO)" 0 "$OPEN_HOOK" "ksu_handle_faccessat"
 
-        # 🚨 [法医级修正]：INPUT 拦截锚点 (保留原来的 patch_file 逻辑，因为 input.c 的特征较好找)
+        echo "💉 正在打孔 drivers/input/input.c..."
         INPUT_HOOK="
         #ifdef CONFIG_KSU
         {
