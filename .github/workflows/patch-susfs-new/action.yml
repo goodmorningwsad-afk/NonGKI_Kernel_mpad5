@@ -53,7 +53,7 @@ runs:
         
                 echo "==== 1. 物理超度旧版补丁，强行截胡最新版 ===="
         
-        # 🚨 第一重防线：全盘搜索并彻底销毁之前在环境准备阶段下载的老补丁！绝不留后患！
+        # 🚨 第一重防线：全盘搜索并彻底销毁之前在环境准备阶段下载的老补丁！
         find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" -type f -exec rm -f {} + || true
         
         # 🚨 第二重防线：强制拉取你指定的满血补丁，并赋予一个专属新名字，物理隔离旧环境！
@@ -75,18 +75,19 @@ runs:
         if [ -n "$KSU_DIR" ]; then
             echo "🔍 找到 SukiSU 源码目录: $KSU_DIR，开始物理换心..."
             
-            # 🚨 将你仓库里备好的 5 个最新版 API 文件强行覆盖进去 (前提是你在仓库建了这个文件夹)
-            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/sucompat.c "$KSU_DIR/kernel/feature/sucompat.c" || true
-            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/sucompat.h "$KSU_DIR/kernel/feature/sucompat.h" || true
-            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/allowlist.c "$KSU_DIR/kernel/policy/allowlist.c" || true
-            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/su_mount_ns.c "$KSU_DIR/kernel/infra/su_mount_ns.c" || true
-            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/syscall_handler.c "$KSU_DIR/kernel/hook/syscall_handler.c" || true
+            # 🚨 极客严谨模式：去掉 || true！如果文件不存在或拷贝失败，当场暴毙！绝不带着残缺的代码继续编译！
+            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/sucompat.c "$KSU_DIR/kernel/feature/sucompat.c"
+            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/sucompat.h "$KSU_DIR/kernel/feature/sucompat.h"
+            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/allowlist.c "$KSU_DIR/kernel/policy/allowlist.c"
+            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/su_mount_ns.c "$KSU_DIR/kernel/infra/su_mount_ns.c"
+            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/syscall_handler.c "$KSU_DIR/kernel/hook/syscall_handler.c"
             
             echo "✅ SukiSU 核心 API 换心完毕！已完美对接 SuSFS 2.1.0！"
         else
-            echo "❌ 未找到 SukiSU 目录，换心失败，可能导致后续编译报错！"
+            echo "❌ 未找到 SukiSU 目录，换心失败，当场暴毙！"
             exit 1
         fi
+
 
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
