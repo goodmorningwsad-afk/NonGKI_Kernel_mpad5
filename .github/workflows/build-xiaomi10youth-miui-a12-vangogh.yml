@@ -113,15 +113,12 @@ jobs:
           
           echo "==== 3. 查源码物理文件 ===="
           ls kernel/kprobes.c 2>/dev/null || echo "❌ 连 kernel/kprobes.c 源码都没有！"
-      - name: 🕵️‍♂️ 终极搜捕：全盘扫描 Manual Hook 真身
+      - name: 🕵️‍♂️ 终极物证提取：谁控制了暗号？
         run: |
-          echo "==== 🔍 全局搜捕 ksu_handle_execveat 真身 ===="
-          # 在整个工作区找 .c 文件，找到直接打印出带函数名的下面 15 行代码
-          find $GITHUB_WORKSPACE -type f -name "*.c" -exec grep -HnA 15 "ksu_handle_execveat(" {} + || echo "❌ 全局未找到 ksu_handle_execveat 定义"
-          
-          echo "==== 🔍 全局搜捕 vfs_read 真身 ===="
-          find $GITHUB_WORKSPACE -type f -name "*.c" -exec grep -HnA 15 "ksu_handle_vfs_read(" {} + || echo "❌ 全局未找到 ksu_handle_vfs_read 定义"
-
+          echo "==== 🔍 全局追查 ksu_execveat_hook 的电源线 ===="
+          # 搜索所有包含这个变量的 .c 和 .h 文件
+          # 重点关注带 '=' 赋值的行，或者 static_branch_enable 这样的激活宏
+          find $GITHUB_WORKSPACE -type f \( -name "*.c" -o -name "*.h" \) -exec grep -Hn "ksu_execveat_hook" {} + || echo "❌ 连变量名都没搜到"
 
 
       - name: 🚑 提取案发现场物证 (打孔崩溃时强制触发)
