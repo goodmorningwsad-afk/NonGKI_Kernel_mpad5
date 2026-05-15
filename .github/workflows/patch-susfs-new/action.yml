@@ -482,6 +482,33 @@ runs:
         echo "🩹 正在为 MODPOST 注入 ion_alloc_dmabuf 弱引用替身..."
         cat << 'EOF' >> mm/madvise.c
 
+                # 13. 铲除 SukiSU 中残留的废弃调用 (SuSFS 2.1.0 已经将其全自动后台化)
+        echo "🩹 正在铲除 kernel_umount.c 和 supercalls.c 中的旧版废弃调用..."
+        sed -i '/susfs_run_sus_path_loop/d' drivers/kernelsu/kernel_umount.c
+        sed -i '/susfs_set_i_state_on_external_dir/d' drivers/kernelsu/supercalls.c
+
+        # 14. 跨时空截胡最新的 SELinux 欺骗模块 (完美复活 App 开关功能)
+        echo "🩹 正在从未来 (HEAD) 窃取满血 SELinux 模块..."
+        KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+        if [ -n "$KSU_DIR" ]; then
+            cd "$KSU_DIR"
+            # 强行从最新分支拽取包含真实 fake_state 的文件，覆盖本地的旧版
+            git checkout origin/HEAD -- kernel/selinux/selinux.c kernel/selinux/selinux.h || \
+            git checkout origin/main -- kernel/selinux/selinux.c kernel/selinux/selinux.h
+            cd -
+        fi
+        
+        # 15. 接入真实的 SELinux 变量声明 (对接刚刚截胡的真实模块)
+        echo "🩹 正在对接真实的 SELinux 欺骗变量..."
+        HOOKS_TOP_REJ="
+        /* FIX_HOOKS_TOP_REJ */
+        #ifdef CONFIG_KSU_SUSFS
+        extern struct selinux_state fake_state;
+        extern bool ksu_selinux_hide_running __read_mostly;
+        #endif"
+        patch_file "security/selinux/hooks.c" "#include \"objsec.h\"" 0 "$HOOKS_TOP_REJ" "FIX_HOOKS_TOP_REJ"
+
+
         #include <linux/export.h>
         void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }
         EXPORT_SYMBOL(ion_alloc_dmabuf);
