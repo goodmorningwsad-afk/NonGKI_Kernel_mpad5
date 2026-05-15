@@ -115,7 +115,7 @@ jobs:
           echo "==== 启动 Git 级时光机，直接回退 ===="
           
           # 精准定位 SukiSU 源码根目录
-          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 300)
           
           if [ -n "$KSU_DIR" ]; then
               echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
