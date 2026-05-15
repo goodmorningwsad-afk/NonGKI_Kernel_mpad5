@@ -488,33 +488,22 @@ runs:
         sed -i '/susfs_run_sus_path_loop/d' drivers/kernelsu/kernel_umount.c
         sed -i '/susfs_set_i_state_on_external_dir/d' drivers/kernelsu/supercalls.c
 
-                # 14. 临时探针：跨时空提取新老文件用于法医解析
-        echo "==== 🔍 开始执行法医提取任务 ===="
+        # 14. 跨时空截胡最新的 SELinux 欺骗模块 (并进行法医级 API 降级缝合)
+        echo "🩹 正在从未来 (HEAD) 窃取满血 SELinux 模块..."
         KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
         if [ -n "$KSU_DIR" ]; then
             cd "$KSU_DIR"
-            
-            echo "==== 📂 [老版本 - 3月2日] rules.c 函数实现 ===="
-            grep -n -A 10 -B 2 "int handle_sepolicy" kernel/selinux/rules.c || true
-            
-            echo "==== 📂 [老版本 - 3月2日] selinux.h 函数声明 ===="
-            grep -n -A 2 -B 2 "handle_sepolicy" kernel/selinux/selinux.h || true
-            
-            echo "==== 🚀 正在截胡新版本 (HEAD) selinux.c 和 selinux.h ===="
+            # 强行从最新分支拽取包含真实 fake_state 的文件，绝不妥协
             git checkout origin/HEAD -- kernel/selinux/selinux.c kernel/selinux/selinux.h || \
             git checkout origin/main -- kernel/selinux/selinux.c kernel/selinux/selinux.h
             
-            echo "==== 📂 [新版本 - 满血] selinux.h 函数声明 ===="
-            grep -n -A 2 -B 2 "handle_sepolicy" kernel/selinux/selinux.h || true
-            
-            echo "==== 📂 [新版本 - 满血] selinux.c 呼叫现场 ===="
-            grep -n -A 5 -B 5 "handle_sepolicy" kernel/selinux/selinux.c || true
+            # 🚨 史诗级 API 缝合：把新版 selinux.h 里的声明，强行掰回老版本 rules.c 的形状！
+            echo "🩹 正在将新版 selinux.h 的函数签名降级适配老底盘..."
+            sed -i 's/int handle_sepolicy(void __user \*user_data, u64 data_len);/int handle_sepolicy(unsigned long arg3, void __user \*arg4);/g' kernel/selinux/selinux.h
             
             cd -
         fi
-        
-        echo "==== 🛑 提取完成！强行中断流水线，等待解析！ ===="
-        exit 1
+
 
         # 16. 修复 SuSFS 原作者的低级失误 (open.c 缺失头文件)
         if ! grep -q "susfs_def.h" fs/open.c; then
