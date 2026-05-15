@@ -120,6 +120,28 @@ jobs:
           # 重点关注带 '=' 赋值的行，或者 static_branch_enable 这样的激活宏
           find $GITHUB_WORKSPACE -type f \( -name "*.c" -o -name "*.h" \) -exec grep -Hn "ksu_execveat_hook" {} + || echo "❌ 连变量名都没搜到"
 
+      - name: 🕵️‍♂️ 开启时光机：追捕阉割 Manual Hook 的确切日期
+        run: |
+          echo "==== ⏳ 启动 Git 历史追溯 ===="
+          # 自动寻找 SukiSU 的源码目录
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d -name ".git" | grep -i -E "kernelsu|sukisu" | head -n 500 | xargs dirname)
+          
+          if [ -z "$KSU_DIR" ]; then
+             echo "❌ 找不到 .git 目录！(可能你拉取源码时没有保留完整的 Git 历史)"
+             exit 1
+          fi
+          
+          cd "$KSU_DIR"
+          
+          echo "==== 📅 案件一：谁、在哪一天引入了 ksu_execveat_hook 暗号？ ===="
+          # -S 搜索字符串，--format 定制输出格式：日期 | Commit号 | 作者 | 提交说明
+          git log -S "ksu_execveat_hook" --date=short --format="%ad | Commit: %h | Author: %an | Msg: %s" -- kernel/feature/sucompat.c || echo "未找到历史记录"
+          
+          echo "==== 📅 案件二：谁、在哪一天用 CONFIG_KSU_SUSFS 阉割了核心驱动？ ===="
+          git log -S "CONFIG_KSU_SUSFS" --date=short --format="%ad | Commit: %h | Author: %an | Msg: %s" -- kernel/feature/sucompat.c || echo "未找到历史记录"
+          
+          echo "==== 📅 案件三：查看 sucompat.c 最近的 5 次手术记录 ===="
+          git log -n 50 --date=short --format="%ad | Commit: %h | Author: %an | Msg: %s" -- kernel/feature/sucompat.c
 
       - name: 🚑 提取案发现场物证 (打孔崩溃时强制触发)
         if: failure()
