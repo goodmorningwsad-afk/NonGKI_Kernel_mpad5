@@ -113,6 +113,17 @@ jobs:
           
           echo "==== 3. 查源码物理文件 ===="
           ls kernel/kprobes.c 2>/dev/null || echo "❌ 连 kernel/kprobes.c 源码都没有！"
+      - name: 🕵️‍♂️ 终极搜捕：Manual Hook 真身是否存在
+        run: |
+          echo "==== 🔍 寻找 ksu_handle_execveat 和 vfs_read 的物理定义 ===="
+          cd $GITHUB_WORKSPACE/device_kernel/drivers/kernelsu/kernel
+          
+          # 搜索函数名，并强制打印其下方的 15 行代码，看看里面到底是干活的代码，还是纯空壳
+          echo ">> 搜捕 execveat 拦截器："
+          grep -rnA 15 "ksu_handle_execveat" . || echo "❌ 连函数名都搜不到！"
+          
+          echo ">> 搜捕 vfs_read 拦截器："
+          grep -rnA 15 "ksu_handle_vfs_read" . || echo "❌ 连函数名都搜不到！"
 
 
       - name: 🚑 提取案发现场物证 (打孔崩溃时强制触发)
