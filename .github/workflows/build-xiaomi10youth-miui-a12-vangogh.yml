@@ -113,17 +113,15 @@ jobs:
           
           echo "==== 3. 查源码物理文件 ===="
           ls kernel/kprobes.c 2>/dev/null || echo "❌ 连 kernel/kprobes.c 源码都没有！"
-      - name: 🕵️‍♂️ 终极搜捕：Manual Hook 真身是否存在
+      - name: 🕵️‍♂️ 终极搜捕：全盘扫描 Manual Hook 真身
         run: |
-          echo "==== 🔍 寻找 ksu_handle_execveat 和 vfs_read 的物理定义 ===="
-          cd $GITHUB_WORKSPACE/device_kernel/drivers/kernelsu/kernel
+          echo "==== 🔍 全局搜捕 ksu_handle_execveat 真身 ===="
+          # 在整个工作区找 .c 文件，找到直接打印出带函数名的下面 15 行代码
+          find $GITHUB_WORKSPACE -type f -name "*.c" -exec grep -HnA 15 "ksu_handle_execveat(" {} + || echo "❌ 全局未找到 ksu_handle_execveat 定义"
           
-          # 搜索函数名，并强制打印其下方的 15 行代码，看看里面到底是干活的代码，还是纯空壳
-          echo ">> 搜捕 execveat 拦截器："
-          grep -rnA 15 "ksu_handle_execveat" . || echo "❌ 连函数名都搜不到！"
-          
-          echo ">> 搜捕 vfs_read 拦截器："
-          grep -rnA 15 "ksu_handle_vfs_read" . || echo "❌ 连函数名都搜不到！"
+          echo "==== 🔍 全局搜捕 vfs_read 真身 ===="
+          find $GITHUB_WORKSPACE -type f -name "*.c" -exec grep -HnA 15 "ksu_handle_vfs_read(" {} + || echo "❌ 全局未找到 ksu_handle_vfs_read 定义"
+
 
 
       - name: 🚑 提取案发现场物证 (打孔崩溃时强制触发)
