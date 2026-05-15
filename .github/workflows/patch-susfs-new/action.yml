@@ -472,19 +472,16 @@ runs:
         echo "🩹 正在全盘缝合 lib/zstd/ 目录下的 ZSTD_FALLTHROUGH ..."
         find lib/zstd -type f -exec sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' {} +
         
-                # 11. 终结链接器 (ld.lld) 的最后 3 个幽灵符号报错
+        # 11. 终结链接器 (ld.lld) 的最后 3 个幽灵符号报错
         echo "🩹 正在为 vmlinux 大一统注入最后的物理替身..."
-        
         echo "bool is_ksu_transition(const void *old_tsec, const void *new_tsec) { return false; }" >> security/selinux/hooks.c
         echo "void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}" >> drivers/mmc/host/sdhci-pltfm.c
         
-        # 12. 修复 MODPOST 打包阶段 KO 模块缺失 ion_alloc_dmabuf 的 Bug
+        # 12. 修复 MODPOST 打包阶段 KO 模块缺失 ion_alloc_dmabuf 的 Bug (全防呆版 echo 注入)
         echo "🩹 正在为 MODPOST 注入 ion_alloc_dmabuf 弱引用替身..."
-        cat << 'EOF' >> mm/madvise.c
-        #include <linux/export.h>
-        void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }
-        EXPORT_SYMBOL(ion_alloc_dmabuf);
-        EOF
+        echo "#include <linux/export.h>" >> mm/madvise.c
+        echo "void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }" >> mm/madvise.c
+        echo "EXPORT_SYMBOL(ion_alloc_dmabuf);" >> mm/madvise.c
 
         # 13. 铲除 SukiSU 中残留的废弃调用 (SuSFS 2.1.0 已经将其全自动后台化)
         echo "🩹 正在铲除 kernel_umount.c 和 supercalls.c 中的旧版废弃调用..."
@@ -496,7 +493,7 @@ runs:
         KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
         if [ -n "$KSU_DIR" ]; then
             cd "$KSU_DIR"
-            # 强行从最新分支拽取包含真实 fake_state 的文件，覆盖本地的旧版
+            # 强行从最新分支拽取包含真实 fake_state 的文件，绝不妥协
             git checkout origin/HEAD -- kernel/selinux/selinux.c kernel/selinux/selinux.h || \
             git checkout origin/main -- kernel/selinux/selinux.c kernel/selinux/selinux.h
             cd -
@@ -512,16 +509,12 @@ runs:
         #endif"
         patch_file "security/selinux/hooks.c" "#include \"objsec.h\"" 0 "$HOOKS_TOP_REJ" "FIX_HOOKS_TOP_REJ"
 
-        sed -i 's/-dirty//g' scripts/setlocalversion
+        # 16. 修复 SuSFS 原作者的低级失误 (open.c 缺失头文件)
+        if ! grep -q "susfs_def.h" fs/open.c; then
+            echo "🩹 正在为 open.c 物理强插 susfs_def.h 头文件..."
+            sed -i '1i #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT\n#include <linux/susfs_def.h>\n#endif' fs/open.c
+        fi
 
-
-        #include <linux/export.h>
-        void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }
-        EXPORT_SYMBOL(ion_alloc_dmabuf);
-        EOF
-        
         sed -i 's/-dirty//g' scripts/setlocalversion
-        
-        # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
         touch .phantom_hooks_applied
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
