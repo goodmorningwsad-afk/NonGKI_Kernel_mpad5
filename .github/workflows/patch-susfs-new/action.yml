@@ -161,6 +161,59 @@ runs:
         	}
         #endif"
         patch_file "fs/namei.c" "static int may_o_create(const struct path *dir, struct dentry *dentry, umode_t mode)" 2 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
+               
+                # 7. 补全 hooks.c 顶部缺失的变量声明 (致命报错的元凶)
+        HOOKS_TOP_REJ="
+        /* FIX_HOOKS_TOP_REJ */
+        #ifdef CONFIG_KSU_SUSFS
+        extern struct selinux_state fake_state;
+        extern bool ksu_selinux_hide_running __read_mostly;
+        #endif"
+        patch_file "security/selinux/hooks.c" "#include \"objsec.h\"" 0 "$HOOKS_TOP_REJ" "FIX_HOOKS_TOP_REJ"
+
+        # 8. 补全 task_mmu.c 第 8 块缺失的隐藏跳过逻辑 (精准 sed 注入)
+        if ! grep -q "FIX_TASK_MMU_8_REJ" fs/proc/task_mmu.c; then
+            echo "🩹 正在缝合 task_mmu.c Hunk 8 内存映射防线..."
+            sed -i '/ret = walk_page_range(start_vaddr, end, &pagemap_walk);/i \
+        /* FIX_TASK_MMU_8_REJ */\n#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n\t\tvma = find_vma(mm, start_vaddr);\n\t\tif (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))\n\t\t\tgoto bypass_orig_flow;\n#endif \/\/ #ifdef CONFIG_KSU_SUSFS_SUS_MAP' fs/proc/task_mmu.c
+        
+            sed -i '/ret = walk_page_range(start_vaddr, end, &pagemap_walk);/a \
+        #ifdef CONFIG_KSU_SUSFS_SUS_MAP\nbypass_orig_flow:\n#endif \/\/ #ifdef CONFIG_KSU_SUSFS_SUS_MAP' fs/proc/task_mmu.c
+        fi
+
+        # 9. 补全 namespace.c 尾部缺失的两个 SuSFS 挂载核心函数
+        if ! grep -q "susfs_get_non_sus_mnt_id_from_mnt" fs/namespace.c; then
+            echo "🩹 正在追加 namespace.c 尾部缺失的底层挂载函数..."
+            cat << 'EOF' >> fs/namespace.c
+
+        #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+        int susfs_get_non_sus_mnt_id_from_mnt(struct mount *orig_mnt) {
+            struct mount *mnt = orig_mnt;
+            int mnt_id;
+            lock_mount_hash();
+            for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
+            mnt_id = mnt->mnt_id;
+            unlock_mount_hash();
+            return mnt_id;
+        }
+
+        struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt) {
+            struct mount *mnt = real_mount(vfsmnt);
+            lock_mount_hash();
+            for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
+            mntget(&mnt->mnt);
+            if (!mnt->mnt.mnt_root || IS_ERR(mnt->mnt.mnt_root)) {
+                mntput(&mnt->mnt);
+                unlock_mount_hash();
+                return vfsmnt;
+            }
+            dget(mnt->mnt.mnt_root);
+            unlock_mount_hash();
+            return &mnt->mnt;
+        }
+        #endif
+        EOF
+        fi
 
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         
