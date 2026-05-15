@@ -108,23 +108,28 @@ jobs:
             device_kernel/fs/namei.c
             device_kernel/**/*.rej
 
-      - name: ⏪ 物理时光机：精准回溯 SukiSU 3号提交
+      - name: ⏪ 物理时光机：精准回溯 SukiSU 3号提交 (竞速版)
         shell: bash
         run: |
           set -e # 🚨 遇错立刻暴毙机制
-          echo "==== 启动 Git 级时光机，直接回退 ===="
+          echo "==== 启动 Git 级时光机 ===="
           
           # 精准定位 SukiSU 源码根目录
-          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 300)
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
           
           if [ -n "$KSU_DIR" ]; then
               echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
               cd "$KSU_DIR"
               
-              # 🚨 核心指令：直接硬重置到 3 月 2 日的最后一个正常提交 (c1fd51c)
-              git reset --hard c1fd51c
+              echo "⬇️ 正在往下深挖 300 层历史记录..."
+              git remote set-url origin https://github.com/SukiSU-Ultra/SukiSU.git
+              # 核心改动：只拉取最近 300 个提交，省时省力
+              git fetch --deepen=300 origin || git fetch --depth=300 origin
               
-              echo "✅ 源码已成功回溯至 3 月 2 日纯净版！"
+              echo "⏪ 正在时间跳跃至 3 月 2 日的纯净版 (c1fd51c)..."
+              git checkout c1fd51c
+              
+              echo "✅ 源码已成功回溯至黄金时代！"
           else
               echo "❌ 致命错误：未找到 SukiSU 源码目录，时光机启动失败！"
               exit 1
