@@ -99,50 +99,6 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-      - name: 🕵️‍♂️ 终极查水表：提取内核 Kprobes 基因
-        run: |
-          echo "==== 🧬 提取内核 Kprobes 基因 ===="
-          # 强制使用绝对路径，如果已经在里面就保持不动
-          cd $GITHUB_WORKSPACE/device_kernel 2>/dev/null || true
-          
-          echo "==== 1. 查架构是否原生支持 ===="
-          grep -rn "HAVE_KPROBES" arch/arm64/Kconfig | head -n 5 || echo "❌ 架构不支持 KPROBES"
-          
-          echo "==== 2. 查 defconfig 里的总闸 ===="
-          grep -E "CONFIG_KPROBES|CONFIG_KRETPROBES" arch/arm64/configs/milito_defconfig || echo "❌ defconfig 里没开 KPROBES"
-          
-          echo "==== 3. 查源码物理文件 ===="
-          ls kernel/kprobes.c 2>/dev/null || echo "❌ 连 kernel/kprobes.c 源码都没有！"
-      - name: 🕵️‍♂️ 终极物证提取：谁控制了暗号？
-        run: |
-          echo "==== 🔍 全局追查 ksu_execveat_hook 的电源线 ===="
-          # 搜索所有包含这个变量的 .c 和 .h 文件
-          # 重点关注带 '=' 赋值的行，或者 static_branch_enable 这样的激活宏
-          find $GITHUB_WORKSPACE -type f \( -name "*.c" -o -name "*.h" \) -exec grep -Hn "ksu_execveat_hook" {} + || echo "❌ 连变量名都没搜到"
-
-      - name: 🕵️‍♂️ 开启时光机：追捕阉割 Manual Hook 的确切日期
-        run: |
-          echo "==== ⏳ 启动 Git 历史追溯 ===="
-          # 自动寻找 SukiSU 的源码目录
-          KSU_DIR=$(find $GITHUB_WORKSPACE -type d -name ".git" | grep -i -E "kernelsu|sukisu" | head -n 500 | xargs dirname)
-          
-          if [ -z "$KSU_DIR" ]; then
-             echo "❌ 找不到 .git 目录！(可能你拉取源码时没有保留完整的 Git 历史)"
-             exit 1
-          fi
-          
-          cd "$KSU_DIR"
-          
-          echo "==== 📅 案件一：谁、在哪一天引入了 ksu_execveat_hook 暗号？ ===="
-          # -S 搜索字符串，--format 定制输出格式：日期 | Commit号 | 作者 | 提交说明
-          git log -S "ksu_execveat_hook" --date=short --format="%ad | Commit: %h | Author: %an | Msg: %s" -- kernel/feature/sucompat.c || echo "未找到历史记录"
-          
-          echo "==== 📅 案件二：谁、在哪一天用 CONFIG_KSU_SUSFS 阉割了核心驱动？ ===="
-          git log -S "CONFIG_KSU_SUSFS" --date=short --format="%ad | Commit: %h | Author: %an | Msg: %s" -- kernel/feature/sucompat.c || echo "未找到历史记录"
-          
-          echo "==== 📅 案件三：查看 sucompat.c 最近的 5 次手术记录 ===="
-          git log -n 50 --date=short --format="%ad | Commit: %h | Author: %an | Msg: %s" -- kernel/feature/sucompat.c
-
       - name: 🚑 提取案发现场物证 (打孔崩溃时强制触发)
         if: failure()
         uses: actions/upload-artifact@v4
@@ -152,13 +108,35 @@ jobs:
             device_kernel/fs/namei.c
             device_kernel/**/*.rej
 
+      - name: ⏪ 物理时光机：精准回溯 SukiSU 3号提交
+        shell: bash
+        run: |
+          set -e # 🚨 遇错立刻暴毙机制
+          echo "==== 启动 Git 级时光机，直接回退 ===="
+          
+          # 精准定位 SukiSU 源码根目录
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
+          
+          if [ -n "$KSU_DIR" ]; then
+              echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
+              cd "$KSU_DIR"
+              
+              # 🚨 核心指令：直接硬重置到 3 月 2 日的最后一个正常提交 (c1fd51c)
+              git reset --hard c1fd51c
+              
+              echo "✅ 源码已成功回溯至 3 月 2 日纯净版！"
+          else
+              echo "❌ 致命错误：未找到 SukiSU 源码目录，时光机启动失败！"
+              exit 1
+          fi
+
       - name: 🩹 Fix Kernel Bugs & Extra Options
         run: |
-          set -e
+          set -e # 🚨 遇错立刻暴毙机制
           cd $GITHUB_WORKSPACE/device_kernel
           
           if [ -f ".kernel_bugs_fixed" ]; then
-              echo "⏭️ 内核 Bug 已修复过，跳过！"
+              echo "⏭️ 内核 Bug 已修复过，防重复跳过！"
               exit 0
           fi
 
@@ -170,201 +148,70 @@ jobs:
           sed -i 's/boost_write_wrapper(/__attribute__((unused)) boost_write_wrapper(/g' kernel/sched/tune.c
           sed -i 's/prefer_idle_write_wrapper(/__attribute__((unused)) prefer_idle_write_wrapper(/g' kernel/sched/tune.c
           
-          echo "==== 3. 抹除 NTFS3 驱动超前参数 ===="
+          echo "==== 3. 抹除 NTFS3 驱动中老编译器不识别的超前参数 ===="
           [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wunused-but-set-variable//g' fs/ntfs3/Makefile
           [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wno-unused-but-set-variable//g' fs/ntfs3/Makefile
           
-          echo "==== 4. 物理补全 namei.c 变量声明 ===="
+          echo "==== 4. 物理补全 namei.c 缺失的变量声明 ===="
           grep -q "FIXED_UNDECLARED_VAR" fs/namei.c || sed -i '3168s/^/    int error = 0; \/* FIXED_UNDECLARED_VAR *\/ \n/' fs/namei.c
           
-          echo "==== 5. 拯救 namespace.c ===="
+          echo "==== 5. 拯救被摧毁的 namespace.c (纯软件层安全覆盖) ===="
           grep -q "LineageOS restored" fs/namespace.c || {
               curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/fs/namespace.c" -o fs/namespace.c
               echo "// LineageOS restored" >> fs/namespace.c
           }
-
+          
           echo "==== 6. 防止 LTO 爆内存，强制保留 ===="
           sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/milito_defconfig
           sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/milito_defconfig
 
           touch .kernel_bugs_fixed
+          echo "✅ 内核基础 Bug 修复完成！"
 
       - name: 🩹 Fix SukiSU Bugs & Defconfig Options
         run: |
-          set -e
+          set -e # 🚨 遇错立刻暴毙机制
           cd $GITHUB_WORKSPACE/device_kernel
           
           if [ -f ".sukisu_bugs_fixed" ]; then
-              echo "⏭️ SukiSU Bug 已修复过，跳过！"
+              echo "⏭️ SukiSU Bug 已修复过，防重复跳过！"
               exit 0
           fi
 
-          echo "==== 🎯 0. 精准锁定 SukiSU 源码大本营 ===="
-          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+          echo "==== 1. 修复 SukiSU builtin 分支原厂笔误 ===="
+          sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
+          sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
+          sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
           
-          if [ -n "$KSU_DIR" ]; then
-              echo "✅ 锁定大本营：$KSU_DIR"
-
-            echo "==== 🎯 0.5 暴力篡改 SukiSU Makefile (强制 Manual Hook) ===="
-              
-              # 智能雷达：优先找 kernel/ 子目录下的 Makefile，如果没有再找根目录的
-              KSU_MAKEFILE=$(find "$KSU_DIR" -type f -path "*/kernel/Makefile" | head -n 1)
-              if [ -z "$KSU_MAKEFILE" ]; then
-                  KSU_MAKEFILE=$(find "$KSU_DIR" -maxdepth 1 -type f -name "Makefile" | head -n 1)
-              fi
-              
-              if [ -n "$KSU_MAKEFILE" ]; then
-                  echo "✅ 锁定真·Makefile: $KSU_MAKEFILE"
-                  sed -i '1i\CONFIG_KSU_MANUAL_HOOK := y' "$KSU_MAKEFILE"
-                  sed -i '1i\CONFIG_KPM := n' "$KSU_MAKEFILE"
-                  sed -i '1i\CONFIG_KSU_SUSFS := n' "$KSU_MAKEFILE"
-                  echo "✅ Makefile 篡改完成！强制切断 KPM 动态寻址"
-              else
-                  echo "❌ 致命错误：翻遍了 $KSU_DIR 竟然找不到 Makefile！"
-                  exit 1
-              fi
-
-              
-              echo "==== 1. 修复 event.c 4.19 兼容性 ===="
-              EVENT_FILE=$(find "$KSU_DIR" -type f -name "event.c" | head -n 1)
-              if [ -n "$EVENT_FILE" ]; then
-                  sed -i 's/\bstrncpy_from_user_nofault(/__strncpy_from_user_nofault(/g' "$EVENT_FILE"
-              fi
-          fi
+          echo "==== 2. 修复 supercalls.c 宏定义套娃 ===="
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
           
-          echo "==== 3. 开启内核配置与防线 ===="
+          echo "==== 3. 屏蔽无用函数警告 ===="
           grep -q "\-Wno-unused-function" fs/Makefile || echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
           grep -q "\-Wno-error" fs/Makefile || echo "ccflags-y += -Wno-error" >> fs/Makefile
+          
+          echo "==== 4. 开启 SukiSU 必须的 MANUAL_HOOK 与 USER_NS ===="
           grep -q "CONFIG_KSU_MANUAL_HOOK=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/milito_defconfig
           sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/g' arch/arm64/configs/milito_defconfig
+          grep -q "CONFIG_USER_NS=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_USER_NS=y" >> arch/arm64/configs/milito_defconfig
+          
+          echo "==== 5. 修复探测 su 掉包漏洞 (切断无差别篡改) ===="
+          grep -q "is_su_allowed" drivers/kernelsu/sucompat.c || sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c
+
+          echo "==== 6. 强行拉起 SECCOMP 防线 (修复 mode 成员缺失报错) ===="
           sed -i 's/# CONFIG_SECCOMP is not set/CONFIG_SECCOMP=y/g' arch/arm64/configs/milito_defconfig
           sed -i 's/# CONFIG_SECCOMP_FILTER is not set/CONFIG_SECCOMP_FILTER=y/g' arch/arm64/configs/milito_defconfig
           grep -q "^CONFIG_SECCOMP=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP=y" >> arch/arm64/configs/milito_defconfig
           grep -q "^CONFIG_SECCOMP_FILTER=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP_FILTER=y" >> arch/arm64/configs/milito_defconfig
 
           touch .sukisu_bugs_fixed
-          
-          echo "==== 🚀 终极物理搬迁与电焊 (In-tree Welding V3: 桥接模式) ===="
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          # 1. 强制物理搬家：将外面的 SukiSU 连锅端进 drivers/ 目录
-          KSU_ROOT=$(find . -maxdepth 1 -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) | head -n 1)
-          if [ -n "$KSU_ROOT" ]; then
-              echo "🚚 发现野生 SukiSU 基地 $KSU_ROOT，强制搬迁至 drivers/kernelsu !"
-              rm -rf drivers/kernelsu 2>/dev/null || true
-              mv "$KSU_ROOT" drivers/kernelsu
-          fi
-
-          # 2. ⚡ 核心绝杀：凭空制造主内核想要的桥接文件！
-          # 骗过 Kconfig，让它去读取子目录真实的 Kconfig
-          echo 'source "drivers/kernelsu/kernel/Kconfig"' > drivers/kernelsu/Kconfig
-          # 骗过 Makefile，让它深入子目录去编译
-          echo 'obj-$(CONFIG_KSU) += kernel/' > drivers/kernelsu/Makefile
-          
-          # 3. 确保主内核挂载了我们的外层桥接文件
-          grep -q 'source "drivers/kernelsu/Kconfig"' drivers/Kconfig || sed -i '$a source "drivers/kernelsu/Kconfig"' drivers/Kconfig
-          grep -q 'obj-$(CONFIG_KSU) += kernelsu/' drivers/Makefile || echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
-
-          echo "==== 🛠️ 暴力篡改 Defconfig (断绝后患) ===="
-          DEFCONFIG="arch/arm64/configs/milito_defconfig"
-          
-          # 强制开启 KSU 和 Manual Hook
-          sed -i 's/.*CONFIG_KSU=.*/CONFIG_KSU=y/g' $DEFCONFIG
-          grep -q "^CONFIG_KSU=y" $DEFCONFIG || echo "CONFIG_KSU=y" >> $DEFCONFIG
-          sed -i 's/.*CONFIG_KSU_MANUAL_HOOK=.*/CONFIG_KSU_MANUAL_HOOK=y/g' $DEFCONFIG
-          grep -q "^CONFIG_KSU_MANUAL_HOOK=y" $DEFCONFIG || echo "CONFIG_KSU_MANUAL_HOOK=y" >> $DEFCONFIG
-          
-          # 强制关闭 KPM 和 SUSFS 毒瘤
-          sed -i 's/.*CONFIG_KPM.*/# CONFIG_KPM is not set/g' $DEFCONFIG
-          sed -i 's/.*CONFIG_KSU_SUSFS.*/# CONFIG_KSU_SUSFS is not set/g' $DEFCONFIG
-          echo "# CONFIG_KPM is not set" >> $DEFCONFIG
-          echo "# CONFIG_KSU_SUSFS is not set" >> $DEFCONFIG
-          
-          echo "✅ 桥接欺骗完成！主内核这次肯定能摸到 SukiSU 的心脏了！"
-
-
-
-
-          echo "==== [防假阳性] 强行开启非 GKI 符号表寻址 ===="
-          sed -i 's/# CONFIG_KALLSYMS is not set/CONFIG_KALLSYMS=y/g' arch/arm64/configs/milito_defconfig
-          sed -i 's/# CONFIG_KALLSYMS_ALL is not set/CONFIG_KALLSYMS_ALL=y/g' arch/arm64/configs/milito_defconfig
-          grep -q "^CONFIG_KALLSYMS=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/milito_defconfig
-          grep -q "^CONFIG_KALLSYMS_ALL=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/milito_defconfig
-                    echo "==== [强制入核] 开启 KSU 主开关 (纯净内置模式) ===="
-               for CONF in CONFIG_KSU CONFIG_OVERLAY_FS; do
-              sed -i "s/# ${CONF} is not set/${CONF}=y/g" arch/arm64/configs/milito_defconfig
-              grep -q "^${CONF}=y" arch/arm64/configs/milito_defconfig || echo "${CONF}=y" >> arch/arm64/configs/milito_defconfig
-          done
-
-
-      - name: 📥 强制截胡：下载你指定的最新版 SuSFS 2.1.0 补丁
-        run: |
-          echo "==== 1. 正在销毁云端自带的所有旧版毒瘤补丁 ===="
-          # 加上 2>/dev/null 屏蔽警告，加上 || true 防止抛出错误码中断 Actions
-          find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" -type f -exec rm -f {} \; 2>/dev/null || true
-          
-          echo "==== 2. 正在强拉你指定的满血版补丁 ===="
-          wget "https://raw.githubusercontent.com/JackA1ltman/NonGKI_Kernel_Build_2nd/9ed26b0d3f438c17a5fedf4fa488902cfdd5a4f6/Patches/Patch/susfs_patch_to_4.19.patch" -O $GITHUB_WORKSPACE/susfs_patch_to_4.19.patch
-          
-          echo "✅ 新补丁下载完成！"
-
-      - name: 🕵️‍♂️ 侦察行动：全盘打印 SukiSU 源码文件清单与入口扫描
-        run: |
-          echo "==== 1. 开始拉网式排查 SukiSU 源码目录 ===="
-          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
-          
-          if [ -n "$KSU_DIR" ]; then
-              echo "✅ 锁定大本营：$KSU_DIR"
-              
-              echo -e "\n==== 2. SukiSU 核心源文件清单 (.c, .h, Makefile, Kconfig) ===="
-              # 列出所有关键源文件，过滤掉无用的杂项，按目录排序方便肉眼逐个排查
-              find "$KSU_DIR" -type f \( -name "*.c" -o -name "*.h" -o -name "Makefile" -o -name "Kconfig" \) | sed "s|$KSU_DIR/||g" | sort
-              
-              echo -e "\n==== 3. 剥去伪装：强行抓捕真·内核入口点 ===="
-              # 不看名字，只看底层逻辑！全局搜索谁调用了内核的初始化宏
-              echo "正在扫描 initcall / module_init 家族..."
-              grep -rnE "module_init|core_initcall|postcore_initcall|arch_initcall|subsys_initcall|fs_initcall|device_initcall|late_initcall" "$KSU_DIR" || echo "未发现标准初始化宏"
-              
-          else
-              echo "❌ 没找到 SukiSU 源码目录！"
-              exit 1
-          fi
-
-
+          echo "✅ SukiSU 专属 Bug 与内核防线配置已全部合闸！"
 
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
-
-      - name: 🔎 终极硬核雷达：全局搜索与全盘提取源码 (满足你看原文件的需求)
-        if: always()
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          mkdir -p $GITHUB_WORKSPACE/Ultimate_Evidence
-          echo "==== 1. 全局地毯式搜索 susfs_extra_works ===="
-          grep -rnw . -e "susfs_extra_works" > $GITHUB_WORKSPACE/Ultimate_Evidence/search_susfs_extra_works.txt || echo "没找到" > $GITHUB_WORKSPACE/Ultimate_Evidence/search_susfs_extra_works.txt
-          echo "==== 2. 全局地毯式搜索静态键和 hook 变量 ===="
-          grep -rn "ksu_vfs_read_hook" . > $GITHUB_WORKSPACE/Ultimate_Evidence/search_vfs_read_hook.txt || true
-          grep -rn "ksu_input_hook_key" . > $GITHUB_WORKSPACE/Ultimate_Evidence/search_ksu_input_hook.txt || true
-          grep -rn "ksu_execveat_hook" . > $GITHUB_WORKSPACE/Ultimate_Evidence/search_execveat_hook.txt || true
-          echo "==== 3. 全局扫描所有 hook 相关文件 ===="
-          find . -name "*hook*.c" > $GITHUB_WORKSPACE/Ultimate_Evidence/all_hook_files.txt || true
-          echo "==== 4. 提取编译器眼中的真实 SukiSU 大本营源码 ===="
-          if [ -d "drivers/kernelsu" ]; then
-              cp -r drivers/kernelsu $GITHUB_WORKSPACE/Ultimate_Evidence/
-          fi
-          echo "==== 5. 提取 fs/ 目录下核心文件 ===="
-          mkdir -p $GITHUB_WORKSPACE/Ultimate_Evidence/fs_patched
-          cp fs/read_write.c fs/exec.c fs/open.c fs/stat.c fs/namespace.c fs/susfs.c fs/Makefile fs/Kconfig $GITHUB_WORKSPACE/Ultimate_Evidence/fs_patched/ 2>/dev/null || true
-          cd $GITHUB_WORKSPACE/Ultimate_Evidence
-          zip -r ../Ultimate_Evidence.zip .
-
-      - name: 📦 上传终极硬核物证包
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Ultimate_Evidence
-          path: Ultimate_Evidence.zip
-
+        
       - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
         run: |
           set -e
@@ -441,210 +288,63 @@ jobs:
       - name: 🔧 Patch Hide Stuff
         uses: ./.github/workflows/patch-hide-stuff
 
-      - name: 🕵️‍♂️ 查水表：抓捕驱动握手现场
-        if: always()
-        run: |
-          echo "==== 正在勘探驱动握手现场 ===="
-          mkdir -p $GITHUB_WORKSPACE/Handshake_Evidence
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          # 1. 查肉身：SukiSU 到底被下载到了哪里？有没有正确放进 drivers/kernelsu？
-          echo "==== 目录分布 ====" > $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
-          find . -maxdepth 3 -type d \( -iname "*kernelsu*" -o -iname "*sukisu*" \) -not -path "*/out/*" -not -path "*/.git/*" >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
-          
-          # 2. 查构建握手：drivers/Makefile 里面有没有加 KSU？
-          echo -e "\n==== Makefile 握手状态 ====" >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
-          grep -i "ksu" drivers/Makefile >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt || echo "❌ Makefile 中没有 KSU 握手记录" >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
-          
-          # 3. 查配置握手：drivers/Kconfig 里面有没有加 KSU？
-          echo -e "\n==== Kconfig 握手状态 ====" >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
-          grep -i "ksu" drivers/Kconfig >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt || echo "❌ Kconfig 中没有 KSU 握手记录" >> $GITHUB_WORKSPACE/Handshake_Evidence/status.txt
-          
-          # 把内核的大门文件直接复印带走
-          cp drivers/Makefile $GITHUB_WORKSPACE/Handshake_Evidence/drivers_Makefile.txt || true
-          cp drivers/Kconfig $GITHUB_WORKSPACE/Handshake_Evidence/drivers_Kconfig.txt || true
-          
-          cd $GITHUB_WORKSPACE/Handshake_Evidence
-          zip -r ../Handshake_Evidence.zip .
-
-      - name: 📦 上传握手物证包
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Handshake_Evidence
-          path: Handshake_Evidence.zip
-          if-no-files-found: ignore
-
-
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
-      - name: 🕵️‍♂️ 深度查水表：提取最新 SukiSU 握手机制真身
+      - name: 🕵️‍♂️ 提取核心嫌疑源码 (fs/susfs.c 案发现场)
         if: always()
         run: |
-          echo "==== 开始全网搜捕 SukiSU 的最新握手代码 ===="
-          mkdir -p $GITHUB_WORKSPACE/Handshake_V3
-          cd $GITHUB_WORKSPACE/device_kernel
+          echo "==== 正在提取法医级源码物证 ===="
+          # 在根目录创建一个专门放嫌疑代码的文件夹
+          mkdir -p $GITHUB_WORKSPACE/Suspect_Source
+          
+          # 1. 提取心脏源码
+          cp $GITHUB_WORKSPACE/device_kernel/fs/susfs.c $GITHUB_WORKSPACE/Suspect_Source/ || echo "❌ 找不到 fs/susfs.c 源码！"
+          
+          # 2. 提取相关的头文件 (防止伪装宏定义藏在这里面)
+          cp $GITHUB_WORKSPACE/device_kernel/include/linux/susfs.h $GITHUB_WORKSPACE/Suspect_Source/ || true
+          cp $GITHUB_WORKSPACE/device_kernel/include/linux/susfs_def.h $GITHUB_WORKSPACE/Suspect_Source/ || true
+          
+          # 打包压缩
+          cd $GITHUB_WORKSPACE/Suspect_Source
+          zip -r ../Suspect_Source.zip .
+          
+      - name: 📦 上传嫌疑源码包
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Suspect_Source_Files
+          # 🚨 路径绝对精准，直接从根目录抓取压缩包
+          path: Suspect_Source.zip
+
+      - name: 🕵️‍♂️ 提取 SukiSU 核心隐身源码 (终极全盘扫描版)
+        if: always()
+        run: |
+          echo "==== 正在全盘雷达扫描 SukiSU 隐身核心源码 ===="
+          mkdir -p $GITHUB_WORKSPACE/SukiSU_Suspects
           
           # 定位 SukiSU 大本营
-          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "SukiSU" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 1)
           
           if [ -n "$KSU_DIR" ]; then
-              echo "✅ 锁定大本营：$KSU_DIR"
+              echo "✅ 成功锁定 SukiSU 大本营: $KSU_DIR"
               
-              # 1. 抓捕所有 hook (挂载/握手) 相关的源码目录 (最新版通常把挂载逻辑独立放在 hook 文件夹)
-              [ -d "$KSU_DIR/hook" ] && cp -r "$KSU_DIR/hook" $GITHUB_WORKSPACE/Handshake_V3/hook_dir || echo "无 hook 目录"
+              # 🚨 史诗级修正：用 find 命令无视层级，直接地毯式抓捕！
+              find "$KSU_DIR" -name "sucompat.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "sucompat.h" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "su_mount_ns.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "allowlist.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
+              find "$KSU_DIR" -name "syscall_handler.c" -exec cp {} $GITHUB_WORKSPACE/SukiSU_Suspects/ \; || true
               
-              # 2. 抓捕核心初始化与权限兼容代码
-              cp "$KSU_DIR/ksu.c" $GITHUB_WORKSPACE/Handshake_V3/ || true
-              cp "$KSU_DIR/kernel_includes.h" $GITHUB_WORKSPACE/Handshake_V3/ || true
-              cp "$KSU_DIR/feature/sucompat.c" $GITHUB_WORKSPACE/Handshake_V3/ || true
-              cp "$KSU_DIR/feature/sucompat.h" $GITHUB_WORKSPACE/Handshake_V3/ || true
-              cp "$KSU_DIR/runtime/ksud.c" $GITHUB_WORKSPACE/Handshake_V3/ || true
-              
-              # 3. 搜索所有使用了 kprobe 或 tracepoint 或 kallsyms 的文件 (查明它到底在靠什么动态寻址)
-              grep -rnE "kprobe|tracepoint|kallsyms|security_hook_heads" "$KSU_DIR" > $GITHUB_WORKSPACE/Handshake_V3/dynamic_hook_search.txt || true
-          fi
-          
-          # 4. 把内核端被我们打过孔的“接头点”也抓出来对照
-          cp fs/exec.c $GITHUB_WORKSPACE/Handshake_V3/kernel_exec.c || true
-          cp fs/read_write.c $GITHUB_WORKSPACE/Handshake_V3/kernel_read_write.c || true
-          cp security/selinux/hooks.c $GITHUB_WORKSPACE/Handshake_V3/kernel_selinux_hooks.c || true
-          
-          cd $GITHUB_WORKSPACE/Handshake_V3
-          zip -r ../Handshake_V3.zip .
-
-      - name: 📦 上传最新握手机制物证包
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Handshake_V3
-          path: Handshake_V3.zip
-
-
-      - name: 🕵️‍♂️ 查水表：提取验证内核开关是否真正生效
-        run: |
-          echo "==== 提取 .config 中的真实编译状态 ===="
-          cd $GITHUB_WORKSPACE/device_kernel/out
-          if [ -f ".config" ]; then
-              grep "CONFIG_KALLSYMS" .config || echo "❌ 彻底没找到 CONFIG_KALLSYMS"
-              grep "CONFIG_KSU" .config || echo "❌ 彻底没找到 CONFIG_KSU"
           else
-              echo "❌ 连 .config 都没生成！"
+              echo "❌ 致命错误：未找到 SukiSU 源码目录！"
           fi
           
-
-
-
-      - name: 🕵️‍♂️ 提取 SukiSU 配置文件与源码物证
-        if: always() # 保证编译失败也会执行
-        run: |
-          echo "==== 开始提取 SukiSU 编译配置物证 ===="
-          mkdir -p $GITHUB_WORKSPACE/ksu_evidence
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          # 1. 提取内核最终生成的完整配置文件 (看看我们加的开关到底在不在)
-          cp .config $GITHUB_WORKSPACE/ksu_evidence/kernel_config.txt || echo ".config 不存在" > $GITHUB_WORKSPACE/ksu_evidence/kernel_config.txt
-          
-          # 2. 提取 SukiSU 的编译图纸 (看看它编译时到底需要哪些 CONFIG)
-          cp KernelSU/kernel/Makefile $GITHUB_WORKSPACE/ksu_evidence/ksu_Makefile.txt || true
-          
-          # 3. 提取包含那两个 bool 变量的案发现场源码 (看看变量周围到底包了什么 #ifdef)
-          cp KernelSU/kernel/runtime/ksud.c $GITHUB_WORKSPACE/ksu_evidence/ || true
-          
-          # 打包物证
-          cd $GITHUB_WORKSPACE/ksu_evidence
-          zip -r ../ksu_evidence.zip .
-
-      - name: 📦 上传 SukiSU 物证包
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ksu_evidence
-          path: ksu_evidence.zip
-
-
-      - name: 🕵️‍♂️ 悬案 1：提取编译现场物证 (绝不瞎猜)
-        if: always() # 保证编译报错中断后，取证代码依然强制执行
-        run: |
-          echo "==== 开始封锁现场，提取核心嫌疑文件 ===="
-          mkdir -p $GITHUB_WORKSPACE/crime_scene
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          # 嫌疑人 1：susfs.o 到底有没有被生出来？生出来的话长什么样？
-          find . -name "susfs.o" -exec cp {} $GITHUB_WORKSPACE/crime_scene/ \; || echo "根本没生成 susfs.o！" > $GITHUB_WORKSPACE/crime_scene/susfs_o_missing.txt
-          
-          # 嫌疑人 2：编译系统到底有没有吃进我们的配置？
-          cp .config $GITHUB_WORKSPACE/crime_scene/kernel_config.txt || true
-          cp include/generated/autoconf.h $GITHUB_WORKSPACE/crime_scene/autoconf_h.txt || true
-          
-          # 嫌疑人 3：fs/Makefile 到底有没有被正确写入 obj-y += susfs.o？
-          cp fs/Makefile $GITHUB_WORKSPACE/crime_scene/fs_Makefile.txt || true
-          
-          # 嫌疑人 4：被打过孔的 read_write.c 和 exec.c (看看那两个 bool 到底写进去没)
-          cp fs/read_write.c $GITHUB_WORKSPACE/crime_scene/ || true
-          cp fs/exec.c $GITHUB_WORKSPACE/crime_scene/ || true
-          
-          # 打包物证带离现场
-          cd $GITHUB_WORKSPACE/crime_scene
-          zip -r ../ultimate_crime_scene.zip .
-
-      - name: 📦 上传终极物证包
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ultimate_crime_scene
-          path: ultimate_crime_scene.zip
-
-
-      - name: 🕵️‍♂️ 全局追捕 susfs_extra_works (法医级提取)
-        if: always() # 保证即使编译报错中断，这个提取步骤也一定会执行
-        run: |
-          echo "==== 开始全盘雷达搜索 susfs_extra_works ===="
-          mkdir -p $GITHUB_WORKSPACE/susfs_evidence
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          # 1. 记录所有出现 susfs_extra_works 的文件和具体行号（生成案卷清单）
-          grep -rnw . -e "susfs_extra_works" > $GITHUB_WORKSPACE/susfs_evidence/search_results.txt || echo "整个内核里压根没找到 susfs_extra_works！" > $GITHUB_WORKSPACE/susfs_evidence/search_results.txt
-          
-          # 2. 顺藤摸瓜：把所有提到了这个名字的 .c 或 .h 源文件，全部连锅端复制出来
-          grep -rlw . -e "susfs_extra_works" | while read -r file; do
-              # 保持原有的目录结构复制，防止不同文件夹下的同名文件互相覆盖
-              mkdir -p "$GITHUB_WORKSPACE/susfs_evidence/$(dirname "$file")"
-              cp "$file" "$GITHUB_WORKSPACE/susfs_evidence/$file"
-          done
-          
-          # 3. 顺便把 SuSFS 的心脏文件也提取出来对照，看看到底是不是它没定义
-          cp fs/susfs.c $GITHUB_WORKSPACE/susfs_evidence/ 2>/dev/null || echo "fs/susfs.c 竟然不存在？" >> $GITHUB_WORKSPACE/susfs_evidence/search_results.txt
-          find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" -exec cp {} $GITHUB_WORKSPACE/susfs_evidence/ \; || true
-          
-          echo "==== 提取完成，正在打包物证 ===="
-          cd $GITHUB_WORKSPACE/susfs_evidence
-          zip -r ../susfs_extra_works_evidence.zip .
-
-      - name: 📦 上传 susfs_extra_works 物证包
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: susfs_extra_works_evidence
-          path: susfs_extra_works_evidence.zip
-
-
-    
-      - name: 🕵️‍♂️ 提取 SukiSU 核心隐身源码 (抓捕 ksu.c 真身)
-        if: always()
-        run: |
-          echo "==== 正在精确提取 SukiSU 案发现场真身 ===="
-          mkdir -p $GITHUB_WORKSPACE/SukiSU_Suspects
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          # 直接揪出 duplicate symbol 报错里点名的主犯 ksu.c
-          cp drivers/kernelsu/ksu.c $GITHUB_WORKSPACE/SukiSU_Suspects/ || echo "没抓到 ksu.c"
-          
+          # 打包压缩 (加上 || true 防止空包时 Action 直接红灯)
           cd $GITHUB_WORKSPACE/SukiSU_Suspects
-          zip -r ../SukiSU_Suspects.zip . || echo "打包失败：文件依然没有复制成功"
-
-      - name: 📦 上传 SukiSU 定向嫌疑源码包
+          zip -r ../SukiSU_Suspects.zip . || true
+          
+      - name: 📦 上传 SukiSU 嫌疑源码包
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -652,11 +352,8 @@ jobs:
           path: SukiSU_Suspects.zip
           if-no-files-found: ignore
 
-
-
       - name: 🔩 Pack Process
         uses: ./.github/workflows/pack-process
 
       - name: ✏️ Upload Artifacts
         uses: ./.github/workflows/upload-files
-
