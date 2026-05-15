@@ -115,18 +115,18 @@ jobs:
           echo "==== 启动 Git 级时光机，直接回退 ===="
           
           # 精准定位 SukiSU 源码根目录
-          # 🚨 微创手术 1：加上排除 .git 目录，并将原来坑人的 head -n 300 改为 head -n 1，确保 cd 只有一个目标
+          # (保留防 .git 干扰和 head -n 1 确保 cd 不暴毙)
           KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
           
           if [ -n "$KSU_DIR" ]; then
               echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
               cd "$KSU_DIR"
               
-              echo "⬇️ 正在向远程强行索取缺失的历史包裹..."
-              # 🚨 微创手术 2：在 reset 前，无视浅克隆环境，用绝对链接把 3月2日 的代码包强行拽到本地
-              git fetch https://github.com/SukiSU-Ultra/SukiSU.git c1fd51c
+              echo "⬇️ 正在向原生 origin 索要缺失的历史包裹..."
+              # 🚨 唯一正确的补丁：直接用自带 Token 的 origin 往下挖历史，绝不碰 URL！
+              git fetch --deepen=300 origin || git fetch --unshallow origin
               
-              # 🚨 核心指令：保留你的原汁原味，直接硬重置！
+              # 🚨 你的原版核心指令：直接硬重置！
               git reset --hard c1fd51c
               
               echo "✅ 源码已成功回溯至 3 月 2 日纯净版！"
@@ -134,6 +134,7 @@ jobs:
               echo "❌ 致命错误：未找到 SukiSU 源码目录，时光机启动失败！"
               exit 1
           fi
+
 
 
       - name: 🩹 Fix Kernel Bugs & Extra Options
