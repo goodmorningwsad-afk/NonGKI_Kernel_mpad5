@@ -51,12 +51,12 @@ runs:
 
         echo "✅ SuSFS 物理开关与 APEX 满血挂载防线全数合闸！"
         
-                echo "==== 1. 物理超度旧版补丁，强行截胡最新版 ===="
+               echo "==== 1. 物理超度旧版补丁，强行截胡最新版 SuSFS 2.1.0 ===="
         
-        # 🚨 第一重防线：全盘搜索并彻底销毁之前在环境准备阶段下载的老补丁！
+        # 🚨 第一重防线：全盘搜索并彻底销毁老补丁，扬了它的骨灰！
         find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" -type f -exec rm -f {} + || true
         
-        # 🚨 第二重防线：强制拉取你指定的满血补丁，并赋予一个专属新名字，物理隔离旧环境！
+        # 🚨 第二重防线：强制拉取最新的满血内核防线补丁！
         curl -LSs "https://raw.githubusercontent.com/JackA1ltman/NonGKI_Kernel_Build_2nd/f2ae4ecd6b1e7cb43d7ed37acd8ea4747d31b367/Patches/Patch/susfs_patch_to_4.19.patch" -o /tmp/susfs_2_1_0_ultimate.patch
         
         # 精准锁定新子弹
@@ -68,27 +68,8 @@ runs:
             patch -p1 -N -f < "$PATCH_FILE" || echo "⚠️ 补丁产生 .rej 拒绝文件，保留全尸继续！"
         fi
 
-        echo "==== 1.5 截胡源码：物理注入 SukiSU 核心对接文件 ===="
-        # 定位 SukiSU 大本营
-        KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
-        
-        if [ -n "$KSU_DIR" ]; then
-            echo "🔍 找到 SukiSU 源码目录: $KSU_DIR，开始物理换心..."
-            
-            # 🚨 极客严谨模式：去掉 || true！如果文件不存在或拷贝失败，当场暴毙！绝不带着残缺的代码继续编译！
-            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/sucompat.c "$KSU_DIR/kernel/feature/sucompat.c"
-            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/sucompat.h "$KSU_DIR/kernel/feature/sucompat.h"
-            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/allowlist.c "$KSU_DIR/kernel/policy/allowlist.c"
-            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/su_mount_ns.c "$KSU_DIR/kernel/infra/su_mount_ns.c"
-            cp $GITHUB_WORKSPACE/Patches/SukiSU_v2.1.0_Files/syscall_handler.c "$KSU_DIR/kernel/hook/syscall_handler.c"
-            
-            echo "✅ SukiSU 核心 API 换心完毕！已完美对接 SuSFS 2.1.0！"
-        else
-            echo "❌ 未找到 SukiSU 目录，换心失败，当场暴毙！"
-            exit 1
-        fi
-
-
+        # 🚨 史诗级避坑：去他妈的“1.5 截胡源码”！
+        # 我们绝对不碰 3月2日 的 SukiSU！老底盘就是最叼的！
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
