@@ -488,7 +488,7 @@ runs:
         sed -i '/susfs_run_sus_path_loop/d' drivers/kernelsu/kernel_umount.c
         sed -i '/susfs_set_i_state_on_external_dir/d' drivers/kernelsu/supercalls.c
 
-        # 14. 跨时空截胡最新的 SELinux 欺骗模块 (并进行法医级 API 降级缝合)
+                # 14. 跨时空截胡最新的 SELinux 欺骗模块 (并进行法医级 API 降级缝合)
         echo "🩹 正在从未来 (HEAD) 窃取满血 SELinux 模块..."
         KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
         if [ -n "$KSU_DIR" ]; then
@@ -503,6 +503,27 @@ runs:
             
             cd -
         fi
+        
+        # 15. 接入真实的 SELinux 变量声明 (这是修复 hooks.c.rej 的保命符，绝不能删！)
+        echo "🩹 正在对接真实的 SELinux 欺骗变量..."
+        HOOKS_TOP_REJ="
+        /* FIX_HOOKS_TOP_REJ */
+        #ifdef CONFIG_KSU_SUSFS
+        extern struct selinux_state fake_state;
+        extern bool ksu_selinux_hide_running __read_mostly;
+        #endif"
+        patch_file "security/selinux/hooks.c" "#include \"objsec.h\"" 0 "$HOOKS_TOP_REJ" "FIX_HOOKS_TOP_REJ"
+
+        # 16. 修复 SuSFS 原作者的低级失误 (open.c 缺失头文件)
+        if ! grep -q "susfs_def.h" fs/open.c; then
+            echo "🩹 正在为 open.c 物理强插 susfs_def.h 头文件..."
+            sed -i '1i #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT\n#include <linux/susfs_def.h>\n#endif' fs/open.c
+        fi
+
+        sed -i 's/-dirty//g' scripts/setlocalversion
+        touch .phantom_hooks_applied
+        echo "✅ 修复所有链接符号，全境畅通，起飞！"
+
 
 
         # 16. 修复 SuSFS 原作者的低级失误 (open.c 缺失头文件)
