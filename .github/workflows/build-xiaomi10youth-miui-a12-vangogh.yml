@@ -115,16 +115,11 @@ jobs:
           echo "==== 启动 Git 级时光机，直接回退 ===="
           
           # 精准定位 SukiSU 源码根目录
-          # 🚨 修复 1：加上 -not -path "*/.git/*" 防止误入 Git 数据库
-          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+          KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" | head -n 300)
           
           if [ -n "$KSU_DIR" ]; then
               echo "🔍 成功锁定 SukiSU 大本营: $KSU_DIR"
               cd "$KSU_DIR"
-              
-              # 🚨 修复 2：解决拉得太浅的问题，无视本地配置，直接从远程把这个 Commit 硬拽下来
-              echo "⬇️ 正在强行抓取 3 月 2 日的目标历史记录..."
-              git fetch https://github.com/SukiSU-Ultra/SukiSU.git c1fd51c
               
               # 🚨 核心指令：直接硬重置到 3 月 2 日的最后一个正常提交 (c1fd51c)
               git reset --hard c1fd51c
