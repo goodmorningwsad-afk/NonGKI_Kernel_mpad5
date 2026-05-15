@@ -214,6 +214,11 @@ runs:
         #endif
         EOF
         fi
+                # 10. 修复 SuSFS 原作者的低级失误 (open.c 缺失头文件导致编译暴毙)
+        if ! grep -q "susfs_def.h" fs/open.c; then
+            echo "🩹 正在为 open.c 物理强插 susfs_def.h 头文件..."
+            sed -i '1i #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT\n#include <linux/susfs_def.h>\n#endif' fs/open.c
+        fi
 
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         
