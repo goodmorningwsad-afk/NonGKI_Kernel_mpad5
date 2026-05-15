@@ -472,7 +472,7 @@ runs:
         echo "🩹 正在全盘缝合 lib/zstd/ 目录下的 ZSTD_FALLTHROUGH ..."
         find lib/zstd -type f -exec sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' {} +
         
-        # 11. 终结链接器 (ld.lld) 的最后 3 个幽灵符号报错
+                # 11. 终结链接器 (ld.lld) 的最后 3 个幽灵符号报错
         echo "🩹 正在为 vmlinux 大一统注入最后的物理替身..."
         
         echo "bool is_ksu_transition(const void *old_tsec, const void *new_tsec) { return false; }" >> security/selinux/hooks.c
@@ -481,8 +481,12 @@ runs:
         # 12. 修复 MODPOST 打包阶段 KO 模块缺失 ion_alloc_dmabuf 的 Bug
         echo "🩹 正在为 MODPOST 注入 ion_alloc_dmabuf 弱引用替身..."
         cat << 'EOF' >> mm/madvise.c
+        #include <linux/export.h>
+        void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }
+        EXPORT_SYMBOL(ion_alloc_dmabuf);
+        EOF
 
-                # 13. 铲除 SukiSU 中残留的废弃调用 (SuSFS 2.1.0 已经将其全自动后台化)
+        # 13. 铲除 SukiSU 中残留的废弃调用 (SuSFS 2.1.0 已经将其全自动后台化)
         echo "🩹 正在铲除 kernel_umount.c 和 supercalls.c 中的旧版废弃调用..."
         sed -i '/susfs_run_sus_path_loop/d' drivers/kernelsu/kernel_umount.c
         sed -i '/susfs_set_i_state_on_external_dir/d' drivers/kernelsu/supercalls.c
@@ -507,6 +511,8 @@ runs:
         extern bool ksu_selinux_hide_running __read_mostly;
         #endif"
         patch_file "security/selinux/hooks.c" "#include \"objsec.h\"" 0 "$HOOKS_TOP_REJ" "FIX_HOOKS_TOP_REJ"
+
+        sed -i 's/-dirty//g' scripts/setlocalversion
 
 
         #include <linux/export.h>
