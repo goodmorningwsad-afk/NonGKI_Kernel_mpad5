@@ -81,11 +81,16 @@ runs:
             fi
           fi
 
-      - name: 🧹 终极无菌手术：彻底剥离内置 KSU 与 SuSFS 1.x
+            - name: 🧹 终极无菌手术：彻底剥离内置 KSU 与 SuSFS 1.x
         shell: bash
         run: |
-          set -ex
+          # 🚨 致命细节：把原来的 set -ex 改成 set -x，防止 grep 找不到东西直接让流水线暴毙
+          set -x
           cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "==== 🔍 [术前验伤] 记录 fs/namespace.c 和 fs/namei.c 初始状态 ===="
+          wc -l fs/namespace.c fs/namei.c || true
+          grep -n -C 3 "security_path_mknod" fs/namei.c || true
           
           echo "==== 1. 物理移除老旧核心文件 ===="
           rm -rf KernelSU kernelsu drivers/kernelsu
@@ -106,7 +111,17 @@ runs:
               bash clean_hook.sh || true
           fi
           
-          echo "✅ 母体已完全恢复无菌状态，完美迎接 SukiSU 与 SuSFS 2.0.0！"
+          echo "==== 🔍 [术后验伤] 看看无菌手术到底砍碎了什么？ ===="
+          wc -l fs/namespace.c fs/namei.c || true
+          grep -n -C 3 "security_path_mknod" fs/namei.c || echo "❌ 惨绝人寰：security_path_mknod 锚点被无菌手术切掉了！"
+          
+          echo "---- 🚨 终极铁证：Git Diff 差异对比 🚨 ----"
+          # 直接用 Git 打印出被无菌手术修改/删除的所有代码细节！
+          git diff fs/namespace.c fs/namei.c
+          
+          echo "==== 🛑 验伤完毕！强行中断流水线，等待法医判决！ ===="
+          exit 1
+
 
       - name: Set KernelSU
         shell: bash
