@@ -450,3 +450,17 @@ runs:
         # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
         touch .phantom_hooks_applied
         echo "✅ 幻影打孔全境贯通，准备进入终极编译！"
+    - name: 📤 提取 SukiSU 修补后的核心大动脉 (法医级取证)
+      uses: actions/upload-artifact@v4
+      if: always()  # 🚨 加上这个，确保就算后面编译报错了，也能强行提取出尸检报告！
+      with:
+          name: SukiSU_Patched_Core_Files
+          path: |
+            device_kernel/fs/namespace.c
+            device_kernel/fs/exec.c
+            device_kernel/fs/namei.c
+            device_kernel/fs/open.c
+            device_kernel/fs/stat.c
+            device_kernel/fs/dcache.c
+            device_kernel/drivers/kernelsu/su_mount_ns.c
+
