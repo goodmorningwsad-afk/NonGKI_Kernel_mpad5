@@ -467,7 +467,7 @@ runs:
         # 9. 修复 zstd 压缩库不支持 fallthrough 关键字导致的暴毙
         echo "🩹 正在缝合 lib/zstd/common/bitstream.h ..."
         sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' lib/zstd/common/bitstream.h
-        - name: "Apply patches and modifications (Part 2 - 链接器修复与探针)"
+    - name: "Apply patches and modifications (Part 2 - 链接器修复与探针)"
       shell: bash
       run: |
         # 🚨 致命关键：全新的 step 必须重新进入内核源码目录！
