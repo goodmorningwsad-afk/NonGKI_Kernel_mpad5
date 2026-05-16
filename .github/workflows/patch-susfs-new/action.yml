@@ -133,14 +133,6 @@ runs:
         #endif"
         patch_file "fs/proc/task_mmu.c" "#include <asm/elf.h>" 0 "$TASK_MMU_HOOK" "FIX_TASK_MMU_REJ"
 
-        # 2. 补全 mount.h 缺失的挂载 ID 备份
-        MOUNT_H_HOOK="
-        /* FIX_MOUNT_H_REJ */
-        #ifdef CONFIG_KSU_SUSFS
-            u64 susfs_mnt_id_backup;
-        #endif"
-        patch_file "include/linux/mount.h" "void *data;" 0 "$MOUNT_H_HOOK" "FIX_MOUNT_H_REJ"
-
         # 3. 补全 proc_namespace.c 的隐藏开关
         PROC_NS_HOOK="
         /* FIX_PROC_NS_REJ */
