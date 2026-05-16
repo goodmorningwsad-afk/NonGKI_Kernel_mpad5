@@ -216,8 +216,8 @@ jobs:
 
      
 
-      #- name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
-        #uses: ./.github/workflows/patch-susfs-new
+      - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
+        uses: ./.github/workflows/patch-susfs-new
         
       - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
         run: |
