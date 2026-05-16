@@ -467,9 +467,12 @@ runs:
         # 9. 修复 zstd 压缩库不支持 fallthrough 关键字导致的暴毙
         echo "🩹 正在缝合 lib/zstd/common/bitstream.h ..."
         sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' lib/zstd/common/bitstream.h
-    - name: "Apply patches and modifications (Part 2 - 链接器修复与探针)"
+        - name: "Apply patches and modifications (Part 2 - 链接器修复与探针)"
       shell: bash
       run: |
+        # 🚨 致命关键：全新的 step 必须重新进入内核源码目录！
+        cd $GITHUB_WORKSPACE/device_kernel
+
         # 10. 全盘清剿 zstd 目录下的 fallthrough 穿越者 Bug
         echo "🩹 正在全盘缝合 lib/zstd/ 目录下的 ZSTD_FALLTHROUGH ..."
         find lib/zstd -type f -exec sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' {} +
@@ -525,8 +528,6 @@ runs:
         echo "==== 🛑 时光机探针执行完毕！强行中断流水线，等待解析！ ===="
         exit 1
 
-
-        
         # 15. 接入真实的 SELinux 变量声明 (这是修复 hooks.c.rej 的保命符，绝不能删！)
         echo "🩹 正在对接真实的 SELinux 欺骗变量..."
         HOOKS_TOP_REJ="
@@ -547,14 +548,3 @@ runs:
         touch .phantom_hooks_applied
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
 
-
-
-        # 16. 修复 SuSFS 原作者的低级失误 (open.c 缺失头文件)
-        if ! grep -q "susfs_def.h" fs/open.c; then
-            echo "🩹 正在为 open.c 物理强插 susfs_def.h 头文件..."
-            sed -i '1i #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT\n#include <linux/susfs_def.h>\n#endif' fs/open.c
-        fi
-
-        sed -i 's/-dirty//g' scripts/setlocalversion
-        touch .phantom_hooks_applied
-        echo "✅ 修复所有链接符号，全境畅通，起飞！"
