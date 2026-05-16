@@ -99,13 +99,15 @@ runs:
           rm -f include/linux/susfs.h include/linux/susfs_def.h include/linux/sus_su.h
           if [ -f "fs/Makefile" ]; then sed -i '/susfs\.o/d' fs/Makefile; fi
           
-          echo "==== 2. 彻底弃用官方屠夫脚本，注入极客级 Python AST 清理探针 ===="
+                    echo "==== 2. 彻底弃用官方屠夫脚本，注入极客级 Python AST 清理探针 ===="
           cat << 'EOF' > clean_ast.py
           import sys, os
 
           def clean_hooks(filepath):
               if not os.path.exists(filepath): return
-              with open(filepath, 'r') as f:
+              
+              # 🚨 核心修复：加入 encoding='utf-8', errors='ignore' 强行越过古董驱动里的特殊字符注释
+              with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
                   lines = f.readlines()
               
               out = []
@@ -128,12 +130,14 @@ runs:
                           if nesting == 0:
                               skip = False
               
-              with open(filepath, 'w') as f:
+              # 写入时也保持 utf-8 编码
+              with open(filepath, 'w', encoding='utf-8') as f:
                   f.writelines(out)
 
           for arg in sys.argv[1:]:
               clean_hooks(arg)
           EOF
+
 
           echo "==== 3. 开始执行神经外科级精准剔除 ===="
           find fs/ include/ kernel/ drivers/ security/ -type f -name "*.c" -o -name "*.h" | xargs python3 clean_ast.py
