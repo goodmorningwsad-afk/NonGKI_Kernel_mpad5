@@ -30,7 +30,9 @@ runs:
         echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$DEFCONFIG_FILE"
-        
+        echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
+        echo "CONFIG_OVERLAY_FS=y" >> "$DEFCONFIG_FILE" # 🚨 这才是修复模块挂载的正道！
+
         echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
         
         echo "CONFIG_SQUASHFS=y" >> "$DEFCONFIG_FILE"
@@ -369,12 +371,6 @@ runs:
         #define prefer_idle_write_wrapper prefer_idle_write
         #endif"
         patch_file "kernel/sched/tune.c" "static struct cftype files[] = {" 0 "$TUNE_HOOK" "STUNE_ASSIST_WRAPPER_FIX"
-        sed -i 's/-dirty//g' scripts/setlocalversion
-        
-        # 4. 修复 sdhci.c 官方注释错误
-        echo "🩹 正在缝合 drivers/mmc/host/sdhci.c ..."
-        sed -i 's|//\* void sdhci_set_uhs_signaling|#if 0\nvoid sdhci_set_uhs_signaling|g' drivers/mmc/host/sdhci.c 
-        sed -i 's|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\*//|EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);\n#endif|g' drivers/mmc/host/sdhci.c 
         sed -i 's/-dirty//g' scripts/setlocalversion
         
         # 5. 修复 core.c 缺失 mmc_card_doing_bkops 宏的官方残疾 Bug
