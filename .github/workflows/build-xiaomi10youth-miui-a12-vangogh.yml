@@ -157,9 +157,6 @@ jobs:
           [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wunused-but-set-variable//g' fs/ntfs3/Makefile
           [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wno-unused-but-set-variable//g' fs/ntfs3/Makefile
           
-          echo "==== 4. 物理补全 namei.c 缺失的变量声明 ===="
-          grep -q "FIXED_UNDECLARED_VAR" fs/namei.c || sed -i '3168s/^/    int error = 0; \/* FIXED_UNDECLARED_VAR *\/ \n/' fs/namei.c
-          
           echo "==== 5. 拯救被摧毁的 namespace.c (纯软件层安全覆盖) ===="
           grep -q "LineageOS restored" fs/namespace.c || {
               curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/fs/namespace.c" -o fs/namespace.c
