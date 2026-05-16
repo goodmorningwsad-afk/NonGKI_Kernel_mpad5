@@ -81,7 +81,7 @@ runs:
             fi
           fi
 
-            - name: 🧹 终极无菌手术：彻底剥离内置 KSU 与 SuSFS 1.x
+      - name: 🧹 终极无菌手术：彻底剥离内置 KSU 与 SuSFS 1.x
         shell: bash
         run: |
           # 🚨 致命细节：把原来的 set -ex 改成 set -x，防止 grep 找不到东西直接让流水线暴毙
