@@ -135,7 +135,84 @@ jobs:
               exit 1
           fi
 
+      - name: 🩹 Fix Kernel Bugs & Extra Options
+        run: |
+          set -e # 🚨 遇错立刻暴毙机制
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          if [ -f ".kernel_bugs_fixed" ]; then
+              echo "⏭️ 内核 Bug 已修复过，防重复跳过！"
+              exit 0
+          fi
 
+          echo "==== 1. 修复高版本 Clang 编译老内核的通病 ===="
+          grep -q "<asm/insn.h>" arch/arm64/kernel/module-plts.c || sed -i '1i #include <asm/insn.h>' arch/arm64/kernel/module-plts.c
+          
+          echo "==== 2. 修复 cgroup 函数名拼写错误 ===="
+          sed -i '/\.write_/s/write_wrapper/write/g' kernel/sched/tune.c
+          sed -i 's/boost_write_wrapper(/__attribute__((unused)) boost_write_wrapper(/g' kernel/sched/tune.c
+          sed -i 's/prefer_idle_write_wrapper(/__attribute__((unused)) prefer_idle_write_wrapper(/g' kernel/sched/tune.c
+          
+          echo "==== 3. 抹除 NTFS3 驱动中老编译器不识别的超前参数 ===="
+          [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wunused-but-set-variable//g' fs/ntfs3/Makefile
+          [ -f fs/ntfs3/Makefile ] && sed -i 's/-Wno-unused-but-set-variable//g' fs/ntfs3/Makefile
+          
+          echo "==== 4. 物理补全 namei.c 缺失的变量声明 ===="
+          grep -q "FIXED_UNDECLARED_VAR" fs/namei.c || sed -i '3168s/^/    int error = 0; \/* FIXED_UNDECLARED_VAR *\/ \n/' fs/namei.c
+          
+          echo "==== 5. 拯救被摧毁的 namespace.c (纯软件层安全覆盖) ===="
+          grep -q "LineageOS restored" fs/namespace.c || {
+              curl -LSs "https://raw.githubusercontent.com/LineageOS/android_kernel_xiaomi_sm7250/lineage-22.1/fs/namespace.c" -o fs/namespace.c
+              echo "// LineageOS restored" >> fs/namespace.c
+          }
+          
+          echo "==== 6. 防止 LTO 爆内存，强制保留 ===="
+          sed -i 's/CONFIG_LTO=y/# CONFIG_LTO is not set/g' arch/arm64/configs/milito_defconfig
+          sed -i 's/CONFIG_LTO_CLANG=y/# CONFIG_LTO_CLANG is not set/g' arch/arm64/configs/milito_defconfig
+
+          touch .kernel_bugs_fixed
+          echo "✅ 内核基础 Bug 修复完成！"
+
+      - name: 🩹 Fix SukiSU Bugs & Defconfig Options
+        run: |
+          set -e # 🚨 遇错立刻暴毙机制
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          if [ -f ".sukisu_bugs_fixed" ]; then
+              echo "⏭️ SukiSU Bug 已修复过，防重复跳过！"
+              exit 0
+          fi
+
+          echo "==== 1. 修复 SukiSU builtin 分支原厂笔误 ===="
+          sed -i 's/profile->selinux_domain/profile.selinux_domain/g' drivers/kernelsu/app_profile.c
+          sed -i 's/newcreds\./newcreds->/g' drivers/kernelsu/app_profile.c
+          sed -i '300,$s/, cred)/, newcreds)/g' drivers/kernelsu/app_profile.c
+          
+          echo "==== 2. 修复 supercalls.c 宏定义套娃 ===="
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_ALLOW_LIST/KSU_IOCTL(NEW_GET_ALLOW_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i 's/KSU_IOCTL(KSU_IOCTL_NEW_GET_DENY_LIST/KSU_IOCTL(NEW_GET_DENY_LIST/g' drivers/kernelsu/supercalls.c
+          sed -i '/ksu_mark_running_process/d' drivers/kernelsu/supercalls.c
+          
+          echo "==== 3. 屏蔽无用函数警告 ===="
+          grep -q "\-Wno-unused-function" fs/Makefile || echo "ccflags-y += -Wno-unused-function" >> fs/Makefile
+          grep -q "\-Wno-error" fs/Makefile || echo "ccflags-y += -Wno-error" >> fs/Makefile
+          
+          echo "==== 4. 开启 SukiSU 必须的 MANUAL_HOOK 与 USER_NS ===="
+          grep -q "CONFIG_KSU_MANUAL_HOOK=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/milito_defconfig
+          sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/g' arch/arm64/configs/milito_defconfig
+          grep -q "CONFIG_USER_NS=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_USER_NS=y" >> arch/arm64/configs/milito_defconfig
+          
+          echo "==== 5. 修复探测 su 掉包漏洞 (切断无差别篡改) ===="
+          grep -q "is_su_allowed" drivers/kernelsu/sucompat.c || sed -i 's/ksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/if (!is_su_allowed()) return 0;\n\tksu_strncpy_from_user_nofault(path, \*filename_user, sizeof(path));/g' drivers/kernelsu/sucompat.c
+
+          echo "==== 6. 强行拉起 SECCOMP 防线 (修复 mode 成员缺失报错) ===="
+          sed -i 's/# CONFIG_SECCOMP is not set/CONFIG_SECCOMP=y/g' arch/arm64/configs/milito_defconfig
+          sed -i 's/# CONFIG_SECCOMP_FILTER is not set/CONFIG_SECCOMP_FILTER=y/g' arch/arm64/configs/milito_defconfig
+          grep -q "^CONFIG_SECCOMP=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP=y" >> arch/arm64/configs/milito_defconfig
+          grep -q "^CONFIG_SECCOMP_FILTER=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_SECCOMP_FILTER=y" >> arch/arm64/configs/milito_defconfig
+
+          touch .sukisu_bugs_fixed
+          echo "✅ SukiSU 专属 Bug 与内核防线配置已全部合闸！"
 
      
 
@@ -221,31 +298,7 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
 
-      - name: 🕵️‍♂️ 提取核心嫌疑源码 (fs/susfs.c 案发现场)
-        if: always()
-        run: |
-          echo "==== 正在提取法医级源码物证 ===="
-          # 在根目录创建一个专门放嫌疑代码的文件夹
-          mkdir -p $GITHUB_WORKSPACE/Suspect_Source
-          
-          # 1. 提取心脏源码
-          cp $GITHUB_WORKSPACE/device_kernel/fs/susfs.c $GITHUB_WORKSPACE/Suspect_Source/ || echo "❌ 找不到 fs/susfs.c 源码！"
-          
-          # 2. 提取相关的头文件 (防止伪装宏定义藏在这里面)
-          cp $GITHUB_WORKSPACE/device_kernel/include/linux/susfs.h $GITHUB_WORKSPACE/Suspect_Source/ || true
-          cp $GITHUB_WORKSPACE/device_kernel/include/linux/susfs_def.h $GITHUB_WORKSPACE/Suspect_Source/ || true
-          
-          # 打包压缩
-          cd $GITHUB_WORKSPACE/Suspect_Source
-          zip -r ../Suspect_Source.zip .
-          
-      - name: 📦 上传嫌疑源码包
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Suspect_Source_Files
-          # 🚨 路径绝对精准，直接从根目录抓取压缩包
-          path: Suspect_Source.zip
+      
 
       - name: 🕵️‍♂️ 提取 SukiSU 核心隐身源码 (终极全盘扫描版)
         if: always()
