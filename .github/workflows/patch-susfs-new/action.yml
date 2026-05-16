@@ -51,25 +51,21 @@ runs:
 
         echo "✅ SuSFS 物理开关与 APEX 满血挂载防线全数合闸！"
         
-               echo "==== 1. 物理超度旧版补丁，强行截胡最新版 SuSFS 2.1.0 ===="
+        echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
+        set +e
+        PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" 2>/dev/null | head -n 1)
+        set -e
         
-        # 🚨 第一重防线：全盘搜索并彻底销毁老补丁，扬了它的骨灰！
-        find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" -type f -exec rm -f {} + || true
-        
-        # 🚨 第二重防线：强制拉取最新的满血内核防线补丁！
-        curl -LSs "https://raw.githubusercontent.com/JackA1ltman/NonGKI_Kernel_Build_2nd/f2ae4ecd6b1e7cb43d7ed37acd8ea4747d31b367/Patches/Patch/susfs_patch_to_4.19.patch" -o /tmp/susfs_2_1_0_ultimate.patch
-        
-        # 精准锁定新子弹
-        PATCH_FILE="/tmp/susfs_2_1_0_ultimate.patch"
-        
-        if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
-            echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
+        if [ -z "$PATCH_FILE" ]; then
+            echo "❌ 致命错误：找不到 susfs_patch_to_4.19.patch！"
+            exit 1 
         else
-            patch -p1 -N -f < "$PATCH_FILE" || echo "⚠️ 补丁产生 .rej 拒绝文件，保留全尸继续！"
+            if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
+                echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
+            else
+                patch -p1 -N -f < "$PATCH_FILE" || echo "⚠️ 补丁产生 .rej 拒绝文件，保留全尸继续！"
+            fi
         fi
-
-        # 🚨 史诗级避坑：去他妈的“1.5 截胡源码”！
-        # 我们绝对不碰 3月2日 的 SukiSU！老底盘就是最叼的！
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
@@ -138,87 +134,29 @@ runs:
         #endif"
         patch_file "fs/stat.c" "#include <linux/compat.h>" 0 "$STAT_TOP_HOOK" "FIX_STAT_REJ"
 
-                # 5. 补全 namei.c 的核心路径隐藏防线一 (SuSFS 2.1.0 新版 inode 机制)
+        # 5. 补全 namei.c 的核心路径隐藏防线一
         NAMEI_HOOK_1="
         /* FIX_NAMEI_1_REJ */
         #ifdef CONFIG_KSU_SUSFS_SUS_PATH
-            if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &inode->i_state)) && likely(susfs_is_current_proc_umounted())) {
+            if (unlikely(inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
                 return -ENOENT;
             }
         #endif"
         patch_file "fs/namei.c" "if ((!sysctl_protected_fifos && S_ISFIFO(inode->i_mode)) ||" 0 "$NAMEI_HOOK_1" "FIX_NAMEI_1_REJ"
 
-        # 6. 补全 namei.c 的核心路径隐藏防线二 (SuSFS 2.1.0 新版 inode 机制)
+        # 6. 补全 namei.c 的核心路径隐藏防线二 
         # 🚨 史诗级修复：用 offset 2 跨过大门，一并复活被清创手术误杀的 security_path_mknod！
         NAMEI_HOOK_2="
         /* FIX_NAMEI_2_REJ */
         	int error = security_path_mknod(dir, dentry, mode, 0);
         #ifdef CONFIG_KSU_SUSFS_SUS_PATH
-        	if (dentry->d_inode && unlikely(test_bit(AS_FLAGS_SUS_PATH, &dentry->d_inode->i_state)) && likely(susfs_is_current_proc_umounted())) {
+        	if (dentry->d_inode && unlikely(dentry->d_inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
         		int err_p = inode_permission2(dir->mnt, dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
         		if (err_p) return err_p;
         		return -ENOENT;
         	}
         #endif"
         patch_file "fs/namei.c" "static int may_o_create(const struct path *dir, struct dentry *dentry, umode_t mode)" 2 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
-
-                # 7. 补全 hooks.c 顶部缺失的变量声明 (致命报错的元凶)
-        HOOKS_TOP_REJ="
-        /* FIX_HOOKS_TOP_REJ */
-        #ifdef CONFIG_KSU_SUSFS
-        extern struct selinux_state fake_state;
-        extern bool ksu_selinux_hide_running __read_mostly;
-        #endif"
-        patch_file "security/selinux/hooks.c" "#include \"objsec.h\"" 0 "$HOOKS_TOP_REJ" "FIX_HOOKS_TOP_REJ"
-
-        # 8. 补全 task_mmu.c 第 8 块缺失的隐藏跳过逻辑 (精准 sed 注入)
-        if ! grep -q "FIX_TASK_MMU_8_REJ" fs/proc/task_mmu.c; then
-            echo "🩹 正在缝合 task_mmu.c Hunk 8 内存映射防线..."
-            sed -i '/ret = walk_page_range(start_vaddr, end, &pagemap_walk);/i \
-        /* FIX_TASK_MMU_8_REJ */\n#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n\t\tvma = find_vma(mm, start_vaddr);\n\t\tif (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))\n\t\t\tgoto bypass_orig_flow;\n#endif \/\/ #ifdef CONFIG_KSU_SUSFS_SUS_MAP' fs/proc/task_mmu.c
-        
-            sed -i '/ret = walk_page_range(start_vaddr, end, &pagemap_walk);/a \
-        #ifdef CONFIG_KSU_SUSFS_SUS_MAP\nbypass_orig_flow:\n#endif \/\/ #ifdef CONFIG_KSU_SUSFS_SUS_MAP' fs/proc/task_mmu.c
-        fi
-
-        # 9. 补全 namespace.c 尾部缺失的两个 SuSFS 挂载核心函数
-        if ! grep -q "susfs_get_non_sus_mnt_id_from_mnt" fs/namespace.c; then
-            echo "🩹 正在追加 namespace.c 尾部缺失的底层挂载函数..."
-            cat << 'EOF' >> fs/namespace.c
-
-        #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-        int susfs_get_non_sus_mnt_id_from_mnt(struct mount *orig_mnt) {
-            struct mount *mnt = orig_mnt;
-            int mnt_id;
-            lock_mount_hash();
-            for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
-            mnt_id = mnt->mnt_id;
-            unlock_mount_hash();
-            return mnt_id;
-        }
-
-        struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt) {
-            struct mount *mnt = real_mount(vfsmnt);
-            lock_mount_hash();
-            for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
-            mntget(&mnt->mnt);
-            if (!mnt->mnt.mnt_root || IS_ERR(mnt->mnt.mnt_root)) {
-                mntput(&mnt->mnt);
-                unlock_mount_hash();
-                return vfsmnt;
-            }
-            dget(mnt->mnt.mnt_root);
-            unlock_mount_hash();
-            return &mnt->mnt;
-        }
-        #endif
-        EOF
-        fi
-                # 10. 修复 SuSFS 原作者的低级失误 (open.c 缺失头文件导致编译暴毙)
-        if ! grep -q "susfs_def.h" fs/open.c; then
-            echo "🩹 正在为 open.c 物理强插 susfs_def.h 头文件..."
-            sed -i '1i #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT\n#include <linux/susfs_def.h>\n#endif' fs/open.c
-        fi
 
         echo "==== [回归原生纯净打孔] 去除多余外壳，相信 SukiSU 内部隐身 ===="
         
@@ -467,84 +405,28 @@ runs:
         # 9. 修复 zstd 压缩库不支持 fallthrough 关键字导致的暴毙
         echo "🩹 正在缝合 lib/zstd/common/bitstream.h ..."
         sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' lib/zstd/common/bitstream.h
-    - name: "Apply patches and modifications (Part 2 - 链接器修复与探针)"
-      shell: bash
-      run: |
-        # 🚨 致命关键：全新的 step 必须重新进入内核源码目录！
-        cd $GITHUB_WORKSPACE/device_kernel
-
+        
         # 10. 全盘清剿 zstd 目录下的 fallthrough 穿越者 Bug
         echo "🩹 正在全盘缝合 lib/zstd/ 目录下的 ZSTD_FALLTHROUGH ..."
         find lib/zstd -type f -exec sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' {} +
         
         # 11. 终结链接器 (ld.lld) 的最后 3 个幽灵符号报错
         echo "🩹 正在为 vmlinux 大一统注入最后的物理替身..."
+        
         echo "bool is_ksu_transition(const void *old_tsec, const void *new_tsec) { return false; }" >> security/selinux/hooks.c
         echo "void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}" >> drivers/mmc/host/sdhci-pltfm.c
         
-        # 12. 修复 MODPOST 打包阶段 KO 模块缺失 ion_alloc_dmabuf 的 Bug (全防呆版 echo 注入)
+        # 12. 修复 MODPOST 打包阶段 KO 模块缺失 ion_alloc_dmabuf 的 Bug
         echo "🩹 正在为 MODPOST 注入 ion_alloc_dmabuf 弱引用替身..."
-        echo "#include <linux/export.h>" >> mm/madvise.c
-        echo "void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }" >> mm/madvise.c
-        echo "EXPORT_SYMBOL(ion_alloc_dmabuf);" >> mm/madvise.c
+        cat << 'EOF' >> mm/madvise.c
 
-        # 13. 铲除 SukiSU 中残留的废弃调用 (SuSFS 2.1.0 已经将其全自动后台化)
-        echo "🩹 正在铲除 kernel_umount.c 和 supercalls.c 中的旧版废弃调用..."
-        sed -i '/susfs_run_sus_path_loop/d' drivers/kernelsu/kernel_umount.c
-        sed -i '/susfs_set_i_state_on_external_dir/d' drivers/kernelsu/supercalls.c
-
-        # 14. 终极法医探针：追查 setuid_hook.c 的前世今生 (时光机模式)
-        echo "==== 🔍 开始执行时光机探针：追查 setuid_hook.c 死亡真相 ===="
-        KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
-        if [ -n "$KSU_DIR" ]; then
-            cd "$KSU_DIR"
-            
-            echo "==== 🕵️‍♂️ 寻找抹杀 setuid_hook.c 的凶手 (Commit) ===="
-            # 查找以 D (Delete) 状态处理该文件的最后一次提交
-            DEL_COMMIT=$(git log --diff-filter=D --format="%H" -1 -- kernel/setuid_hook.c 2>/dev/null)
-            
-            if [ -n "$DEL_COMMIT" ]; then
-                echo "🚨 找到了！删除发生在 Commit: $DEL_COMMIT"
-                git show -s --format="时间: %ci | 提交信息: %s" $DEL_COMMIT
-                
-                echo "==== 📜 提取它临死前 (上一版本) 的完整遗骸 ===="
-                # 提取删除前的最后一个可用版本
-                git show ${DEL_COMMIT}^:kernel/setuid_hook.c > /tmp/last_setuid_hook.c
-                
-                echo "==== 🔍 扫描遗骸：是否有【手动打孔】核心关键词？ ===="
-                grep -E -n "kprobe|execve|sucompat|vfs_" /tmp/last_setuid_hook.c || echo "⚠️ 遗骸中未发现打孔代码！"
-                
-                echo "==== 🔍 扫描遗骸：是否有【SuSFS/SELinux】缺失符号？ ===="
-                grep -E -n "susfs_zygote_sid|susfs_is_sid_equal" /tmp/last_setuid_hook.c || echo "⚠️ 遗骸中未发现我们需要的新版缺失符号！"
-                
-            else
-                echo "❓ 奇怪，Git 历史中找不到 setuid_hook.c 的删除记录！"
-                echo "正在全历史搜索该文件曾经的踪迹..."
-                git log --all --full-history --stat -- kernel/setuid_hook.c | head -n 20
-            fi
-            cd -
-        fi
+        #include <linux/export.h>
+        void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }
+        EXPORT_SYMBOL(ion_alloc_dmabuf);
+        EOF
         
-        echo "==== 🛑 时光机探针执行完毕！强行中断流水线，等待解析！ ===="
-        exit 1
-
-        # 15. 接入真实的 SELinux 变量声明 (这是修复 hooks.c.rej 的保命符，绝不能删！)
-        echo "🩹 正在对接真实的 SELinux 欺骗变量..."
-        HOOKS_TOP_REJ="
-        /* FIX_HOOKS_TOP_REJ */
-        #ifdef CONFIG_KSU_SUSFS
-        extern struct selinux_state fake_state;
-        extern bool ksu_selinux_hide_running __read_mostly;
-        #endif"
-        patch_file "security/selinux/hooks.c" "#include \"objsec.h\"" 0 "$HOOKS_TOP_REJ" "FIX_HOOKS_TOP_REJ"
-
-        # 16. 修复 SuSFS 原作者的低级失误 (open.c 缺失头文件)
-        if ! grep -q "susfs_def.h" fs/open.c; then
-            echo "🩹 正在为 open.c 物理强插 susfs_def.h 头文件..."
-            sed -i '1i #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT\n#include <linux/susfs_def.h>\n#endif' fs/open.c
-        fi
-
         sed -i 's/-dirty//g' scripts/setlocalversion
+        
+        # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
         touch .phantom_hooks_applied
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
-
