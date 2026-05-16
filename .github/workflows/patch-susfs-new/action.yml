@@ -156,16 +156,15 @@ runs:
         #endif"
         patch_file "fs/namei.c" "if ((!sysctl_protected_fifos && S_ISFIFO(inode->i_mode)) ||" 0 "$NAMEI_HOOK_1" "FIX_NAMEI_1_REJ"
 
-        # 6. 补全 namei.c 的核心路径隐藏防线二 
+                # 6. 补全 namei.c 的核心路径隐藏防线二 (剔除了重复的 error 声明)
         NAMEI_HOOK_2="
         /* FIX_NAMEI_2_REJ */
-            int error = security_path_mknod(dir, dentry, mode, 0);
         #ifdef CONFIG_KSU_SUSFS_SUS_PATH
-            if (dentry->d_inode && unlikely(dentry->d_inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
-                int err_p = inode_permission2(dir->mnt, dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
-                if (err_p) return err_p;
-                return -ENOENT;
-            }
+        	if (dentry->d_inode && unlikely(dentry->d_inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
+        		int err_p = inode_permission2(dir->mnt, dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
+        		if (err_p) return err_p;
+        		return -ENOENT;
+        	}
         #endif"
         patch_file "fs/namei.c" "static int may_o_create(const struct path *dir, struct dentry *dentry, umode_t mode)" 2 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
 
