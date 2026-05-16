@@ -66,6 +66,25 @@ runs:
                 patch -p1 -N -f < "$PATCH_FILE" || echo "⚠️ 补丁产生 .rej 拒绝文件，保留全尸继续！"
             fi
         fi
+                # 临时探针：全盘暴破，寻找 SukiSU 魔法挂载的【核心证据文件】
+        echo "==== 🔍 开始执行：搜查魔法挂载核心证据文件 ===="
+        KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
+        if [ -n "$KSU_DIR" ]; then
+            cd "$KSU_DIR"
+            
+            echo "==== 📂 嫌疑文件清单 (按名字排查) ===="
+            find kernel/ -name "*mount*.c" -o -name "*module*.c" -o -name "sucompat.c"
+            
+            echo "==== 🚨 核心挂载大动脉扫描 (查找 overlay, path_umount, magic_mount) ===="
+            grep -rnE "overlay|path_umount|magic_mount|vfs_mount|ksu_handle_execveat" kernel/ || true
+            
+            cd -
+        else
+            echo "❌ 找不到 KernelSU 源码目录！"
+        fi
+        
+        echo "==== 🛑 证据搜查完毕！强行中断流水线，等待提审！ ===="
+        exit 1
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
