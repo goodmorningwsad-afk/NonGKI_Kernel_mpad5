@@ -66,31 +66,35 @@ runs:
                 patch -p1 -N -f < "$PATCH_FILE" || echo "⚠️ 补丁产生 .rej 拒绝文件，保留全尸继续！"
             fi
         fi
-                # 临时探针：深挖 su_mount_ns.c 的魔法挂载真身
-        echo "==== 🔍 开始执行：提取魔法挂载核心源码 ===="
+    - name: "Apply patches and modifications (Part 2 - 链接器修复与探针)"
+      shell: bash
+      run: |
+        cd $GITHUB_WORKSPACE/device_kernel
+        
+        # 临时探针：地毯式暴破寻找魔法挂载真身
+        echo "==== 🔍 开始执行：全盘暴破寻找魔法挂载真身 ===="
         KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
         if [ -n "$KSU_DIR" ]; then
             cd "$KSU_DIR"
             
-            echo "==== 📂 提取 su_mount_ns.c 包含的函数清单 ===="
-            grep "^[a-z_A-Z].*(" kernel/su_mount_ns.c || echo "未找到函数列表"
+            echo "==== 📂 看看 kernel 目录下到底藏了哪些文件 ===="
+            ls -1 kernel/
             
-            echo "==== 🚨 提取魔法挂载核心逻辑 (精确锁定 mount 相关调用) ===="
-            # 提取包含 do_mount, vfs_mount, bind 等底层挂载字眼的代码块
-            grep -n -C 5 "do_mount" kernel/su_mount_ns.c || true
-            grep -n -C 5 "ksu_magic_mount" kernel/su_mount_ns.c || true
-            grep -n -C 5 "vfs_mount" kernel/su_mount_ns.c || true
+            echo "==== 🚨 整个 SukiSU 仓库地毯式搜索挂载指令 (do_mount / MS_BIND) ===="
+            # 搜索内核和可能存在的守护进程目录
+            grep -rnE "do_mount|MS_BIND" ./ || echo "全盘未找到底层挂载调用！"
             
-            echo "==== 🚨 看看它是怎么处理模块路径的 ===="
-            grep -n -C 5 "/data/adb" kernel/su_mount_ns.c || true
+            echo "==== 🚨 整个 SukiSU 仓库搜索魔法挂载字眼 (magic) ===="
+            grep -rnE -i "magic_mount|magic" ./ || echo "全盘未找到 magic 字眼！"
             
             cd -
         else
             echo "❌ 找不到 KernelSU 源码目录！"
         fi
         
-        echo "==== 🛑 源码提取完毕！强行中断流水线，等待提审！ ===="
+        echo "==== 🛑 证据搜查完毕！强行中断流水线，等待提审！ ===="
         exit 1
+
 
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
