@@ -488,21 +488,35 @@ runs:
         sed -i '/susfs_run_sus_path_loop/d' drivers/kernelsu/kernel_umount.c
         sed -i '/susfs_set_i_state_on_external_dir/d' drivers/kernelsu/supercalls.c
 
-                # 14. 跨时空截胡最新的 SELinux 欺骗模块 (并进行法医级 API 降级缝合)
-        echo "🩹 正在从未来 (HEAD) 窃取满血 SELinux 模块..."
+         # 14. 临时探针：法医级排查 setuid_hook.c 和 selinux 目录是否含有打孔逻辑
+        echo "==== 🔍 开始执行法医提取任务：排查手动打孔嫌疑 ===="
         KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
         if [ -n "$KSU_DIR" ]; then
             cd "$KSU_DIR"
-            # 强行从最新分支拽取包含真实 fake_state 的文件，绝不妥协
-            git checkout origin/HEAD -- kernel/selinux/selinux.c kernel/selinux/selinux.h || \
-            git checkout origin/main -- kernel/selinux/selinux.c kernel/selinux/selinux.h
             
-            # 🚨 史诗级 API 缝合：把新版 selinux.h 里的声明，强行掰回老版本 rules.c 的形状！
-            echo "🩹 正在将新版 selinux.h 的函数签名降级适配老底盘..."
-            sed -i 's/int handle_sepolicy(void __user \*user_data, u64 data_len);/int handle_sepolicy(unsigned long arg3, void __user \*arg4);/g' kernel/selinux/selinux.h
+            echo "==== 📥 临时拉取最新分支的待查文件 ===="
+            git checkout origin/HEAD -- kernel/selinux/ kernel/setuid_hook.c || \
+            git checkout origin/main -- kernel/selinux/ kernel/setuid_hook.c
+            
+            echo "==== 🔍 [最新版] setuid_hook.c 包含的函数清单 ===="
+            grep "^[a-z_A-Z].*(" kernel/setuid_hook.c || true
+            
+            echo "==== 🔍 [最新版] selinux/selinux.c 包含的函数清单 ===="
+            grep "^[a-z_A-Z].*(" kernel/selinux/selinux.c || true
+            
+            echo "==== 🔍 [最新版] selinux/rules.c 包含的函数清单 ===="
+            grep "^[a-z_A-Z].*(" kernel/selinux/rules.c || true
+            
+            echo "==== 🚨 危险关键词扫描 (排查打孔嫌疑) ===="
+            echo "正在扫描 kprobe, execve, sucompat, vfs_ 等核心打孔关键词..."
+            grep -E -n "kprobe|execve|sucompat|vfs_" kernel/setuid_hook.c kernel/selinux/selinux.c kernel/selinux/rules.c || echo "✅ 未发现任何打孔关键词！"
             
             cd -
         fi
+        
+        echo "==== 🛑 提取完成！强行中断流水线，等待解析！ ===="
+        exit 1
+
         
         # 15. 接入真实的 SELinux 变量声明 (这是修复 hooks.c.rej 的保命符，绝不能删！)
         echo "🩹 正在对接真实的 SELinux 欺骗变量..."
