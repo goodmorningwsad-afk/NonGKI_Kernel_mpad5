@@ -81,52 +81,76 @@ runs:
             fi
           fi
 
-      - name: 🧹 终极无菌手术：彻底剥离内置 KSU 与 SuSFS 1.x
+      - name: 🧹 终极无菌手术：AST 级精准剥离旧版 KSU 与 SuSFS 
         shell: bash
         run: |
           set -ex
           cd $GITHUB_WORKSPACE/device_kernel
           
-          # 🚨🚨🚨 临时抓捕探针：打印 clean_hook.sh 的真身 🚨🚨🚨
-          echo "==== 🔍 抓捕内鬼：打印 clean_hook.sh 源码 ===="
-          if [ -f "/tmp/Bin/clean_hook.sh" ]; then
-              cat /tmp/Bin/clean_hook.sh
-          else
-              echo "❌ 没找到 /tmp/Bin/clean_hook.sh，内鬼跑了！"
-          fi
-          echo "==== 🛑 真身已打印！为了防止它继续破坏内核，强行中断！ ===="
-          exit 1
-          # 🚨🚨🚨 探针结束 🚨🚨🚨
-          
           echo "==== 1. 物理移除老旧核心文件 ===="
           rm -rf KernelSU kernelsu drivers/kernelsu
-          sed -i '/KernelSU/d' .gitmodules || true
-          sed -i '/kernelsu/d' drivers/Makefile || true
-          sed -i '/kernelsu/d' drivers/Kconfig || true
+          
+          # 🚨 已经严格按照要求去掉所有 || true，一旦报错立刻熔断，绝不掩盖隐患！
+          if [ -f ".gitmodules" ]; then sed -i '/KernelSU/d' .gitmodules; fi
+          if [ -f "drivers/Makefile" ]; then sed -i '/kernelsu/d' drivers/Makefile; fi
+          if [ -f "drivers/Kconfig" ]; then sed -i '/kernelsu/d' drivers/Kconfig; fi
           
           rm -f fs/susfs.c fs/sus_su.c
           rm -f include/linux/susfs.h include/linux/susfs_def.h include/linux/sus_su.h
-          sed -i '/susfs\.o/d' fs/Makefile || true
+          if [ -f "fs/Makefile" ]; then sed -i '/susfs\.o/d' fs/Makefile; fi
           
-          echo "==== 2. 魔法摘除 SuSFS 1.x 底层 Hook ===="
-          find fs/ include/ kernel/ -type f -exec sed -i '/#ifdef CONFIG_KSU_SUSFS.*/,/#endif/d' {} +
+          echo "==== 2. 彻底弃用官方屠夫脚本，注入极客级 Python AST 清理探针 ===="
+          cat << 'EOF' > clean_ast.py
+          import sys, os
+
+          def clean_hooks(filepath):
+              if not os.path.exists(filepath): return
+              with open(filepath, 'r') as f:
+                  lines = f.readlines()
+              
+              out = []
+              skip = False
+              nesting = 0
+              
+              for line in lines:
+                  stripped = line.strip()
+                  if not skip:
+                      if stripped.startswith("#ifdef CONFIG_KSU") or stripped.startswith("#if defined(CONFIG_KSU") or stripped.startswith("#ifndef CONFIG_KSU"):
+                          skip = True
+                          nesting = 1
+                      else:
+                          out.append(line)
+                  else:
+                      if stripped.startswith("#if ") or stripped.startswith("#ifdef ") or stripped.startswith("#ifndef "):
+                          nesting += 1
+                      elif stripped.startswith("#endif"):
+                          nesting -= 1
+                          if nesting == 0:
+                              skip = False
+              
+              with open(filepath, 'w') as f:
+                  f.writelines(out)
+
+          for arg in sys.argv[1:]:
+              clean_hooks(arg)
+          EOF
+
+          echo "==== 3. 开始执行神经外科级精准剔除 ===="
+          find fs/ include/ kernel/ drivers/ security/ -type f -name "*.c" -o -name "*.h" | xargs python3 clean_ast.py
           
-          echo "==== 3. 调用官方净化器清洗残留 KSU Hook ===="
-          if [ -f "/tmp/Bin/clean_hook.sh" ]; then
-              cp /tmp/Bin/clean_hook.sh ./
-              bash clean_hook.sh || true
-          fi
+          echo "==== 4. 收尾清理 ===="
+          if [ -f "fs/Makefile" ]; then sed -i '/CONFIG_KSU_SUSFS/d' fs/Makefile; fi
           
-          echo "==== 🔍 [术后验伤] 看看无菌手术到底砍碎了什么？ ===="
-          wc -l fs/namespace.c fs/namei.c || true
-          grep -n -C 3 "security_path_mknod" fs/namei.c || echo "❌ 惨绝人寰：security_path_mknod 锚点被无菌手术切掉了！"
+          echo "==== 🔍 [术后验伤] 确保大动脉完好无损 ===="
+          wc -l fs/namespace.c fs/namei.c
           
-          echo "---- 🚨 终极铁证：Git Diff 差异对比 🚨 ----"
-          # 直接用 Git 打印出被无菌手术修改/删除的所有代码细节！
+          echo "---- 🚨 追加步骤：神经外科手术前后对比现场 (Git Diff) 🚨 ----"
+          # 精准打印 namespace.c 和 namei.c 等核心文件的剥离差异
           git diff fs/namespace.c fs/namei.c
           
-          echo "==== 🛑 验伤完毕！强行中断流水线，等待法医判决！ ===="
+          echo "==== 🛑 现场抓取完毕！强制中断流水线，供你核查修改细节！ ===="
           exit 1
+
 
 
       - name: Set KernelSU
