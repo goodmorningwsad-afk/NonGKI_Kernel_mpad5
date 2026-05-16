@@ -50,35 +50,26 @@ runs:
 
         echo "✅ SuSFS 物理开关与 APEX 满血挂载防线全数合闸！"
         
-        echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
-        
-        set +e # 🚨 防爆死装甲：防止 find 遇到无权限目录导致整个流水线红灯
+                echo "==== 1. 物理缝合 SuSFS 核心补丁 (自带器官创造术) ===="
+        set +e
         PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" 2>/dev/null | head -n 1)
         set -e
         
         if [ -z "$PATCH_FILE" ]; then
-            echo "❌ 致命错误：找不到本地预先下载的老补丁！"
+            echo "❌ 致命错误：找不到 susfs_patch_to_4.19.patch！"
             exit 1 
         fi
 
-        echo "==== 1.5 物理植入本地预下载的纯净器官 ===="
-        
-        set +e # 🚨 再次开启防爆死装甲
-        SUSFS_H_SRC=$(find /tmp $GITHUB_WORKSPACE -name "susfs.h" -not -path "*/device_kernel/*" 2>/dev/null | head -n 1)
-        set -e
-        
-        if [ -n "$SUSFS_H_SRC" ]; then
-            echo "📦 从本地 /tmp 成功找到纯净版器官，正在植入..."
-            SUSFS_INC=$(dirname "$SUSFS_H_SRC")
-            SUSFS_FS="$(dirname "$SUSFS_INC")/fs"
-            
-            cp -r "$SUSFS_INC"/* include/linux/
-            cp -r "$SUSFS_FS"/* fs/
-            echo "✅ 核心器官 (susfs.h, susfs.c) 本地植入完毕！"
+        if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
+            echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
         else
-            echo "❌ 致命错误：本地找不到预先下载的 susfs.h，请检查准备阶段！"
-            exit 1
+            echo "🔨 正在使用你极其完美的本地老补丁创造器官与打孔..."
+            patch -p1 -N -f < "$PATCH_FILE" || {
+                echo "⚠️ 补丁产生 .rej 拒绝文件！(如果有，交由下方的极客脚本缝合)"
+            }
         fi
+
+
         
         if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
             echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
