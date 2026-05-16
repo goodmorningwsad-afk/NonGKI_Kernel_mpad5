@@ -60,16 +60,20 @@ runs:
             exit 1 
         fi
 
-        # 👇👇👇 核心补漏：把切除的纯净器官重新塞进去 👇👇👇
+                # 👇👇👇 核心补漏：把切除的纯净器官重新塞进去 👇👇👇
         echo "==== 1.5 物理植入 SuSFS 纯净版核心器官 ===="
+        
+        set +e # 🚨 极其关键：临时关闭错误捕获，防止 find 遇到无权限目录时导致流水线暴毙！
         SUSFS_H_SRC=$(find /tmp $GITHUB_WORKSPACE -name "susfs.h" -not -path "*/device_kernel/*" 2>/dev/null | head -n 1)
+        set -e # 🚨 搜寻完毕，重新开启错误捕获！
+        
         if [ -n "$SUSFS_H_SRC" ]; then
             echo "📦 从本地找到纯净版 SuSFS 源文件，正在植入..."
             SUSFS_INC=$(dirname "$SUSFS_H_SRC")
             SUSFS_FS="$(dirname "$SUSFS_INC")/fs"
             
-            cp "$SUSFS_INC"/* include/linux/
-            cp "$SUSFS_FS"/* fs/
+            cp -r "$SUSFS_INC"/* include/linux/
+            cp -r "$SUSFS_FS"/* fs/
             echo "✅ 核心器官 (susfs.h, susfs.c) 植入完毕！"
         else
             echo "⚠️ 未在本地找到 susfs.h，紧急从云端拉取纯净应急版！"
@@ -80,6 +84,7 @@ runs:
             echo "✅ 云端器官植入完毕！"
         fi
         # 👆👆👆 补漏结束 👆👆👆
+
         
         if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
             echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
