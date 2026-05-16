@@ -50,7 +50,7 @@ runs:
 
         echo "✅ SuSFS 物理开关与 APEX 满血挂载防线全数合闸！"
         
-        echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
+                echo "==== 1. 物理缝合 SuSFS 3000行隐身大动脉 ===="
         set +e
         PATCH_FILE=$(find /tmp $GITHUB_WORKSPACE -name "susfs_patch_to_4.19.patch" 2>/dev/null | head -n 1)
         set -e
@@ -58,17 +58,38 @@ runs:
         if [ -z "$PATCH_FILE" ]; then
             echo "❌ 致命错误：找不到 susfs_patch_to_4.19.patch！"
             exit 1 
-        else
-            if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
-                echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
-            else
-                patch -p1 -N -f < "$PATCH_FILE" || {
-                    echo "⚠️ 补丁产生 .rej 拒绝文件！"
-                    echo "==== 🔍 停机验尸：打印所有 .rej 现场 ===="
-                    find . -name "*.rej" -type f -exec echo -e "\n\n🚨🚨🚨 发现遗骸: {} 🚨🚨🚨" \; -exec cat {} \;
-                }
-            fi
         fi
+
+        # 👇👇👇 核心补漏：把切除的纯净器官重新塞进去 👇👇👇
+        echo "==== 1.5 物理植入 SuSFS 纯净版核心器官 ===="
+        SUSFS_H_SRC=$(find /tmp $GITHUB_WORKSPACE -name "susfs.h" -not -path "*/device_kernel/*" 2>/dev/null | head -n 1)
+        if [ -n "$SUSFS_H_SRC" ]; then
+            echo "📦 从本地找到纯净版 SuSFS 源文件，正在植入..."
+            SUSFS_INC=$(dirname "$SUSFS_H_SRC")
+            SUSFS_FS="$(dirname "$SUSFS_INC")/fs"
+            
+            cp "$SUSFS_INC"/* include/linux/
+            cp "$SUSFS_FS"/* fs/
+            echo "✅ 核心器官 (susfs.h, susfs.c) 植入完毕！"
+        else
+            echo "⚠️ 未在本地找到 susfs.h，紧急从云端拉取纯净应急版！"
+            curl -LSs "https://raw.githubusercontent.com/simonpunk/susfs4ksu/gki-android14-6.1/kernel_patches/include/linux/susfs.h" -o include/linux/susfs.h
+            curl -LSs "https://raw.githubusercontent.com/simonpunk/susfs4ksu/gki-android14-6.1/kernel_patches/include/linux/susfs_def.h" -o include/linux/susfs_def.h
+            curl -LSs "https://raw.githubusercontent.com/simonpunk/susfs4ksu/gki-android14-6.1/kernel_patches/fs/susfs.c" -o fs/susfs.c
+            curl -LSs "https://raw.githubusercontent.com/simonpunk/susfs4ksu/gki-android14-6.1/kernel_patches/fs/sus_su.c" -o fs/sus_su.c
+            echo "✅ 云端器官植入完毕！"
+        fi
+        # 👆👆👆 补漏结束 👆👆👆
+        
+        if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
+            echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
+        else
+            patch -p1 -N -f < "$PATCH_FILE" || {
+                echo "⚠️ 补丁产生 .rej 拒绝文件！"
+                echo "==== 🔍 停机验尸：打印所有 .rej 现场 ===="
+                find . -name "*.rej" -type f -exec echo -e "\n\n🚨🚨🚨 发现遗骸: {} 🚨🚨🚨" \; -exec cat {} \;
+            }
+         fi
         
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
