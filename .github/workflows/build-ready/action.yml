@@ -84,13 +84,19 @@ runs:
       - name: 🧹 终极无菌手术：彻底剥离内置 KSU 与 SuSFS 1.x
         shell: bash
         run: |
-          # 🚨 致命细节：把原来的 set -ex 改成 set -x，防止 grep 找不到东西直接让流水线暴毙
-          set -x
+          set -ex
           cd $GITHUB_WORKSPACE/device_kernel
           
-          echo "==== 🔍 [术前验伤] 记录 fs/namespace.c 和 fs/namei.c 初始状态 ===="
-          wc -l fs/namespace.c fs/namei.c || true
-          grep -n -C 3 "security_path_mknod" fs/namei.c || true
+          # 🚨🚨🚨 临时抓捕探针：打印 clean_hook.sh 的真身 🚨🚨🚨
+          echo "==== 🔍 抓捕内鬼：打印 clean_hook.sh 源码 ===="
+          if [ -f "/tmp/Bin/clean_hook.sh" ]; then
+              cat /tmp/Bin/clean_hook.sh
+          else
+              echo "❌ 没找到 /tmp/Bin/clean_hook.sh，内鬼跑了！"
+          fi
+          echo "==== 🛑 真身已打印！为了防止它继续破坏内核，强行中断！ ===="
+          exit 1
+          # 🚨🚨🚨 探针结束 🚨🚨🚨
           
           echo "==== 1. 物理移除老旧核心文件 ===="
           rm -rf KernelSU kernelsu drivers/kernelsu
