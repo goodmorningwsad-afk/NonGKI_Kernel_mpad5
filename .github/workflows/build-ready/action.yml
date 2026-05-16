@@ -99,38 +99,67 @@ runs:
           rm -f include/linux/susfs.h include/linux/susfs_def.h include/linux/sus_su.h
           if [ -f "fs/Makefile" ]; then sed -i '/susfs\.o/d' fs/Makefile; fi
           
-                    echo "==== 2. 彻底弃用官方屠夫脚本，注入极客级 Python AST 清理探针 ===="
+          echo "==== 2. 彻底弃用官方屠夫脚本，注入极客级 Python AST 清理探针 ===="
           cat << 'EOF' > clean_ast.py
           import sys, os
 
           def clean_hooks(filepath):
               if not os.path.exists(filepath): return
               
-              # 🚨 核心修复：加入 encoding='utf-8', errors='ignore' 强行越过古董驱动里的特殊字符注释
+              # 强行越过古董驱动里的特殊字符注释
               with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
                   lines = f.readlines()
               
               out = []
-              skip = False
-              nesting = 0
+              state = 'NORMAL' 
+              nesting_stack = []
               
               for line in lines:
                   stripped = line.strip()
-                  if not skip:
-                      if stripped.startswith("#ifdef CONFIG_KSU") or stripped.startswith("#if defined(CONFIG_KSU") or stripped.startswith("#ifndef CONFIG_KSU"):
-                          skip = True
-                          nesting = 1
+                  
+                  is_ifdef = stripped.startswith("#ifdef ") or stripped.startswith("#if defined")
+                  is_ifndef = stripped.startswith("#ifndef ")
+                  is_if_other = stripped.startswith("#if ") and not (is_ifdef or is_ifndef)
+                  is_else = stripped.startswith("#else")
+                  is_elif = stripped.startswith("#elif")
+                  is_endif = stripped.startswith("#endif")
+                  
+                  if is_ifdef or is_ifndef or is_if_other:
+                      nesting_stack.append(state)
+                      if "CONFIG_KSU" in stripped:
+                          if is_ifndef:
+                              state = 'IN_KSU_FALSE' # #ifndef 意味着接下来的代码是原厂的
+                          else:
+                              state = 'IN_KSU_TRUE'  # #ifdef 意味着接下来的代码是 KSU 的
                       else:
-                          out.append(line)
-                  else:
-                      if stripped.startswith("#if ") or stripped.startswith("#ifdef ") or stripped.startswith("#ifndef "):
-                          nesting += 1
-                      elif stripped.startswith("#endif"):
-                          nesting -= 1
-                          if nesting == 0:
-                              skip = False
-              
-              # 写入时也保持 utf-8 编码
+                          if state in ('IN_KSU_TRUE', 'IN_KSU_TRUE_NESTED'):
+                              state = 'IN_KSU_TRUE_NESTED'
+                          elif state in ('IN_KSU_FALSE', 'IN_KSU_FALSE_NESTED'):
+                              state = 'IN_KSU_FALSE_NESTED'
+                          else:
+                              state = 'NORMAL_NESTED'
+                  elif is_else or is_elif:
+                      # 遇到 #else，立刻反转状态！保护原厂代码！
+                      if state == 'IN_KSU_TRUE':
+                          state = 'IN_KSU_FALSE'
+                          continue
+                      elif state == 'IN_KSU_FALSE':
+                          state = 'IN_KSU_TRUE'
+                          continue
+                  elif is_endif:
+                      if nesting_stack:
+                          prev_state = nesting_stack.pop()
+                          if state in ('IN_KSU_TRUE', 'IN_KSU_FALSE') and prev_state == 'NORMAL':
+                              state = prev_state
+                              continue
+                          state = prev_state
+                  
+                  # 只有在 NORMAL 或 IN_KSU_FALSE（原厂分支）状态下，才保留代码
+                  if state in ('NORMAL', 'NORMAL_NESTED', 'IN_KSU_FALSE', 'IN_KSU_FALSE_NESTED'):
+                      if (is_ifdef or is_ifndef or is_if_other) and "CONFIG_KSU" in stripped and state in ('IN_KSU_FALSE', 'IN_KSU_TRUE'):
+                          continue
+                      out.append(line)
+
               with open(filepath, 'w', encoding='utf-8') as f:
                   f.writelines(out)
 
