@@ -106,59 +106,75 @@ runs:
           def clean_hooks(filepath):
               if not os.path.exists(filepath): return
               
-              # 强行越过古董驱动里的特殊字符注释
               with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
                   lines = f.readlines()
               
               out = []
-              state = 'NORMAL' 
-              nesting_stack = []
+              ksu_active = False
+              ksu_level = 0
+              show_content = True
+              transformed_elif = False
               
               for line in lines:
                   stripped = line.strip()
-                  
-                  is_ifdef = stripped.startswith("#ifdef ") or stripped.startswith("#if defined")
-                  is_ifndef = stripped.startswith("#ifndef ")
-                  is_if_other = stripped.startswith("#if ") and not (is_ifdef or is_ifndef)
+                  is_if = stripped.startswith("#if")
                   is_else = stripped.startswith("#else")
                   is_elif = stripped.startswith("#elif")
                   is_endif = stripped.startswith("#endif")
                   
-                  if is_ifdef or is_ifndef or is_if_other:
-                      nesting_stack.append(state)
-                      if "CONFIG_KSU" in stripped:
-                          if is_ifndef:
-                              state = 'IN_KSU_FALSE' # #ifndef 意味着接下来的代码是原厂的
+                  if not ksu_active:
+                      # 如果在原生代码区，遇到了 KSU 的宏，立刻拉起警戒线
+                      if is_if and "CONFIG_KSU" in stripped:
+                          ksu_active = True
+                          ksu_level = 1
+                          transformed_elif = False
+                          # 如果是 #ifndef，说明下面的代码是原生代码，需要保留 (show_content=True)
+                          if stripped.startswith("#ifndef"):
+                              show_content = True
                           else:
-                              state = 'IN_KSU_TRUE'  # #ifdef 意味着接下来的代码是 KSU 的
+                              show_content = False
+                          continue # 抛弃这行 #if
                       else:
-                          if state in ('IN_KSU_TRUE', 'IN_KSU_TRUE_NESTED'):
-                              state = 'IN_KSU_TRUE_NESTED'
-                          elif state in ('IN_KSU_FALSE', 'IN_KSU_FALSE_NESTED'):
-                              state = 'IN_KSU_FALSE_NESTED'
-                          else:
-                              state = 'NORMAL_NESTED'
-                  elif is_else or is_elif:
-                      # 遇到 #else，立刻反转状态！保护原厂代码！
-                      if state == 'IN_KSU_TRUE':
-                          state = 'IN_KSU_FALSE'
-                          continue
-                      elif state == 'IN_KSU_FALSE':
-                          state = 'IN_KSU_TRUE'
-                          continue
-                  elif is_endif:
-                      if nesting_stack:
-                          prev_state = nesting_stack.pop()
-                          if state in ('IN_KSU_TRUE', 'IN_KSU_FALSE') and prev_state == 'NORMAL':
-                              state = prev_state
+                          out.append(line)
+                  else:
+                      # 处于 KSU 警戒区内
+                      if is_if and not is_elif:
+                          ksu_level += 1
+                          if show_content: out.append(line)
+                      elif is_else:
+                          if ksu_level == 1:
+                              # 遇到 #else，反转显示状态（保护原厂代码）
+                              show_content = not show_content
                               continue
-                          state = prev_state
-                  
-                  # 只有在 NORMAL 或 IN_KSU_FALSE（原厂分支）状态下，才保留代码
-                  if state in ('NORMAL', 'NORMAL_NESTED', 'IN_KSU_FALSE', 'IN_KSU_FALSE_NESTED'):
-                      if (is_ifdef or is_ifndef or is_if_other) and "CONFIG_KSU" in stripped and state in ('IN_KSU_FALSE', 'IN_KSU_TRUE'):
-                          continue
-                      out.append(line)
+                          else:
+                              if show_content: out.append(line)
+                      elif is_elif:
+                          if ksu_level == 1:
+                              if not show_content:
+                                  # 把 #elif 变成 #if，拯救分支里的原厂代码
+                                  out.append(line.replace("#elif", "#if", 1))
+                                  show_content = True
+                                  transformed_elif = True
+                              else:
+                                  show_content = False
+                              continue
+                          else:
+                              if show_content: out.append(line)
+                      elif is_endif:
+                          ksu_level -= 1
+                          if ksu_level == 0:
+                              # 警戒线归零，彻底离开 KSU 区域！
+                              ksu_active = False
+                              show_content = True
+                              if transformed_elif:
+                                  out.append(line)
+                                  transformed_elif = False
+                              continue # 抛弃这行 #endif
+                          else:
+                              if show_content: out.append(line)
+                      else:
+                          # 普通代码行
+                          if show_content: out.append(line)
 
               with open(filepath, 'w', encoding='utf-8') as f:
                   f.writelines(out)
