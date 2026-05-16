@@ -30,11 +30,8 @@ runs:
         echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$DEFCONFIG_FILE"
-        echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
-        echo "CONFIG_OVERLAY_FS=y" >> "$DEFCONFIG_FILE" # 🚨 这才是修复模块挂载的正道！
-
-        echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
         
+        # (OverlayFS 和 BLK_DEV_LOOP 已经在准备阶段开启，此处可以保留 squashfs/erofs 等额外配置)
         echo "CONFIG_SQUASHFS=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_FILE_DIRECT=y" >> "$DEFCONFIG_FILE"
         echo "CONFIG_SQUASHFS_DECOMP_MULTI_PERCPU=y" >> "$DEFCONFIG_FILE"
@@ -62,7 +59,7 @@ runs:
             echo "❌ 致命错误：找不到 susfs_patch_to_4.19.patch！"
             exit 1 
         else
-                        if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
+            if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
                 echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
             else
                 patch -p1 -N -f < "$PATCH_FILE" || {
@@ -101,9 +98,6 @@ runs:
         }
 
         echo "==== [手工缝合] 修复 LineageOS 专属的 .rej 冲突 ===="
-        
-        # 🚨 提前清理主工作流中留下的 error=0 脏补丁，防止干扰
-        sed -i '/FIXED_UNDECLARED_VAR/d' fs/namei.c || true
         
         # 1. 针对 task_mmu.c 的头文件极客注入
         TASK_MMU_HOOK="
@@ -151,16 +145,15 @@ runs:
         patch_file "fs/namei.c" "if ((!sysctl_protected_fifos && S_ISFIFO(inode->i_mode)) ||" 0 "$NAMEI_HOOK_1" "FIX_NAMEI_1_REJ"
 
         # 6. 补全 namei.c 的核心路径隐藏防线二 
-        # 🚨 史诗级修复：用 offset 2 跨过大门，一并复活被清创手术误杀的 security_path_mknod！
         NAMEI_HOOK_2="
         /* FIX_NAMEI_2_REJ */
-        	int error = security_path_mknod(dir, dentry, mode, 0);
+            int error = security_path_mknod(dir, dentry, mode, 0);
         #ifdef CONFIG_KSU_SUSFS_SUS_PATH
-        	if (dentry->d_inode && unlikely(dentry->d_inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
-        		int err_p = inode_permission2(dir->mnt, dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
-        		if (err_p) return err_p;
-        		return -ENOENT;
-        	}
+            if (dentry->d_inode && unlikely(dentry->d_inode->i_mapping->flags & BIT_SUS_PATH) && likely(susfs_is_current_proc_umounted())) {
+                int err_p = inode_permission2(dir->mnt, dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
+                if (err_p) return err_p;
+                return -ENOENT;
+            }
         #endif"
         patch_file "fs/namei.c" "static int may_o_create(const struct path *dir, struct dentry *dentry, umode_t mode)" 2 "$NAMEI_HOOK_2" "FIX_NAMEI_2_REJ"
 
@@ -179,6 +172,7 @@ runs:
         }
         #endif"
         patch_file "fs/exec.c" "return __do_execve_file(fd, filename, argv, envp, flags, NULL);" 0 "$EXEC_HOOK" "ksu_execveat_hook"
+        
         OPEN_HOOK="
         #ifdef CONFIG_KSU
         {
@@ -218,6 +212,56 @@ runs:
         }
         #endif"
         patch_file "drivers/input/input.c" "if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)" 0 "$INPUT_HOOK" "ksu_handle_input_handle_event"
+
+        # 🚨 魔法挂载防线补充：复原缺失的 namespace.c 终极拦截！
+        if ! grep -q "susfs_reorder_mnt_id" fs/namespace.c; then
+            echo "🩹 正在追加 namespace.c 底层挂载穿透防线..."
+            cat << 'EOF' >> fs/namespace.c
+
+        #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+        void susfs_reorder_mnt_id(void) {
+            struct mnt_namespace *mnt_ns = current->nsproxy->mnt_ns;
+            struct mount *mnt;
+            int first_mnt_id = 0;
+            if (!mnt_ns) return;
+            if (atomic64_read(&susfs_ksu_mounts) == 0) return;
+            get_mnt_ns(mnt_ns);
+            first_mnt_id = list_first_entry(&mnt_ns->list, struct mount, mnt_list)->mnt_id;
+            list_for_each_entry(mnt, &mnt_ns->list, mnt_list) {
+                if (mnt->mnt_id == DEFAULT_KSU_MNT_ID) continue;
+                WRITE_ONCE(mnt->mnt.susfs_mnt_id_backup, READ_ONCE(mnt->mnt_id));
+                WRITE_ONCE(mnt->mnt_id, first_mnt_id++);
+            }
+            put_mnt_ns(mnt_ns);
+        }
+
+        int susfs_get_non_sus_mnt_id_from_mnt(struct mount *orig_mnt) {
+            struct mount *mnt = orig_mnt;
+            int mnt_id;
+            lock_mount_hash();
+            for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
+            mnt_id = mnt->mnt_id;
+            unlock_mount_hash();
+            return mnt_id;
+        }
+
+        struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt) {
+            struct mount *mnt = real_mount(vfsmnt);
+            lock_mount_hash();
+            for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
+            mntget(&mnt->mnt);
+            if (!mnt->mnt.mnt_root || IS_ERR(mnt->mnt.mnt_root)) {
+                mntput(&mnt->mnt);
+                unlock_mount_hash();
+                return vfsmnt;
+            }
+            dget(mnt->mnt.mnt_root);
+            unlock_mount_hash();
+            return &mnt->mnt;
+        }
+        #endif
+        EOF
+        fi
 
         if ! grep -q "path_umount" fs/namespace.c; then
             cat << 'EOF' >> fs/namespace.c
@@ -329,13 +373,8 @@ runs:
         SUCOMPAT_FILE=$(find $GITHUB_WORKSPACE -type f -name "sucompat.c" | head -n 1)
         if [ -n "$SUCOMPAT_FILE" ]; then
             echo "🩹 正在为 $SUCOMPAT_FILE 注入权限拦截大坝..."
-            
-            # 在 faccessat 函数中注入权限判断
             sed -i '/int ksu_handle_faccessat/,/ksu_strncpy_from_user_nofault/ s/ksu_strncpy_from_user_nofault/if (!ksu_is_allow_uid_for_current(current_uid().val)) return 0;\n\n\tksu_strncpy_from_user_nofault/' "$SUCOMPAT_FILE"
-            
-            # 在 4.19 版的 ksu_handle_stat 函数中注入权限判断
             sed -i '/int ksu_handle_stat(int \*dfd, const char __user \*\*filename_user/,/ksu_strncpy_from_user_nofault/ s/ksu_strncpy_from_user_nofault/if (!ksu_is_allow_uid_for_current(current_uid().val)) return 0;\n\n\tksu_strncpy_from_user_nofault/' "$SUCOMPAT_FILE"
-            
             echo "✅ 漏洞修复完毕！检测软件再也无法通过 sh 借尸还魂了！"
         else
             echo "❌ 找不到 sucompat.c，纠偏失败！"
@@ -355,22 +394,6 @@ runs:
         #endif"
         patch_file "kernel/cgroup/cpuset.c" "static ssize_t cpuset_write_resmask_wrapper(struct kernfs_open_file *of," 0 "$CPUSET_HOOK_2" "CPUSET_ASSIST_FIX_END"
         
-        # 2. 修复 module-plts.c 找不到指令集的 Bug
-        INSN_HOOK="
-        /* MODULE_PLTS_INSN_FIX */
-        #include <asm/insn.h>"
-        patch_file "arch/arm64/kernel/module-plts.c" "#include <linux/sort.h>" 0 "$INSN_HOOK" "MODULE_PLTS_INSN_FIX"
-        
-        # 3. 修复 tune.c 结构体未定义 wrapper 的官方残疾 Bug
-        TUNE_HOOK="
-        /* STUNE_ASSIST_WRAPPER_FIX */
-        #ifndef CONFIG_STUNE_ASSIST
-        #define sched_boost_override_write_wrapper sched_boost_override_write
-        #define sched_colocate_write_wrapper sched_colocate_write
-        #define boost_write_wrapper boost_write
-        #define prefer_idle_write_wrapper prefer_idle_write
-        #endif"
-        patch_file "kernel/sched/tune.c" "static struct cftype files[] = {" 0 "$TUNE_HOOK" "STUNE_ASSIST_WRAPPER_FIX"
         sed -i 's/-dirty//g' scripts/setlocalversion
         
         # 5. 修复 core.c 缺失 mmc_card_doing_bkops 宏的官方残疾 Bug
@@ -410,40 +433,9 @@ runs:
         echo "🩹 正在全盘缝合 lib/zstd/ 目录下的 ZSTD_FALLTHROUGH ..."
         find lib/zstd -type f -exec sed -i 's|ZSTD_FALLTHROUGH;|/* fallthrough */|g' {} +
         
-        # 11. 终结链接器 (ld.lld) 的最后 3 个幽灵符号报错
-        echo "🩹 正在为 vmlinux 大一统注入最后的物理替身..."
-        
+        # 11. 注入 is_ksu_transition 物理替身 (仅保留这一个未前置的必要替身)
         echo "bool is_ksu_transition(const void *old_tsec, const void *new_tsec) { return false; }" >> security/selinux/hooks.c
-        echo "void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}" >> drivers/mmc/host/sdhci-pltfm.c
-        
-        # 12. 修复 MODPOST 打包阶段 KO 模块缺失 ion_alloc_dmabuf 的 Bug
-        echo "🩹 正在为 MODPOST 注入 ion_alloc_dmabuf 弱引用替身..."
-        cat << 'EOF' >> mm/madvise.c
-
-        #include <linux/export.h>
-        void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }
-        EXPORT_SYMBOL(ion_alloc_dmabuf);
-        EOF
-        
-        sed -i 's/-dirty//g' scripts/setlocalversion
         
         # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
         touch .phantom_hooks_applied
-        echo "✅ 修复所有链接符号，全境畅通，起飞！"
-                echo "==== 🔍 [铁证核查] 打印核心缝合现场 ===="
-        echo "---- fs/namespace.c 挂载防线现场 ----"
-        grep -n -C 10 "susfs_get_non_sus_mnt_id_from_mnt" fs/namespace.c || echo "❌ 缝合失败！"
-        
-        echo "---- fs/namei.c 路径隐藏现场 ----"
-        grep -n -C 5 "BIT_SUS_PATH" fs/namei.c || echo "❌ 缝合失败！"
-
-        echo "==== 🚨 [物理排雷] 查清替身的调用源头 ===="
-        echo "到底是谁在呼叫 sdhci_set_uhs_signaling？"
-        grep -rn "sdhci_set_uhs_signaling" drivers/mmc/ || echo "未找到调用源"
-        
-        echo "到底是谁在呼叫 ion_alloc_dmabuf？"
-        grep -rn "ion_alloc_dmabuf" drivers/ || grep -rn "ion_alloc_dmabuf" mm/ || echo "未找到调用源"
-        
-        echo "==== 🛑 自检完毕！强行中断，等待法医确认！ ===="
-        exit 1
-
+        echo "✅ 幻影打孔全境贯通，准备进入终极编译！"
