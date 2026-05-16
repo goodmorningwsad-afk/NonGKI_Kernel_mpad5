@@ -67,8 +67,6 @@ runs:
                     echo "⚠️ 补丁产生 .rej 拒绝文件！"
                     echo "==== 🔍 停机验尸：打印所有 .rej 现场 ===="
                     find . -name "*.rej" -type f -exec echo -e "\n\n🚨🚨🚨 发现遗骸: {} 🚨🚨🚨" \; -exec cat {} \;
-                    echo "==== 🛑 验尸完毕！强行中断流水线，等待法医解析！ ===="
-                    exit 1
                 }
             fi
         fi
@@ -436,3 +434,20 @@ runs:
         # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
         touch .phantom_hooks_applied
         echo "✅ 修复所有链接符号，全境畅通，起飞！"
+                echo "==== 🔍 [铁证核查] 打印核心缝合现场 ===="
+        echo "---- fs/namespace.c 挂载防线现场 ----"
+        grep -n -C 10 "susfs_get_non_sus_mnt_id_from_mnt" fs/namespace.c || echo "❌ 缝合失败！"
+        
+        echo "---- fs/namei.c 路径隐藏现场 ----"
+        grep -n -C 5 "BIT_SUS_PATH" fs/namei.c || echo "❌ 缝合失败！"
+
+        echo "==== 🚨 [物理排雷] 查清替身的调用源头 ===="
+        echo "到底是谁在呼叫 sdhci_set_uhs_signaling？"
+        grep -rn "sdhci_set_uhs_signaling" drivers/mmc/ || echo "未找到调用源"
+        
+        echo "到底是谁在呼叫 ion_alloc_dmabuf？"
+        grep -rn "ion_alloc_dmabuf" drivers/ || grep -rn "ion_alloc_dmabuf" mm/ || echo "未找到调用源"
+        
+        echo "==== 🛑 自检完毕！强行中断，等待法医确认！ ===="
+        exit 1
+
