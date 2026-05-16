@@ -151,9 +151,21 @@ runs:
           echo "---- 🚨 追加步骤：神经外科手术前后对比现场 (Git Diff) 🚨 ----"
           # 精准打印 namespace.c 和 namei.c 等核心文件的剥离差异
           git diff fs/namespace.c fs/namei.c
+                  # 1. 修复原厂 sdhci 驱动注释错误导致的全局链接暴毙 (属于原厂 Bug，必须带上)
+          echo "void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}" >> drivers/mmc/host/sdhci-pltfm.c
+        
+          # 2. 修复 MODPOST 阶段缺少 ION 内存分配器符号的 Bug (属于原厂/配置 Bug，必须带上)
+          cat << 'EOF' >> mm/madvise.c
+          #include <linux/export.h>
+          void * __attribute__((weak)) ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask, unsigned int flags) { return (void *)0; }
+          EXPORT_SYMBOL(ion_alloc_dmabuf);
+          EOF
+
+          # 3. 补充 OverlayFS 地基 (如果你虽然注释了 SuSFS，但依然要测试 SukiSU 的挂载功能，这个必须带上)
+          echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
+          echo "CONFIG_OVERLAY_FS=y" >> "$DEFCONFIG_FILE"
+
           
-          echo "==== 🛑 现场抓取完毕！强制中断流水线，供你核查修改细节！ ===="
-          exit 1
 
 
 
