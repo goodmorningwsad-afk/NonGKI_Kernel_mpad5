@@ -60,42 +60,19 @@ runs:
             echo "❌ 致命错误：找不到 susfs_patch_to_4.19.patch！"
             exit 1 
         else
-            if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
+                        if grep -q "susfs.o" fs/Makefile 2>/dev/null; then
                 echo "⏭️ 检测到 fs/Makefile 已包含 susfs.o，安全跳过 patch 阶段！"
             else
-                patch -p1 -N -f < "$PATCH_FILE" || echo "⚠️ 补丁产生 .rej 拒绝文件，保留全尸继续！"
+                patch -p1 -N -f < "$PATCH_FILE" || {
+                    echo "⚠️ 补丁产生 .rej 拒绝文件！"
+                    echo "==== 🔍 停机验尸：打印所有 .rej 现场 ===="
+                    find . -name "*.rej" -type f -exec echo -e "\n\n🚨🚨🚨 发现遗骸: {} 🚨🚨🚨" \; -exec cat {} \;
+                    echo "==== 🛑 验尸完毕！强行中断流水线，等待法医解析！ ===="
+                    exit 1
+                }
             fi
         fi
-    - name: "Apply patches and modifications (Part 2 - 链接器修复与探针)"
-      shell: bash
-      run: |
-        cd $GITHUB_WORKSPACE/device_kernel
         
-        # 临时探针：地毯式暴破寻找魔法挂载真身
-        echo "==== 🔍 开始执行：全盘暴破寻找魔法挂载真身 ===="
-        KSU_DIR=$(find $GITHUB_WORKSPACE -type d \( -name "KernelSU" -o -name "kernelsu" \) -not -path "*/out/*" -not -path "*/.git/*" | head -n 1)
-        if [ -n "$KSU_DIR" ]; then
-            cd "$KSU_DIR"
-            
-            echo "==== 📂 看看 kernel 目录下到底藏了哪些文件 ===="
-            ls -1 kernel/
-            
-            echo "==== 🚨 整个 SukiSU 仓库地毯式搜索挂载指令 (do_mount / MS_BIND) ===="
-            # 搜索内核和可能存在的守护进程目录
-            grep -rnE "do_mount|MS_BIND" ./ || echo "全盘未找到底层挂载调用！"
-            
-            echo "==== 🚨 整个 SukiSU 仓库搜索魔法挂载字眼 (magic) ===="
-            grep -rnE -i "magic_mount|magic" ./ || echo "全盘未找到 magic 字眼！"
-            
-            cd -
-        else
-            echo "❌ 找不到 KernelSU 源码目录！"
-        fi
-        
-        echo "==== 🛑 证据搜查完毕！强行中断流水线，等待提审！ ===="
-        exit 1
-
-
         echo "==== 2. 载入极客法医级 Bash 缝合函数 ===="
         patch_file() {
             local file="$1"
