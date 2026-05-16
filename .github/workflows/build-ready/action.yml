@@ -151,7 +151,16 @@ runs:
           echo "---- 🚨 追加步骤：神经外科手术前后对比现场 (Git Diff) 🚨 ----"
           # 精准打印 namespace.c 和 namei.c 等核心文件的剥离差异
           git diff fs/namespace.c fs/namei.c
-                  # 1. 修复原厂 sdhci 驱动注释错误导致的全局链接暴毙 (属于原厂 Bug，必须带上)
+          
+          echo "==== [提前注入] 修复原厂内核残缺与配置地基 ===="
+          # 🚨 必须在这里重新定义 DEFCONFIG_FILE，否则下面的追加会报错！
+          if [[ -d "arch/arm64/configs" ]]; then
+              DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          else
+              DEFCONFIG_FILE="arch/arm/configs/${{ env.DEFCONFIG_NAME }}"
+          fi
+          
+          # 1. 修复原厂 sdhci 驱动注释错误导致的全局链接暴毙 (属于原厂 Bug，必须带上)
           echo "void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing) {}" >> drivers/mmc/host/sdhci-pltfm.c
         
           # 2. 修复 MODPOST 阶段缺少 ION 内存分配器符号的 Bug (属于原厂/配置 Bug，必须带上)
@@ -161,13 +170,9 @@ runs:
           EXPORT_SYMBOL(ion_alloc_dmabuf);
           EOF
 
-          # 3. 补充 OverlayFS 地基 (如果你虽然注释了 SuSFS，但依然要测试 SukiSU 的挂载功能，这个必须带上)
+          # 3. 补充 OverlayFS 地基 
           echo "CONFIG_BLK_DEV_LOOP=y" >> "$DEFCONFIG_FILE"
           echo "CONFIG_OVERLAY_FS=y" >> "$DEFCONFIG_FILE"
-
-          
-
-
 
       - name: Set KernelSU
         shell: bash
