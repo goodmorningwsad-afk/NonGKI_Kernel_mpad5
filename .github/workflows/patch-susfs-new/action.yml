@@ -473,11 +473,8 @@ runs:
           echo "==== 开始全网搜捕 KSU_NS 宏定义真实数字 ===="
           grep -rnE "#define KSU_NS_INHERITED|#define KSU_NS_GLOBAL|#define KSU_NS_INDIVIDUAL" drivers/kernelsu/
           echo "==== 搜捕结束 ===="
-
-
-
-
-        
+          
+    
         # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
         touch .phantom_hooks_applied
         echo "✅ 幻影打孔全境贯通，准备进入终极编译！"
