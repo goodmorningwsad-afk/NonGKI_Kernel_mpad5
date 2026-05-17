@@ -463,4 +463,15 @@ runs:
             device_kernel/fs/stat.c
             device_kernel/fs/dcache.c
             device_kernel/drivers/kernelsu/su_mount_ns.c
+    - name: 📤 提取内核启动源头与 OverlayFS 源码 (全景雷达)
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+          name: Vangogh_Kernel_Core_Radar
+          path: |
+            device_kernel/kernel/sys.c
+            device_kernel/kernel/fork.c
+            device_kernel/fs/exec.c
+            device_kernel/fs/overlayfs/
+
 
