@@ -552,6 +552,16 @@ runs:
           echo ""
           echo "==== 🔴 2. 取证：提取 vfs_read 函数本体以便动刀 ===="
           grep -A 15 "ssize_t vfs_read(struct file" fs/read_write.c
+          cd $GITHUB_WORKSPACE/device_kernel
+
+          echo "==== 🔴 1. 寻找 SukiSU 内部的挂载油门 ===="
+          grep -rnE "setup_mount_ns|su_mount_ns|ksu_mount_ns" drivers/kernelsu/
+
+          echo ""
+          echo "==== 🔴 2. 检查 execve 钩子到底有没有调用挂载 ===="
+          # 看看拦截到 App 启动后，它到底去干嘛了
+          grep -A 10 "int ksu_handle_execveat" drivers/kernelsu/ksu_hooks.c drivers/kernelsu/ksu.c drivers/kernelsu/su_exec.c drivers/kernelsu/supercalls.c 2>/dev/null
+
 
 
 
