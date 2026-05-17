@@ -455,6 +455,17 @@ runs:
           sed -i '/\/\/ inherit mode/a \    pr_err("SUKISU_FATAL_TRACE: setup_mount_ns triggered! PID: %d, Mode: %d\\n", current->pid, ns_mode);' drivers/kernelsu/su_mount_ns.c
           
           echo "✅ 挂载雷达发信器植入完成！"
+    - name: 👑 源码级强杀：硬编码强制开启魔法挂载 (无视管理器)
+      shell: bash
+      run: |
+       cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "==== 强行篡改 SukiSU 挂载逻辑 ===="
+          # 在 su_mount_ns.c 的 setup_mount_ns 函数中，强行将 ns_mode 覆写为独立挂载模式
+          sed -i '/\/\/ inherit mode/a \    ns_mode = KSU_NS_INDIVIDUAL; \/\/ 👑 源码级强杀：强行开启魔法挂载！无视APP发送的 0 指令！' drivers/kernelsu/su_mount_ns.c
+          
+          echo "✅ 强制挂载代码注入完成！现在内核将永远执行魔法挂载！"
+
 
 
         
