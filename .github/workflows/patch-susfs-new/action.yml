@@ -474,6 +474,7 @@ runs:
             device_kernel/fs/exec.c
             device_kernel/fs/overlayfs/
     - name: 🔍 全局雷达：追踪 SukiSU 拦截命门到底在哪
+      shell: bash  # 🚨 就是少了这救命的一行！
       run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
