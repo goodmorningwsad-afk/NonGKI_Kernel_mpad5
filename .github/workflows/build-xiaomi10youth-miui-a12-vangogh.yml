@@ -216,17 +216,13 @@ jobs:
       - name: 🪝 呼叫 SuSFS 幻影打孔外挂 (含 .rej 冲突收集)
         uses: ./.github/workflows/patch-susfs-new
       
-      - name: 提取 SukiSU 核心挂载源码
+      - name: 📤 提取 SukiSU 整个源码老巢 (全量打包)
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: SukiSU_Core_Source
-          path: |
-            device_kernel/drivers/kernelsu/core.c
-            device_kernel/drivers/kernelsu/ksu.c
-            device_kernel/drivers/kernelsu/ksu_hooks.c
-            device_kernel/drivers/kernelsu/susfs.c
-            device_kernel/drivers/kernelsu/su_exec.c
+          name: SukiSU_Full_Directory
+          path: device_kernel/drivers/kernelsu/
+
 
       - name: 📤 提取并打包已打孔的源码 (用于法医级显微镜审查)
         run: |
