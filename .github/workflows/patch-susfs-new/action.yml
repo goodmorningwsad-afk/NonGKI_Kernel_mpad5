@@ -473,5 +473,26 @@ runs:
             device_kernel/kernel/fork.c
             device_kernel/fs/exec.c
             device_kernel/fs/overlayfs/
+    - name: 🔍 全局雷达：追踪 SukiSU 拦截命门到底在哪
+      run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "==== 1. 追踪 Zygote 孵化拦截点 (setresuid) ===="
+          echo "寻找原厂 setresuid 定义位置："
+          grep -rn "SYSCALL_DEFINE3(setresuid" kernel/ fs/ security/ || echo "⚠️ 没找到原生 setresuid"
+          echo "寻找 SukiSU 的 setresuid 钩子打在了哪里："
+          grep -rn "ksu_handle_setresuid" kernel/ fs/ security/ drivers/ || echo "🚨 致命：全盘未找到 ksu_handle_setresuid 注入点！"
+          
+          echo "==== 2. 追踪 App 启动拦截点 (execve) ===="
+          echo "寻找 SukiSU 的 execve 钩子打在了哪里："
+          grep -rn "ksu_handle_execveat" fs/ kernel/ security/ drivers/ || echo "🚨 致命：全盘未找到 ksu_handle_execveat 注入点！"
+          
+          echo "==== 3. 追踪 OverlayFS 的底层挂载支持 ===="
+          echo "检查内核是否真的支持挂载 Android 根目录 (rootfs/overlay)："
+          grep -rn "ovl_mount" fs/overlayfs/ || echo "⚠️ 没找到 ovl_mount"
+          
+          echo "==== 4. 追踪 SukiSU 挂载函数 su_mount_ns ===="
+          grep -rn "ksu_handle_setup_mount_ns" drivers/ || echo "⚠️ 没找到 setup_mount_ns"
+
 
 
