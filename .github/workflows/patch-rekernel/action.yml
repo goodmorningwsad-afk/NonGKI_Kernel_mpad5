@@ -9,6 +9,12 @@ runs:
       shell: bash
       run: |
         cd $GITHUB_WORKSPACE/device_kernel/
+        echo "==== 🔴 物理取证：强行提取 re-kernel 手术刀源码 ===="
+        cat /tmp/Patches/Rekernel/rekernel_patches.sh
+        
+        echo "==== 🔴 物理取证：提取基站补丁核心内容 ===="
+        cat /tmp/Patches/Rekernel/rekernel_extra.patch
+
         
         echo "==== 1. 建立通信基站 (rekernel.h) ===="
         mkdir -p drivers/rekernel
