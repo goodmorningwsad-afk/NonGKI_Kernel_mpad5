@@ -446,6 +446,16 @@ runs:
         
         # 11. 注入 is_ksu_transition 物理替身 (仅保留这一个未前置的必要替身)
         echo "bool is_ksu_transition(const void *old_tsec, const void *new_tsec) { return false; }" >> security/selinux/hooks.c
+    - name: 💉 物理植入 SukiSU 挂载雷达发信器
+      shell: bash
+      run: |
+       cd $GITHUB_WORKSPACE/device_kernel
+          
+          # 强行在 setup_mount_ns 函数的开头插入一句最高级别的内核日志
+          sed -i '/void setup_mount_ns(int32_t ns_mode)/a \    pr_err("SUKISU_FATAL_TRACE: setup_mount_ns triggered! PID: %d, Mode: %d\\n", current->pid, ns_mode);' drivers/kernelsu/su_mount_ns.c
+          
+          echo "✅ 挂载雷达发信器植入完成！"
+
         
         # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
         touch .phantom_hooks_applied
