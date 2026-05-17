@@ -534,8 +534,13 @@ runs:
           # 2. 检查文件读取大动脉 (vfs_read) 是否被劫持
           grep -rnE "ksu_handle_vfs_read" fs/read_write.c || echo "💀 致命：vfs_read 钩子缺失！模块文件读不出来！"
 
-          # 3. 检查 Kprobes 动态钩子开关是否开启 (如果使用 kprobe 方案)
-          grep -i "CONFIG_KPROBES=y" arch/arm64/configs/你的defconfig名字 || echo "💀 致命：Kprobes 未开启，动态钩子暴毙！"
+          echo "==== 🔴 1. 查杀 milito_defconfig 的 KPROBES 状态 ===="
+          grep -inE "CONFIG_KPROBES|CONFIG_KPROBE_EVENTS" arch/arm64/configs/milito_defconfig
+
+          echo ""
+          echo "==== 🔴 2. 取证：提取 vfs_read 函数本体以便动刀 ===="
+          grep -A 15 "ssize_t vfs_read(struct file" fs/read_write.c
+
 
 
 
