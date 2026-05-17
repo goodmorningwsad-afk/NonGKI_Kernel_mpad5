@@ -525,6 +525,18 @@ runs:
           
           echo "==== 4. 追踪 SukiSU 挂载函数 su_mount_ns ===="
           grep -rn "ksu_handle_setup_mount_ns" drivers/ || echo "⚠️ 没找到 setup_mount_ns"
+          cd $GITHUB_WORKSPACE/device_kernel
+
+          echo "==== 🔴 X光透视：检测魔法挂载核心钩子是否存活 ===="
+          # 1. 检查文件路径解析大动脉 (dcache) 是否被成功打孔
+          grep -rnE "susfs_sus_path|ksu_handle_stat" fs/dcache.c fs/stat.c || echo "💀 致命：dcache/stat 钩子缺失！魔法挂载眼瞎了！"
+
+          # 2. 检查文件读取大动脉 (vfs_read) 是否被劫持
+          grep -rnE "ksu_handle_vfs_read" fs/read_write.c || echo "💀 致命：vfs_read 钩子缺失！模块文件读不出来！"
+
+          # 3. 检查 Kprobes 动态钩子开关是否开启 (如果使用 kprobe 方案)
+          grep -i "CONFIG_KPROBES=y" arch/arm64/configs/你的defconfig名字 || echo "💀 致命：Kprobes 未开启，动态钩子暴毙！"
+
 
 
 
