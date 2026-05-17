@@ -504,16 +504,16 @@ runs:
             device_kernel/kernel/fork.c
             device_kernel/fs/exec.c
             device_kernel/fs/overlayfs/
-    - name: 👑 终极抢救：纯手动硬注入 vfs_read 魔法钩子
+    - name: 👑 终极抢救：纯手动硬注入 vfs_read 魔法钩子 (修复版)
       shell: bash
       run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
-          echo "==== 精确缝合 vfs_read 挂载重定向大动脉 ===="
-          # 直接在 ssize_t ret; 后面插入 SukiSU 的魔法重定向函数
-          sed -i '/ssize_t ret;/a \    extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos_ptr);\n    ksu_handle_vfs_read(\&file, \&buf, \&count, \&pos);' fs/read_write.c
+          echo "==== 单点狙击 vfs_read 挂载重定向大动脉 ===="
+          # 使用 perl 多行正则，严格绑定 vfs_read 函数签名，绝不误伤其他函数
+          perl -0777 -pi -e 's/(ssize_t vfs_read\(struct file \*file, char __user \*buf, size_t count, loff_t \*pos\)\s*\{\s*ssize_t ret;)/$1\n\textern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos_ptr);\n\tksu_handle_vfs_read(&file, &buf, &count, &pos);/g' fs/read_write.c
           
-          echo "✅ 手动注入完成！查看大动脉是否缝合成功："
+          echo "✅ 手动注入完成！查看大动脉是否缝合成功（只应出现一次）："
           grep -A 5 "ssize_t vfs_read(struct file" fs/read_write.c
 
     - name: 🔍 全局雷达：追踪 SukiSU 拦截命门到底在哪
