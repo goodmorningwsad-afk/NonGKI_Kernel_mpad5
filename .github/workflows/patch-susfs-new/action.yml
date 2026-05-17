@@ -465,6 +465,15 @@ runs:
           sed -i '/\/\/ inherit mode/a \    ns_mode = KSU_NS_INDIVIDUAL; \/\/ 👑 源码级强杀：强行开启魔法挂载！无视APP发送的 0 指令！' drivers/kernelsu/su_mount_ns.c
           
           echo "✅ 强制挂载代码注入完成！现在内核将永远执行魔法挂载！"
+    - name: 🕵️‍♂️ 终极底牌揭秘：抓取挂载模式的真实数字
+      shell: bash
+      run: |
+        cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "==== 开始全网搜捕 KSU_NS 宏定义真实数字 ===="
+          grep -rnE "#define KSU_NS_INHERITED|#define KSU_NS_GLOBAL|#define KSU_NS_INDIVIDUAL" drivers/kernelsu/
+          echo "==== 搜捕结束 ===="
+
 
 
 
