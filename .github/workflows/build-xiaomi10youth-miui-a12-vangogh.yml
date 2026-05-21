@@ -247,7 +247,13 @@ jobs:
           [ -f device_kernel/fs/dcache.c ] && cp device_kernel/fs/dcache.c patched_source_files/fs/
           [ -f device_kernel/fs/readdir.c ] && cp device_kernel/fs/readdir.c patched_source_files/fs/
           [ -f device_kernel/fs/namei.c ] && cp device_kernel/fs/namei.c patched_source_files/fs/
-          
+          # 👇 ---- 新增：强行抄收 ReKernel 的案发现场 ---- 👇
+          echo "==== 收集 ReKernel 打孔源码 ===="
+          [ -f device_kernel/drivers/rekernel/rekernel.h ] && cp device_kernel/drivers/rekernel/rekernel.h patched_source_files/drivers/rekernel/
+          [ -f device_kernel/drivers/android/binder.c ] && cp device_kernel/drivers/android/binder.c patched_source_files/drivers/android/
+          [ -f device_kernel/drivers/android/binder_alloc.c ] && cp device_kernel/drivers/android/binder_alloc.c patched_source_files/drivers/android/
+          [ -f device_kernel/kernel/signal.c ] && cp device_kernel/kernel/signal.c patched_source_files/kernel/
+          # 👆 ------------------------------------------ 👆
           cd patched_source_files
           zip -r ../Patched_Source_Files.zip .
       - name: 📦 上传打孔后源码验证包
