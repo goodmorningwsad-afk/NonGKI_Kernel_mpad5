@@ -247,13 +247,6 @@ jobs:
           [ -f device_kernel/fs/dcache.c ] && cp device_kernel/fs/dcache.c patched_source_files/fs/
           [ -f device_kernel/fs/readdir.c ] && cp device_kernel/fs/readdir.c patched_source_files/fs/
           [ -f device_kernel/fs/namei.c ] && cp device_kernel/fs/namei.c patched_source_files/fs/
-          # 👇 ---- 新增：强行抄收 ReKernel 的案发现场 ---- 👇
-          echo "==== 收集 ReKernel 打孔源码 ===="
-          [ -f device_kernel/drivers/rekernel/rekernel.h ] && cp device_kernel/drivers/rekernel/rekernel.h patched_source_files/drivers/rekernel/
-          [ -f device_kernel/drivers/android/binder.c ] && cp device_kernel/drivers/android/binder.c patched_source_files/drivers/android/
-          [ -f device_kernel/drivers/android/binder_alloc.c ] && cp device_kernel/drivers/android/binder_alloc.c patched_source_files/drivers/android/
-          [ -f device_kernel/kernel/signal.c ] && cp device_kernel/kernel/signal.c patched_source_files/kernel/
-          # 👆 ------------------------------------------ 👆
           cd patched_source_files
           zip -r ../Patched_Source_Files.zip .
       - name: 📦 上传打孔后源码验证包
@@ -295,6 +288,25 @@ jobs:
         with:
           name: SuSFS_Rej_Files
           path: Rej_Files.zip
+          if-no-files-found: ignore
+      - name: 🕵️‍♂️ 全局搜捕 ReKernel 打孔现场 (地毯式搜查版)
+        if: always()
+        run: |
+          echo "==== 🔴 启动地毯式全搜查，绝不漏掉一个文件 ===="
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          # 1. 直接用 grep -rl 全盘扫描所有带有 REKERNEL 标记的文件，并把它们直接塞进压缩包！
+          grep -rl "REKERNEL" . | zip ../ReKernel_Source.zip -@ || echo "⚠️ 未找到包含 REKERNEL 的文件"
+          
+          # 2. 把基站核心文件也一并抓进去 (因为 rekernel.h 里面可能没写大写的 REKERNEL)
+          [ -f drivers/rekernel/rekernel.h ] && zip ../ReKernel_Source.zip drivers/rekernel/rekernel.h || echo "⚠️ 未找到 rekernel.h"
+          
+      - name: 📦 上传 ReKernel 物理显微镜审查包
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ReKernel_Source
+          path: ReKernel_Source.zip
           if-no-files-found: ignore
 
       - name: 🧰 Patch Kernel of Re:Kernel
