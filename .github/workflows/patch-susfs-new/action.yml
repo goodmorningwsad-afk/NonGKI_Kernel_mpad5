@@ -455,6 +455,17 @@ runs:
           sed -i '/\/\/ inherit mode/a \    pr_err("SUKISU_FATAL_TRACE: setup_mount_ns triggered! PID: %d, Mode: %d\\n", current->pid, ns_mode);' drivers/kernelsu/su_mount_ns.c
           
           echo "✅ 挂载雷达发信器植入完成！"
+          echo "==== 部署 Cmdline 终极抗毒血清 ===="
+          cd $GITHUB_WORKSPACE/device_kernel
+
+          # 1. 开启内核自带的 Cmdline 扩展功能 (允许我们强行在末尾追加指令)
+          sed -i 's/# CONFIG_CMDLINE_EXTEND is not set/CONFIG_CMDLINE_EXTEND=y/g' arch/arm64/configs/milito_defconfig
+          grep -q "CONFIG_CMDLINE_EXTEND=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_CMDLINE_EXTEND=y" >> arch/arm64/configs/milito_defconfig
+
+         # 2. 注入抗毒指令：强行开启 memory，并抵消掉 disable 的效果
+         sed -i '/CONFIG_CMDLINE=/d' arch/arm64/configs/milito_defconfig
+         echo 'CONFIG_CMDLINE="cgroup_enable=memory swapaccount=1"' >> arch/arm64/configs/milito_defconfig
+
           
     
         # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
