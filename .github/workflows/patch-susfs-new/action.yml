@@ -458,13 +458,13 @@ runs:
           echo "==== 部署 Cmdline 终极抗毒血清 ===="
           cd $GITHUB_WORKSPACE/device_kernel
 
-          # 1. 开启内核自带的 Cmdline 扩展功能 (允许我们强行在末尾追加指令)
-          sed -i 's/# CONFIG_CMDLINE_EXTEND is not set/CONFIG_CMDLINE_EXTEND=y/g' arch/arm64/configs/milito_defconfig
-          grep -q "CONFIG_CMDLINE_EXTEND=y" arch/arm64/configs/milito_defconfig || echo "CONFIG_CMDLINE_EXTEND=y" >> arch/arm64/configs/milito_defconfig
+          sed -i 's/"cgroup_disable="/"cgroup_ignore="/g' kernel/cgroup/cgroup.c
 
-         # 2. 注入抗毒指令：强行开启 memory，并抵消掉 disable 的效果
-         sed -i '/CONFIG_CMDLINE=/d' arch/arm64/configs/milito_defconfig
-         echo 'CONFIG_CMDLINE="cgroup_enable=memory swapaccount=1"' >> arch/arm64/configs/milito_defconfig
+         # 第一刀：斩断主控开关的监听器
+         sed -i 's/"cgroup_disable="/"cgroup_ignore="/g' kernel/cgroup/cgroup.c
+
+         # 第二刀：斩断 memory 深度限制的监听器
+         sed -i 's/"cgroup.memory="/"cgroup.memory_ignore="/g' mm/memcontrol.c
 
           
     
