@@ -10,10 +10,10 @@ runs:
           cd $GITHUB_WORKSPACE/device_kernel/
           wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
           
-          # 🚨 极客修正：直接锁定 arm64 架构路径，防止环境变量缺失导致暴毙
+          # 锁定 arm64 架构路径，防止环境变量缺失导致路径断裂
           echo "CONFIG_BBG=y" >> ./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
 
-          # 完美避开 4.19 老内核的坑
+          # 自动探测现代化 LSM 架构（完美避开 4.19 老内核的坑）
           if grep -q "DEFINE_LSM" "include/linux/lsm_hooks.h" && ! grep -q "baseband_guard" "./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"; then
             echo "=======Detect======="
             echo "= Found DEFINE_LSM ="
