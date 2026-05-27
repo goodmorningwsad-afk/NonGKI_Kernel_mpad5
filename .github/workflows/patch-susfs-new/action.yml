@@ -516,52 +516,6 @@ runs:
           echo "✅ 手动注入完成！查看大动脉是否缝合成功（只应出现一次）："
           grep -A 5 "ssize_t vfs_read(struct file" fs/read_write.c
 
-    - name: 🔍 全局雷达：追踪 SukiSU 拦截命门到底在哪
-      shell: bash  # 🚨 就是少了这救命的一行！
-      run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "==== 1. 追踪 Zygote 孵化拦截点 (setresuid) ===="
-          echo "寻找原厂 setresuid 定义位置："
-          grep -rn "SYSCALL_DEFINE3(setresuid" kernel/ fs/ security/ || echo "⚠️ 没找到原生 setresuid"
-          echo "寻找 SukiSU 的 setresuid 钩子打在了哪里："
-          grep -rn "ksu_handle_setresuid" kernel/ fs/ security/ drivers/ || echo "🚨 致命：全盘未找到 ksu_handle_setresuid 注入点！"
-          
-          echo "==== 2. 追踪 App 启动拦截点 (execve) ===="
-          echo "寻找 SukiSU 的 execve 钩子打在了哪里："
-          grep -rn "ksu_handle_execveat" fs/ kernel/ security/ drivers/ || echo "🚨 致命：全盘未找到 ksu_handle_execveat 注入点！"
-          
-          echo "==== 3. 追踪 OverlayFS 的底层挂载支持 ===="
-          echo "检查内核是否真的支持挂载 Android 根目录 (rootfs/overlay)："
-          grep -rn "ovl_mount" fs/overlayfs/ || echo "⚠️ 没找到 ovl_mount"
-          
-          echo "==== 4. 追踪 SukiSU 挂载函数 su_mount_ns ===="
-          grep -rn "ksu_handle_setup_mount_ns" drivers/ || echo "⚠️ 没找到 setup_mount_ns"
-          cd $GITHUB_WORKSPACE/device_kernel
-
-          echo "==== 🔴 X光透视：检测魔法挂载核心钩子是否存活 ===="
-          # 1. 检查文件路径解析大动脉 (dcache) 是否被成功打孔
-          grep -rnE "susfs_sus_path|ksu_handle_stat" fs/dcache.c fs/stat.c || echo "💀 致命：dcache/stat 钩子缺失！魔法挂载眼瞎了！"
-
-          # 2. 检查文件读取大动脉 (vfs_read) 是否被劫持
-          grep -rnE "ksu_handle_vfs_read" fs/read_write.c || echo "💀 致命：vfs_read 钩子缺失！模块文件读不出来！"
-
-          echo "==== 🔴 1. 查杀 milito_defconfig 的 KPROBES 状态 ===="
-          grep -inE "CONFIG_KPROBES|CONFIG_KPROBE_EVENTS" arch/arm64/configs/milito_defconfig
-
-          echo ""
-          echo "==== 🔴 2. 取证：提取 vfs_read 函数本体以便动刀 ===="
-          grep -A 15 "ssize_t vfs_read(struct file" fs/read_write.c
-          cd $GITHUB_WORKSPACE/device_kernel
-
-          echo "==== 🔴 1. 寻找 SukiSU 内部的挂载油门 ===="
-          grep -rnE "setup_mount_ns|su_mount_ns|ksu_mount_ns" drivers/kernelsu/
-
-          echo ""
-          echo "==== 🔴 2. 检查 execve 钩子到底有没有调用挂载 ===="
-          # 看看拦截到 App 启动后，它到底去干嘛了
-          grep -A 10 "int ksu_handle_execveat" drivers/kernelsu/ksu_hooks.c drivers/kernelsu/ksu.c drivers/kernelsu/su_exec.c drivers/kernelsu/supercalls.c 2>/dev/null
-
 
 
 
