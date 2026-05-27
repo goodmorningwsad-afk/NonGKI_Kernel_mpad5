@@ -65,8 +65,7 @@ env:
   KPM_KPATCH_NEXT: "false" 
   KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" 
 
-  BASEBAND_GUARD_ENABLE: "false" 
-  BASEBAND_GUARD_BOOT: "false" 
+  BASEBAND_GUARD_ENABLE: "true"  
   HIDE_STUFF: "false" 
 
   GENERATE_DTB: "true" 
