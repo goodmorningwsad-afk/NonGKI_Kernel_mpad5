@@ -474,10 +474,7 @@ runs:
           grep -rnE "#define KSU_NS_INHERITED|#define KSU_NS_GLOBAL|#define KSU_NS_INDIVIDUAL" drivers/kernelsu/
           echo "==== 搜捕结束 ===="
           
-           echo "==== [底层纠偏] 修复 Re:Kernel 在 4.19 上 check_argv 的 -14 EFAULT 暴毙 Bug ===="
-        sed -i 's/pagefault_disable();//g' drivers/kernelsu/kernel_compat.c
-        sed -i 's/pagefault_enable();//g' drivers/kernelsu/kernel_compat.c
-
+    
         # 🛡️ 在所有流程跑完的最后，烙下物理印记，宣告打孔成功！
         touch .phantom_hooks_applied
         echo "✅ 幻影打孔全境贯通，准备进入终极编译！"
@@ -504,19 +501,27 @@ runs:
             device_kernel/kernel/fork.c
             device_kernel/fs/exec.c
             device_kernel/fs/overlayfs/
-    - name: 👑 终极抢救：纯手动硬注入 vfs_read 魔法钩子 (修复版)
-      shell: bash
+    - name: 🔍 全局雷达：追踪 SukiSU 拦截命门到底在哪
+      shell: bash  # 🚨 就是少了这救命的一行！
       run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
-          echo "==== 单点狙击 vfs_read 挂载重定向大动脉 ===="
-          # 使用 perl 多行正则，严格绑定 vfs_read 函数签名，绝不误伤其他函数
-          perl -0777 -pi -e 's/(ssize_t vfs_read\(struct file \*file, char __user \*buf, size_t count, loff_t \*pos\)\s*\{\s*ssize_t ret;)/$1\n\textern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr, size_t *count_ptr, loff_t **pos_ptr);\n\tksu_handle_vfs_read(&file, &buf, &count, &pos);/g' fs/read_write.c
+          echo "==== 1. 追踪 Zygote 孵化拦截点 (setresuid) ===="
+          echo "寻找原厂 setresuid 定义位置："
+          grep -rn "SYSCALL_DEFINE3(setresuid" kernel/ fs/ security/ || echo "⚠️ 没找到原生 setresuid"
+          echo "寻找 SukiSU 的 setresuid 钩子打在了哪里："
+          grep -rn "ksu_handle_setresuid" kernel/ fs/ security/ drivers/ || echo "🚨 致命：全盘未找到 ksu_handle_setresuid 注入点！"
           
-          echo "✅ 手动注入完成！查看大动脉是否缝合成功（只应出现一次）："
-          grep -A 5 "ssize_t vfs_read(struct file" fs/read_write.c
-
-
+          echo "==== 2. 追踪 App 启动拦截点 (execve) ===="
+          echo "寻找 SukiSU 的 execve 钩子打在了哪里："
+          grep -rn "ksu_handle_execveat" fs/ kernel/ security/ drivers/ || echo "🚨 致命：全盘未找到 ksu_handle_execveat 注入点！"
+          
+          echo "==== 3. 追踪 OverlayFS 的底层挂载支持 ===="
+          echo "检查内核是否真的支持挂载 Android 根目录 (rootfs/overlay)："
+          grep -rn "ovl_mount" fs/overlayfs/ || echo "⚠️ 没找到 ovl_mount"
+          
+          echo "==== 4. 追踪 SukiSU 挂载函数 su_mount_ns ===="
+          grep -rn "ksu_handle_setup_mount_ns" drivers/ || echo "⚠️ 没找到 setup_mount_ns"
 
 
 
