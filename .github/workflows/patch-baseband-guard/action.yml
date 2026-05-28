@@ -8,21 +8,18 @@ runs:
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel/
+          
+          echo "==== 🔴 1. 战前铺垫：铺设物理隔离带 ===="
+          # 【必须在 setup.sh 之前执行】强行给原厂 Makefile 垫一个空行，防止官方脚本拼接时粘连！
+          echo "" >> security/selinux/Makefile
+          
+          echo "==== 🔴 2. 执行挂载：呼叫官方补丁脚本 ===="
           wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
-                  # 👇 ---------- 新增的净化手术代码 ---------- 👇
-             echo "==== 🔴 启动 Makefile 语法与幽灵字符物理级抢救 ===="
-        
-              # 1. 防粘连：强行在末尾补一个换行符，防止原厂代码没换行导致粘连
-              echo "" >> security/selinux/Makefile
-        
-              # 2. 斩杀 Windows 幽灵字符：物理抹除所有的 \r (CRLF回车符)
-              sed -i 's/\r//g' security/selinux/Makefile
-              sed -i 's/\r//g' security/selinux/include/objsec.h
-        
-               # 3. 修复代差：强制为原厂所有不规范的 ifeq/ifneq 补上空格，兼容新版 Make 4.3+
-              sed -i 's/ifeq(/ifeq (/g' security/selinux/Makefile
-              sed -i 's/ifneq(/ifneq (/g' security/selinux/Makefile
-              # 👆 -------------------------------------- 👆
+          
+          echo "==== 🔴 3. 战后净化：超度幽灵字符 ===="
+          # 【必须在 setup.sh 之后执行】官方脚本留下了 Windows 回车符，立刻用 sed 物理抹杀 \r！
+          sed -i 's/\r//g' security/selinux/Makefile
+          sed -i 's/\r//g' security/selinux/include/objsec.h
           
           # 锁定 arm64 架构路径，防止环境变量缺失导致路径断裂
           echo "CONFIG_BBG=y" >> ./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
@@ -40,9 +37,6 @@ runs:
                 echo "[+] Found default CONFIG_LSM values."
                 sed -i 's/\(CONFIG_LSM="[^"]*\)"/\1,baseband_guard"/' ./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
             fi
-
           fi
-        
-
-
+          
           echo "✅ Patched Baseband Guard for your kernel successfully."
