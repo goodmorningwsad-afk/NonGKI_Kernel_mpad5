@@ -10,21 +10,27 @@ runs:
           cd $GITHUB_WORKSPACE/device_kernel/
           
           echo "==== 🔴 1. 战前铺垫：铺设物理隔离带 ===="
-          # 【必须在 setup.sh 之前执行】强行给原厂 Makefile 垫一个空行，防止官方脚本拼接时粘连！
           echo "" >> security/selinux/Makefile
           
           echo "==== 🔴 2. 执行挂载：呼叫官方补丁脚本 ===="
           wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
           
-          echo "==== 🔴 3. 战后净化：超度幽灵字符 ===="
-          # 【必须在 setup.sh 之后执行】官方脚本留下了 Windows 回车符，立刻用 sed 物理抹杀 \r！
+          echo "==== 🔴 3. 终极净化：抹杀隐藏的注释陷阱与幽灵字符 ===="
+          # 物理超度 Windows 幽灵字符
           sed -i 's/\r//g' security/selinux/Makefile
           sed -i 's/\r//g' security/selinux/include/objsec.h
           
-          # 锁定 arm64 架构路径，防止环境变量缺失导致路径断裂
+          # 🚨 终极杀手刀：拔掉上游作者写在 shell 命令里的 # 号，防止 Make 引擎误触注释截断机制！
+          sed -i "s/'#define DEFINE_LSM(lsm)'/'define DEFINE_LSM(lsm)'/g" security/selinux/Makefile
+          
+          # 修复旧语法规范
+          sed -i 's/ifeq(/ifeq (/g' security/selinux/Makefile
+          sed -i 's/ifneq(/ifneq (/g' security/selinux/Makefile
+          
+          echo "==== 🔴 4. 锁定架构配置 ===="
           echo "CONFIG_BBG=y" >> ./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
 
-          # 自动探测现代化 LSM 架构（完美避开 4.19 老内核的坑）
+          # 自动探测现代化 LSM 架构
           if grep -q "DEFINE_LSM" "include/linux/lsm_hooks.h" && ! grep -q "baseband_guard" "./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"; then
             echo "=======Detect======="
             echo "= Found DEFINE_LSM ="
